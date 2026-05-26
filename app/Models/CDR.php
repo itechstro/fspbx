@@ -3,10 +3,8 @@
 namespace App\Models;
 
 use Carbon\Carbon;
-use libphonenumber\PhoneNumberUtil;
 use libphonenumber\PhoneNumberFormat;
 use Illuminate\Database\Eloquent\Model;
-use libphonenumber\NumberParseException;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class CDR extends Model
@@ -55,14 +53,14 @@ class CDR extends Model
 
     public function getCallerIdNumberFormattedAttribute()
     {
-        return $this->caller_id_number ? formatPhoneNumber($this->caller_id_number) : null;
+        return $this->caller_id_number ? $this->formatCdrPhoneNumber($this->caller_id_number) : null;
     }
 
     public function getCallerIdNameFormattedAttribute()
     {
         // If the "name" looks like a US +1 number, normalize it
         if (preg_match('/^(?:\+?1)?[2-9]\d{9}$/', $this->caller_id_name)) {
-            return formatPhoneNumber($this->caller_id_name);
+            return $this->formatCdrPhoneNumber($this->caller_id_name);
         }
 
         // Otherwise return as-is (because it's likely a real name)
@@ -74,7 +72,8 @@ class CDR extends Model
         if ($this->caller_destination === null || $this->caller_destination === '') {
             return null;
         }
-        return formatPhoneNumber($this->caller_destination);
+
+        return $this->formatCdrPhoneNumber($this->caller_destination);
     }
 
     public function getDestinationNumberFormattedAttribute()
@@ -83,7 +82,7 @@ class CDR extends Model
             return null;
         }
 
-        return formatPhoneNumber($this->destination_number);
+        return $this->formatCdrPhoneNumber($this->destination_number);
     }
 
     public function getStartDateAttribute()
@@ -247,24 +246,25 @@ class CDR extends Model
 
     public function formatPhoneNumber($value)
     {
-        //Get libphonenumber object
-        $phoneNumberUtil = PhoneNumberUtil::getInstance();
+        return $this->formatCdrPhoneNumber($value);
+    }
 
-        //try to convert phone number to National format
-        try {
-            $phoneNumberObject = $phoneNumberUtil->parse($value, 'US');
-            if ($phoneNumberUtil->isValidNumber($phoneNumberObject)) {
-                $number_formatted = $phoneNumberUtil
-                    ->format($phoneNumberObject, PhoneNumberFormat::NATIONAL);
-            } else {
-                $number_formatted = $value;
-            }
-        } catch (NumberParseException $e) {
-            // Do nothing and leave the numbner as is
-            $number_formatted = $value;
+    private function phoneCountryCode(): string
+    {
+        if (!$this->domain_uuid) {
+            return 'US';
         }
 
-        return $number_formatted;
+        return get_domain_setting('country', $this->domain_uuid) ?? 'US';
+    }
+
+    private function formatCdrPhoneNumber(?string $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return formatPhoneNumber($value, $this->phoneCountryCode(), PhoneNumberFormat::NATIONAL);
     }
 
     public function relatedQueueCalls()
