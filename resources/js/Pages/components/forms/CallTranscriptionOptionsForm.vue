@@ -42,14 +42,30 @@
                             <ToggleElement name="auto_transcribe" text="Automatically transcribe new calls"
                                 :true-value="true" :false-value="false" :disabled="disableOptions" />
 
+                            <ToggleElement name="auto_translate" text="Automatically translate completed transcriptions"
+                                :true-value="true" :false-value="false" :disabled="disableOptions" />
+
                             <!-- Email Transcription -->
                             <ToggleElement name="email_transcription" text="Automatically email call transcripts"
                                 :true-value="true" :false-value="false" :disabled="disableOptions" />
+
+                            <ToggleElement name="email_translation" text="Automatically email call translations"
+                                :true-value="true" :false-value="false" :disabled="disableOptions"
+                                :conditions="[
+                                    ['auto_translate', '==', true]
+                                ]" />
 
                             <TextElement name="email" label="Email"
                                 :columns="{ lg: { wrapper: 5 } }" :conditions="[
                                     ['email_transcription', '==', true]
                                 ]" />
+
+                            <SelectElement name="translation_language" label="Translation Language"
+                                :items="translationLanguages" :search="true" :native="false" input-type="search"
+                                autocomplete="off" :allow-absent="true" :strict="false"
+                                placeholder="e.g. en-us, zh-cn, ms, ta"
+                                :columns="{ lg: { wrapper: 5 } }"
+                                description="Target language used when translating call transcripts." />
 
                             <!-- Provider -->
                             <SelectElement v-if="!domain_uuid" name="provider_uuid" label="Provider" :search="true"
@@ -129,6 +145,18 @@ const emit = defineEmits(['error', 'success']);
 
 const form$ = ref(null)
 const providers = ref([])
+const translationLanguages = ref([
+    { value: 'en-us', label: 'English (US) - en-us' },
+    { value: 'en-gb', label: 'English (UK) - en-gb' },
+    { value: 'zh-cn', label: 'Chinese (Simplified) - zh-cn' },
+    { value: 'zh-tw', label: 'Chinese (Traditional) - zh-tw' },
+    { value: 'ms', label: 'Malay - ms' },
+    { value: 'ta', label: 'Tamil - ta' },
+    { value: 'id', label: 'Indonesian - id' },
+    { value: 'th', label: 'Thai - th' },
+    { value: 'ja', label: 'Japanese - ja' },
+    { value: 'ko', label: 'Korean - ko' },
+])
 const policy = ref([])
 const isProvidersLoading = ref(false)
 const isFormLoading = ref(false)
@@ -190,6 +218,9 @@ function cancelOverride() {
         enabled: policy.value.enabled ?? false,
         provider_uuid: policy.value.provider_uuid ?? null,
         domain_uuid: props.domain_uuid ?? null,
+        auto_translate: policy.value.auto_translate ?? false,
+        email_translation: policy.value.email_translation ?? false,
+        translation_language: policy.value.translation_language ?? null,
     })
 }
 

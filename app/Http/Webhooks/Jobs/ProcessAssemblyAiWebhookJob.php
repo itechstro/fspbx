@@ -55,6 +55,7 @@ class ProcessAssemblyAiWebhookJob extends SpatieProcessWebhookJob
 
             // Dispatch the job for summaries
             dispatch(new \App\Jobs\SummarizeCallTranscription($row->uuid))->onQueue('transcriptions');
+
         } elseif ($status === 'error') {
             // Pull the current transcript for error details if useful
             $provider = $service->providerForScope($row->domain_uuid);

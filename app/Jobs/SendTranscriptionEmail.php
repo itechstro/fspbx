@@ -111,7 +111,12 @@ class SendTranscriptionEmail implements ShouldQueue
                 'utterances'     => $resultPayload['utterances'] ?? [],
                 'speaker_map'    => $speakerMap,
                 'agent_label'    => $agentLabel,
-                'email_subject'  => 'New transcription'
+                'translation_text' => data_get($transcription->translation_payload, 'text'),
+                'translation_summary' => data_get($transcription->translation_payload, 'summary_text'),
+                'translation_target_language' => $transcription->translation_target_language,
+                'email_subject'  => data_get($transcription->translation_payload, 'text')
+                    ? 'New transcription and translation'
+                    : 'New transcription'
             ];
 
             // 4. Send Email

@@ -247,4 +247,60 @@ class OpenAIService
             'text'   => $text, // may be '', caller should handle
         ];
     }
+
+    /**
+     * Kick off a background translation task for transcript and summary text.
+     */
+    public function createBackgroundTranslation(
+        string $transcriptText,
+        ?string $summaryText,
+        string $targetLanguage,
+        string $model = 'gpt-4.1-mini'
+    ): array
+    {
+        $url = 'https://api.openai.com/v1/responses';
+
+        $instructions = implode("\n", [
+            'You are a precise translation assistant for call transcriptions.',
+            'Translate the provided transcript and summary to the requested target language.',
+            'Rules:',
+            '- Preserve meaning, speaker intent, and tone.',
+            '- Keep line breaks when they exist.',
+            '- Return ONLY valid JSON, no markdown and no commentary.',
+            '- If summary is missing, return summary_text as null.',
+            '',
+            'Output JSON schema:',
+            '{',
+            '  "transcript_text": "string",',
+            '  "summary_text": "string|null"',
+            '}',
+        ]);
+
+        $input = implode("\n\n", [
+            "Target language: {$targetLanguage}",
+            'Transcript:',
+            $transcriptText,
+            'Summary:',
+            trim((string) $summaryText) !== '' ? (string) $summaryText : '[none]',
+        ]);
+
+        $payload = [
+            'model'        => $model,
+            'background'   => true,
+            'instructions' => $instructions,
+            'input'        => $input,
+            'store'        => false,
+        ];
+
+        $resp = Http::withToken($this->apiKey)
+            ->acceptJson()
+            ->post($url, $payload)
+            ->throw()
+            ->json();
+
+        return [
+            'id'     => data_get($resp, 'id'),
+            'status' => data_get($resp, 'status'),
+        ];
+    }
 }

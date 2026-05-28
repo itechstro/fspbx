@@ -200,6 +200,16 @@
                                                 }}</span>
 
                                             </button>
+
+                                            <button
+                                                v-if="hasTranscript && recordingOptions?.permissions?.transcription_summary"
+                                                type="button"
+                                                @click="requestTranslation"
+                                                :disabled="isRequestingTranslation || displayTranslationStatus === 'queued' || displayTranslationStatus === 'in_progress' || displayTranslationStatus === 'processing'"
+                                                class="inline-flex items-center text-sm/6 font-medium text-indigo-600 hover:text-indigo-500 disabled:cursor-not-allowed disabled:opacity-50">
+                                                <ArrowPathIcon :class="['h-4 w-4', isRequestingTranslation ? 'animate-spin' : '']" />
+                                                <span class="ml-1">{{ isRequestingTranslation ? 'Translating…' : (hasTranslation ? 'Re-translate' : 'Translate') }}</span>
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -466,6 +476,70 @@
                                                     </div>
                                                 </TabPanel>
 
+                                                <!-- Translation Panel -->
+                                                <TabPanel :key="TABS[2].key"
+                                                    class="rounded-lg p-0.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:p-2">
+                                                    <div v-if="hasTranslation" class="space-y-4">
+                                                        <h3 class="text-base font-semibold text-gray-800">
+                                                            Translation
+                                                            <span v-if="recordingOptions?.transcription?.translation_target_language"
+                                                                class="text-sm font-normal text-gray-500">
+                                                                ({{ recordingOptions?.transcription?.translation_target_language }})
+                                                            </span>
+                                                        </h3>
+
+                                                        <div v-if="recordingOptions?.transcription?.translation_summary" class="space-y-1">
+                                                            <h4 class="text-sm font-semibold text-gray-700">Summary</h4>
+                                                            <p class="whitespace-pre-wrap leading-relaxed text-gray-700">
+                                                                {{ recordingOptions?.transcription?.translation_summary }}
+                                                            </p>
+                                                        </div>
+
+                                                        <div class="space-y-1">
+                                                            <h4 class="text-sm font-semibold text-gray-700">Transcript</h4>
+                                                            <p class="whitespace-pre-wrap leading-relaxed text-gray-700">
+                                                                {{ recordingOptions?.transcription?.translation_text }}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+
+                                                    <div v-else-if="displayTranslationStatus === 'queued' || displayTranslationStatus === 'in_progress' || displayTranslationStatus === 'processing'"
+                                                        class="flex flex-col items-center justify-center rounded-lg border border-gray-200 bg-gray-50 p-12 text-center">
+                                                        <p class="mt-4 text-sm font-semibold text-indigo-600">
+                                                            Generating translation...
+                                                        </p>
+                                                        <button type="button" @click="refreshStatus"
+                                                            :disabled="!canRefresh"
+                                                            class="mt-6 inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">
+                                                            <ArrowPathIcon class="-ml-0.5 mr-1.5 h-5 w-5 text-gray-400"
+                                                                :class="{ 'animate-spin': !canRefresh }" />
+                                                            <span v-if="canRefresh">Refresh Status</span>
+                                                            <span v-else>Refresh in {{ cooldownSeconds }}s</span>
+                                                        </button>
+                                                    </div>
+
+                                                    <div v-else-if="displayTranslationStatus === 'failed'"
+                                                        class="rounded-lg border-2 border-dashed border-rose-300 bg-rose-50 p-12 text-center">
+                                                        <ExclamationTriangleIcon class="mx-auto h-12 w-12 text-rose-400" />
+                                                        <h3 class="mt-2 text-sm font-semibold text-rose-900">
+                                                            Translation Failed
+                                                        </h3>
+                                                        <p class="mt-1 text-sm text-rose-700">
+                                                            {{ recordingOptions?.transcription?.translation_error || 'Unable to translate this transcript.' }}
+                                                        </p>
+                                                    </div>
+
+                                                    <div v-else
+                                                        class="rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
+                                                        <SparklesIcon class="mx-auto h-12 w-12 text-gray-400" />
+                                                        <h3 class="mt-2 text-sm font-semibold text-gray-900">
+                                                            Translation is available
+                                                        </h3>
+                                                        <p class="mt-1 text-sm text-gray-500">
+                                                            Use the Translate button above to translate the transcript.
+                                                        </p>
+                                                    </div>
+                                                </TabPanel>
 
                                             </TabPanels>
                                         </TabGroup>
@@ -521,6 +595,7 @@ const transcriptRequested = ref(false)
 const isRequestingTranscription = ref(null)
 const isRegenerating = ref(false)
 const isRegeneratingSummary = ref(false)
+const isRequestingTranslation = ref(false)
 const recordingOptions = ref(null)
 const currentStatus = ref(null)
 const selectedTabIndex = ref(0)
@@ -537,6 +612,10 @@ const currentSummaryStatus = ref(null)
 const summaryStatus = computed(() => recordingOptions.value?.transcription?.summary_status ?? null)
 const hasSummary = computed(() => summaryStatus.value === 'completed' && recordingOptions.value?.transcription?.summary)
 const displaySummaryStatus = computed(() => currentSummaryStatus.value ?? summaryStatus.value ?? null)
+const translationStatus = computed(() => recordingOptions.value?.transcription?.translation_status ?? null)
+const currentTranslationStatus = ref(null)
+const displayTranslationStatus = computed(() => currentTranslationStatus.value ?? translationStatus.value ?? null)
+const hasTranslation = computed(() => displayTranslationStatus.value === 'completed' && Boolean(recordingOptions.value?.transcription?.translation_text))
 
 const showTranscribeBtn = computed(() =>
     !hasTranscript.value && !transcriptRequested.value && !status.value
@@ -644,6 +723,26 @@ async function regenerateSummary() {
     }
 }
 
+async function requestTranslation() {
+    if (isRequestingTranslation.value) return
+    isRequestingTranslation.value = true
+    currentTranslationStatus.value = 'queued'
+    try {
+        const { data } = await axios.post(
+            recordingOptions.value.routes.translate_route,
+            {
+                uuid: recordingOptions.value?.transcription?.uuid ?? null,
+            }
+        )
+        emit('success', 'success', data.messages)
+    } catch (err) {
+        emit('error', err)
+        currentTranslationStatus.value = null
+    } finally {
+        isRequestingTranslation.value = false
+    }
+}
+
 
 function capitalizeFirstLetter(string) {
     if (!string) return '';
@@ -681,6 +780,7 @@ async function refreshStatus() {
     if (status.value === 'failed') {
         transcriptRequested.value = false
     }
+    currentTranslationStatus.value = null
     startCooldown()
 }
 
@@ -751,6 +851,7 @@ const DEFAULT_PALETTE = {
 const TABS = [
     { key: 'transcript', label: 'Transcript' },
     { key: 'summary', label: 'Summary' },
+    { key: 'translation', label: 'Translation' },
 ]
 
 
@@ -792,6 +893,7 @@ watch(
             loading.value = true
             transcriptRequested.value = false
             currentStatus.value = null
+            currentTranslationStatus.value = null
             getCallRecordingOptions()
         }
 

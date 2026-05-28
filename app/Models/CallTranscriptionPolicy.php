@@ -20,9 +20,12 @@ class CallTranscriptionPolicy extends Model
         'domain_uuid',
         'enabled',
         'auto_transcribe',
+        'auto_translate',
         'provider_uuid',
         'email_transcription',
+        'email_translation',
         'email',
+        'translation_language',
     ];
 
     public function provider()

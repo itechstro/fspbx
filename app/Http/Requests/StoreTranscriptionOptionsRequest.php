@@ -21,6 +21,7 @@ class StoreTranscriptionOptionsRequest extends FormRequest
         return [
             'enabled' => ['required', 'boolean'],
             'auto_transcribe'  => ['required','boolean'],
+            'auto_translate'  => ['nullable','boolean'],
 
             // For system scope: provider is required if enabled
             // For domain scope: provider is optional (inherit system if null)
@@ -35,7 +36,9 @@ class StoreTranscriptionOptionsRequest extends FormRequest
 
             'domain_uuid' => ['nullable', 'uuid'],
             'email_transcription'  => ['required','boolean'],
+            'email_translation'  => ['nullable','boolean'],
             'email' => ['nullable', 'string'],
+            'translation_language' => ['nullable', 'string', 'max:32'],
         ];
     }
 

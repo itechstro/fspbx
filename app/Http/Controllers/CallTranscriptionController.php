@@ -7,6 +7,7 @@ use App\Models\Extensions;
 use Illuminate\Support\Arr;
 use Illuminate\Http\Request;
 use App\Jobs\TranscribeCdrJob;
+use App\Jobs\TranslateCallTranscription;
 use Illuminate\Support\Facades\DB;
 use Spatie\QueryBuilder\QueryBuilder;
 use App\Models\CallTranscriptionPolicy;
@@ -65,18 +66,25 @@ class CallTranscriptionController extends Controller
         // Effective: domain overrides if set; else system
         $enabled       = $domain?->enabled ?? ($system?->enabled ?? false);
         $auto_transcribe       = $domain?->auto_transcribe ?? ($system?->auto_transcribe ?? false);
+        $auto_translate       = $domain?->auto_translate ?? ($system?->auto_translate ?? false);
         $providerUuid  = $domain?->provider_uuid ?? ($system?->provider_uuid ?? null);
         $emailTranscription = $domain?->email_transcription ?? ($system?->email_transcription ?? false);
+        $emailTranslation = $domain?->email_translation ?? ($system?->email_translation ?? false);
         $email              = $domain?->email ?? ($system?->email ?? null);
+        $translationLanguage = $domain?->translation_language
+            ?? ($system?->translation_language ?? null);
 
         return response()->json([
             'scope'         => $domain ? 'domain' : 'system',
             'domain_uuid'   => $domainUuid,
             'enabled'       => (bool) $enabled,
             'auto_transcribe' => (bool) $auto_transcribe,
+            'auto_translate' => (bool) $auto_translate,
             'provider_uuid' => $providerUuid,
             'email_transcription' => (bool) $emailTranscription,
+            'email_translation' => (bool) $emailTranslation,
             'email'              => $email,
+            'translation_language' => $translationLanguage,
         ]);
     }
 
@@ -95,10 +103,13 @@ class CallTranscriptionController extends Controller
                 [
                     'enabled'       => (bool) $data['enabled'],
                     'auto_transcribe'       => (bool) $data['auto_transcribe'],
+                    'auto_translate' => (bool) ($data['auto_translate'] ?? false),
                     // In domain scope this may be null to inherit system provider
                     'provider_uuid' => $data['provider_uuid'] ?? null,
                     'email_transcription'       => (bool) $data['email_transcription'],
+                    'email_translation' => (bool) ($data['email_translation'] ?? false),
                     'email'       => $data['email'] ?? null,
+                    'translation_language' => $data['translation_language'] ?? null,
                 ]
             );
 
@@ -376,6 +387,30 @@ class CallTranscriptionController extends Controller
             ], 202);
         } catch (\Throwable $e) {
             logger("CallTranscriptionController@summarize error: " . $e->getMessage() . " at " . $e->getFile() . ":" . $e->getLine());
+
+            return response()->json([
+                'errors' => ['error' => [$e->getMessage()]],
+            ], 500);
+        }
+    }
+
+    /**
+     * Start a translation for an existing transcription.
+     */
+    public function translate(Request $request)
+    {
+        $data = $request->validate([
+            'uuid' => ['required', 'uuid'],
+        ]);
+
+        try {
+            TranslateCallTranscription::dispatch($data['uuid'])->onQueue('transcriptions');
+
+            return response()->json([
+                'messages' => ['success' => ['Translation request queued.']],
+            ], 202);
+        } catch (\Throwable $e) {
+            logger("CallTranscriptionController@translate error: " . $e->getMessage() . " at " . $e->getFile() . ":" . $e->getLine());
 
             return response()->json([
                 'errors' => ['error' => [$e->getMessage()]],

@@ -93,8 +93,23 @@ class FetchTranscriptionSummary implements ShouldQueue
                 $transcriptionService = app(CallTranscriptionService::class);
                 $cfg = $transcriptionService->emailDeliveryConfig($row->domain_uuid ?? null);
 
-                if ($cfg['enabled'] && !empty($cfg['email'])) {
+                $autoTranslate = $transcriptionService->shouldAutoTranslate($row->domain_uuid ?? null);
+                $translationEmailEnabled = (bool) ($cfg['translation_enabled'] ?? false);
+                $hasEmailRecipient = !empty($cfg['email']);
+
+                // Avoid duplicate emails: when auto-translate + translation email are enabled,
+                // send only once after translation completes.
+                $shouldSendSummaryEmail = (bool) ($cfg['enabled'] ?? false)
+                    && $hasEmailRecipient
+                    && !($autoTranslate && $translationEmailEnabled);
+
+                if ($shouldSendSummaryEmail) {
                     SendTranscriptionEmail::dispatch($row->uuid, $cfg['email']);
+                }
+
+                // Auto-translate only after summary is completed so translation can include summary text.
+                if ($autoTranslate) {
+                    TranslateCallTranscription::dispatch($row->uuid)->onQueue('transcriptions');
                 }
 
                 return;

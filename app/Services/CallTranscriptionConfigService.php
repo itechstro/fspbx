@@ -48,8 +48,10 @@ class CallTranscriptionConfigService
         // Effective: domain overrides if set; else system
         $enabled       = $domain?->enabled ?? ($system?->enabled ?? false);
         $auto_transcribe = $domain?->auto_transcribe ?? ($system?->auto_transcribe ?? false);
+        $auto_translate = $domain?->auto_translate ?? ($system?->auto_translate ?? false);
         $providerUuid  = $domain?->provider_uuid ?? ($system?->provider_uuid ?? null);
         $emailTranscription = $domain?->email_transcription ?? ($system?->email_transcription ?? false);
+        $emailTranslation = $domain?->email_translation ?? ($system?->email_translation ?? false);
         $email              = $domain?->email ?? ($system?->email ?? null);
 
         // 2) Provider row (may be null if not set yet)
@@ -87,7 +89,9 @@ class CallTranscriptionConfigService
         return [
             'enabled'          => $enabled,
             'auto_transcribe'  => $auto_transcribe,
+            'auto_translate'   => $auto_translate,
             'email_transcription' => $emailTranscription,
+            'email_translation' => $emailTranslation,
             'email' => $email,
             'provider_uuid'    => $providerUuid,
             'provider_key'     => $providerKey,

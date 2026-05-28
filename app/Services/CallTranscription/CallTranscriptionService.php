@@ -105,11 +105,22 @@ class CallTranscriptionService
         $cfg = $this->transcriptionConfigCached($domainUuid);
 
         $enabled = (bool) ($cfg['email_transcription'] ?? false);
+        $translationEnabled = (bool) ($cfg['email_translation'] ?? false);
         $email   = isset($cfg['email']) ? trim((string) $cfg['email']) : '';
 
         return [
             'enabled' => $enabled,
+            'translation_enabled' => $translationEnabled,
             'email'   => ($email !== '') ? $email : null,
         ];
     }
+
+    public function shouldAutoTranslate(?string $domainUuid): bool
+    {
+        $cfg = $this->transcriptionConfigCached($domainUuid);
+        return array_key_exists('auto_translate', $cfg)
+            ? (bool) $cfg['auto_translate']
+            : false;
+    }
+
 }

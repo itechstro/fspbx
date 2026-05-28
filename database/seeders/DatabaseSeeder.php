@@ -1077,6 +1077,14 @@ class DatabaseSeeder extends Seeder
                 'default_setting_description'   => "gpt-4o-transcribe - best quality, gpt-4o-mini-transcribe - faster/cheaper/less accurate, whisper-1 - good, but older",
             ],
             [
+                'default_setting_category'      => 'call_transcription',
+                'default_setting_subcategory'   => 'transcription_translation_language',
+                'default_setting_name'          => 'text',
+                'default_setting_value'         => "en-us",
+                'default_setting_enabled'       => true,
+                'default_setting_description'   => "Target language for AI transcript translation. Examples: en-us, zh-cn, ms, ta.",
+            ],
+            [
                 'default_setting_category'      => 'recordings',
                 'default_setting_subcategory'   => 'openai_default_voice',
                 'default_setting_name'          => 'text',

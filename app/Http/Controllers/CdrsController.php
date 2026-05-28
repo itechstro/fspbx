@@ -191,7 +191,7 @@ class CdrsController extends Controller
                     'extension:extension_uuid,extension,effective_caller_id_name',
                 ])
                 ->with([
-                    'callTranscription:uuid,xml_cdr_uuid,status,error_message,result_payload,summary_status,summary_error,summary_payload'
+                    'callTranscription:uuid,xml_cdr_uuid,domain_uuid,external_id,status,error_message,result_payload,summary_status,summary_error,summary_payload,translation_status,translation_error,translation_payload,translation_target_language'
                 ])
                 ->first();
 
@@ -208,12 +208,74 @@ class CdrsController extends Controller
             $routes = [
                 'transcribe_route' => route('cdrs.recording.transcribe'),
                 'summarize_route' => route('cdrs.recording.summarize'),
+                'translate_route' => route('cdrs.recording.translate'),
             ];
 
             // Is call transcription service enabled for this account
             $transcriptionService = app(CallTranscriptionService::class);
             $config = $transcriptionService->getCachedConfig($item->domain_uuid ?? null);
             $isCallTranscriptionServiceEnabled = (bool) ($config['enabled'] ?? false);
+
+            // Fallback status sync for translation to support manual refresh in UI.
+            if ($isCallTranscriptionServiceEnabled && $item->callTranscription) {
+                $ct = $item->callTranscription;
+                if (
+                    in_array($ct->translation_status, ['queued', 'in_progress', 'processing'], true)
+                    && !empty($ct->translation_external_id)
+                ) {
+                    try {
+                        $openAiService = app(\App\Services\OpenAIService::class);
+                        $retrieved = $openAiService->retrieveResponseById($ct->translation_external_id);
+                        $remoteStatus = data_get($retrieved, 'status');
+                        $remoteText = trim((string) data_get($retrieved, 'text', ''));
+                        $raw = data_get($retrieved, 'raw', []);
+
+                        if (in_array($remoteStatus, ['queued', 'in_progress'], true)) {
+                            $ct->update(['translation_status' => $remoteStatus]);
+                        } elseif ($remoteStatus === 'failed') {
+                            $ct->update([
+                                'translation_status' => 'failed',
+                                'translation_error' => (string) data_get($raw, 'error.message') ?: 'OpenAI reported failure.',
+                            ]);
+                        } elseif ($remoteStatus === 'completed') {
+                            if ($remoteText === '') {
+                                $ct->update([
+                                    'translation_status' => 'failed',
+                                    'translation_error' => 'OpenAI returned empty translation output.',
+                                    'translation_payload' => ['raw_response' => $raw],
+                                ]);
+                            } else {
+                                $decoded = json_decode($remoteText, true);
+                                $translatedTranscript = is_array($decoded)
+                                    ? trim((string) data_get($decoded, 'transcript_text', ''))
+                                    : '';
+                                $translatedSummary = is_array($decoded)
+                                    ? trim((string) data_get($decoded, 'summary_text', ''))
+                                    : '';
+
+                                if ($translatedTranscript === '') {
+                                    $translatedTranscript = $remoteText;
+                                }
+
+                                $ct->update([
+                                    'translation_status' => 'completed',
+                                    'translation_error' => null,
+                                    'translation_completed_at' => now(),
+                                    'translation_payload' => [
+                                        'text' => $translatedTranscript,
+                                        'summary_text' => $translatedSummary !== '' ? $translatedSummary : null,
+                                        'target_language' => $ct->translation_target_language,
+                                    ],
+                                ]);
+                            }
+                        }
+
+                        $item->setRelation('callTranscription', $ct->fresh());
+                    } catch (\Throwable $syncErr) {
+                        logger('Translation status sync failed: ' . $syncErr->getMessage() . " at " . $syncErr->getFile() . ":" . $syncErr->getLine());
+                    }
+                }
+            }
 
             // Build a lean transcription payload
             $transcription = null;
@@ -231,6 +293,11 @@ class CdrsController extends Controller
                     'decisions_made'         => data_get($item->callTranscription->summary_payload, 'decisions_made'),
                     'compliance_flags'         => data_get($item->callTranscription->summary_payload, 'compliance_flags'),
                     'sentiment_overall'         => data_get($item->callTranscription->summary_payload, 'sentiment_overall'),
+                    'translation_status' => $item->callTranscription->translation_status,
+                    'translation_error' => $item->callTranscription->translation_error,
+                    'translation_text' => data_get($item->callTranscription->translation_payload, 'text'),
+                    'translation_summary' => data_get($item->callTranscription->translation_payload, 'summary_text'),
+                    'translation_target_language' => $item->callTranscription->translation_target_language ?? data_get($item->callTranscription->translation_payload, 'target_language'),
 
                 ];
 
@@ -626,4 +693,5 @@ class CdrsController extends Controller
 
         return $permissions;
     }
+
 }
