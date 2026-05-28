@@ -101,7 +101,6 @@ if (session ~= nil) then
         default_language = session:getVariable("default_language");
         default_dialect = session:getVariable("default_dialect");
         default_voice = session:getVariable("default_voice");
-        freeswitch.consoleLog("notice", "[voicemail] default_voice: " .. default_voice ..  "\n");
         if (not default_language) then default_language = 'en'; end
         if (not default_dialect) then default_dialect = 'us'; end
         if (not default_voice) then default_voice = 'callie'; end

@@ -136,13 +136,9 @@
 	bridge_hangup_cause = env:getHeader("bridge_hangup_cause");
 	fax_result_code = env:getHeader("fax_result_code");
 	fax_remote_station_id = env:getHeader("fax_remote_station_id");
-    fax_document_transferred_pages = env:getHeader("fax_document_transferred_pages");
 	fax_document_total_pages = env:getHeader("fax_document_total_pages");
 	hangup_cause_q850 = tonumber(env:getHeader("hangup_cause_q850"));
 	fax_file = env:getHeader("fax_file");
-    freeswitch.consoleLog("INFO","[fax] RX fax_document_transferred_pages: " .. fax_document_transferred_pages .. "\n")
-    freeswitch.consoleLog("INFO","[fax] RX fax_document_total_pages: " .. fax_document_total_pages .. "\n")
-
 
 --prevent nil errors
 	if (fax_file == nil) then

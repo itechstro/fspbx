@@ -164,8 +164,6 @@ end
 	hangup_cause_q850 = tonumber(env:getHeader("hangup_cause_q850"));
 	fax_file = env:getHeader("fax_file");
 	fax_duration = env:getHeader("billsec");
-    freeswitch.consoleLog("INFO","[fax] TX fax_document_transferred_pages: " .. fax_document_transferred_pages .. "\n")
-    freeswitch.consoleLog("INFO","[fax] TX fax_document_total_pages: " .. fax_document_total_pages .. "\n")
 
 --prevent nil errors
 	if (fax_file == nil) then
