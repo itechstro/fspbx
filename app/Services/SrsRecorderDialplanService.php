@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Models\ConferenceProfile;
+use App\Models\ConferenceProfileParam;
 use App\Models\DialplanDetails;
 use App\Models\Dialplans;
 use App\Models\Domain;
@@ -12,6 +14,8 @@ use Illuminate\Support\Str;
 class SrsRecorderDialplanService
 {
     public const SETTING_SUBCATEGORY = 'show_recorder_filter';
+
+    public const CONFERENCE_PROFILE_NAME = 'recorder';
 
     public function __construct(private readonly DialplanService $dialplanService)
     {
@@ -68,6 +72,7 @@ class SrsRecorderDialplanService
         DB::transaction(function () use ($domain) {
             $this->upsertSrsRecorderDialplan($domain);
             $this->upsertRecorderCatchDialplan($domain);
+            $this->upsertRecorderConferenceProfile();
         });
 
         $this->clearCaches($domain->domain_name);
@@ -81,6 +86,10 @@ class SrsRecorderDialplanService
                 $dialplan->update_date = now();
                 $dialplan->update_user = session('user_uuid');
                 $dialplan->save();
+            }
+
+            if (! $this->anyDomainHasRecorderEnabled()) {
+                $this->disableRecorderConferenceProfile();
             }
         });
 
@@ -287,11 +296,111 @@ class SrsRecorderDialplanService
         }
     }
 
+    protected function upsertRecorderConferenceProfile(): ConferenceProfile
+    {
+        $profile = ConferenceProfile::query()
+            ->where('profile_name', self::CONFERENCE_PROFILE_NAME)
+            ->first();
+
+        $isNew = ! $profile;
+        $profile ??= new ConferenceProfile();
+        $profileUuid = $profile->conference_profile_uuid ?: (string) Str::uuid();
+
+        $profile->forceFill([
+            'conference_profile_uuid' => $profileUuid,
+            'profile_name' => self::CONFERENCE_PROFILE_NAME,
+            'profile_enabled' => 'true',
+            'profile_description' => 'SIPREC recorder bridge profile (silence, wideband)',
+            'insert_date' => $isNew ? now() : ($profile->insert_date ?? now()),
+            'insert_user' => $isNew ? session('user_uuid') : $profile->insert_user,
+            'update_date' => $isNew ? null : now(),
+            'update_user' => $isNew ? null : session('user_uuid'),
+        ])->save();
+
+        ConferenceProfileParam::query()
+            ->where('conference_profile_uuid', $profileUuid)
+            ->delete();
+
+        foreach ($this->recorderConferenceProfileParams() as $name => $value) {
+            ConferenceProfileParam::create([
+                'conference_profile_param_uuid' => (string) Str::uuid(),
+                'conference_profile_uuid' => $profileUuid,
+                'profile_param_name' => $name,
+                'profile_param_value' => $value,
+                'profile_param_enabled' => 'true',
+                'profile_param_description' => null,
+                'insert_date' => now(),
+                'insert_user' => session('user_uuid'),
+            ]);
+        }
+
+        return $profile;
+    }
+
+    protected function disableRecorderConferenceProfile(): void
+    {
+        ConferenceProfile::query()
+            ->where('profile_name', self::CONFERENCE_PROFILE_NAME)
+            ->update([
+                'profile_enabled' => 'false',
+                'update_date' => now(),
+                'update_user' => session('user_uuid'),
+            ]);
+    }
+
+    protected function anyDomainHasRecorderEnabled(): bool
+    {
+        $domains = Domain::query()
+            ->where('domain_enabled', 'true')
+            ->pluck('domain_uuid');
+
+        foreach ($domains as $domainUuid) {
+            if ($this->isRecorderEnabledForDomain($domainUuid)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function recorderConferenceProfileParams(): array
+    {
+        return [
+            'domain' => '',
+            'rate' => '48000',
+            'interval' => '20',
+            'energy-level' => '200',
+            'comfort-noise' => 'false',
+            'auto-gain-level' => '0',
+            'caller-controls' => 'default',
+            'moderator-controls' => 'moderator',
+            'caller-id-name' => '',
+            'caller-id-number' => '',
+            'moh-sound' => 'silence',
+            'enter-sound' => 'silence',
+            'exit-sound' => 'silence',
+            'alone-sound' => 'silence',
+            'muted-sound' => 'silence',
+            'unmuted-sound' => 'silence',
+            'pin-sound' => 'silence',
+            'bad-pin-sound' => 'silence',
+            'locked-sound' => 'silence',
+            'is-locked-sound' => 'silence',
+            'is-unlocked-sound' => 'silence',
+            'kicked-sound' => 'silence',
+            'min-required-recording-participants' => '1',
+        ];
+    }
+
     protected function clearCaches(string $domainName): void
     {
         FusionCache::clear('dialplan:*');
         FusionCache::clear('dialplan:' . $domainName);
         FusionCache::clear('dialplan:public');
+        FusionCache::clear('configuration:conference.conf');
         $this->dialplanService->clearDialplanCache('global');
         $this->dialplanService->clearDialplanCache('public');
     }
