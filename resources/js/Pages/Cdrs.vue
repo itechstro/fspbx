@@ -164,16 +164,21 @@
                     <tr v-for="row in data.data" :key="row.xml_cdr_uuid">
                         <!-- <TableField class="whitespace-nowrap py-2 pl-4 pr-3 text-sm text-gray-500 sm:pl-6"
                         :text="row.direction" /> -->
-                        <TableField :text="row.direction"
+                        <TableField :text="directionDisplayLabel(row.direction)"
                             class="whitespace-nowrap py-2 pl-4 pr-3 text-sm text-gray-500 sm:pl-6">
-                            <ejs-tooltip :content="row.direction + ' call'" position='TopLeft'
+                            <ejs-tooltip
+                                :content="directionTooltipLabel(row.direction)"
+                                position='TopLeft'
                                 target="#destination_tooltip_target">
                                 <div id="destination_tooltip_target">
-                                    <PhoneOutgoingIcon class="w-5 h-5 text-blue-600"
-                                        v-if="row.direction === 'outbound'" />
-                                    <PhoneIncomingIcon class="w-5 h-5 text-green-600"
-                                        v-if="row.direction === 'inbound'" />
-                                    <PhoneLocalIcon class="w-5 h-5 text-fuchsia-600" v-if="row.direction === 'local'" />
+                                    <PhoneRecorderIcon v-if="row.direction === 'recorder'"
+                                        class="w-5 h-5 text-red-600" />
+                                    <PhoneOutgoingIcon v-else-if="row.direction === 'outbound'"
+                                        class="w-5 h-5 text-blue-600" />
+                                    <PhoneIncomingIcon v-else-if="row.direction === 'inbound'"
+                                        class="w-5 h-5 text-green-600" />
+                                    <PhoneLocalIcon v-else-if="row.direction === 'local'"
+                                        class="w-5 h-5 text-fuchsia-600" />
                                 </div>
                             </ejs-tooltip>
 
@@ -323,6 +328,7 @@ import Paginator from "./components/general/Paginator.vue";
 import PhoneOutgoingIcon from "./components/icons/PhoneOutgoingIcon.vue"
 import PhoneIncomingIcon from "./components/icons/PhoneIncomingIcon.vue"
 import PhoneLocalIcon from "./components/icons/PhoneLocalIcon.vue"
+import PhoneRecorderIcon from "./components/icons/PhoneRecorderIcon.vue"
 import Badge from "@generalComponents/Badge.vue";
 import moment from 'moment-timezone';
 import { TooltipComponent as EjsTooltip } from "@syncfusion/ej2-vue-popups";
@@ -385,10 +391,18 @@ const props = defineProps({
     csvUrl: Object,
     routes: Object,
     permissions: Object,
+    showRecorderFilter: {
+        type: Boolean,
+        default: true,
+    },
 });
 
 
 onMounted(() => {
+    if (!props.showRecorderFilter && filterData.value.direction?.value === 'recorder') {
+        filterData.value.direction = null;
+    }
+
     getData();
     getEntities();
 })
@@ -419,6 +433,25 @@ const sortData = ref({
 const showGlobal = ref(props.showGlobal);
 const itemOptions = ref({});
 const selectedUuid = ref(null)
+const selectedDirectionValue = computed(() => {
+    return filterData.value?.direction?.value ?? filterData.value?.direction ?? null;
+});
+
+const directionDisplayLabel = (direction) => {
+    if (direction === 'recorder') {
+        return 'Recorder';
+    }
+
+    return direction;
+};
+
+const directionTooltipLabel = (direction) => {
+    if (direction === 'recorder') {
+        return 'Recorded call';
+    }
+
+    return `${direction} call`;
+};
 const callBlockHeader = computed(() => {
     const item = callBlockOptions.value?.item ?? {};
     const value = item.call_block_number || item.call_block_name;
@@ -440,11 +473,19 @@ const callBlockAdvancedActions = (row) => [
     },
 ];
 
-const callDirections = [
-    { value: 'outbound', name: 'Outbound' },
-    { value: 'inbound', name: 'Inbound' },
-    { value: 'local', name: 'Local' },
-]
+const callDirections = computed(() => {
+    const directions = [
+        { value: 'outbound', name: 'Outbound' },
+        { value: 'inbound', name: 'Inbound' },
+        { value: 'local', name: 'Local' },
+    ];
+
+    if (props.showRecorderFilter) {
+        directions.unshift({ value: 'recorder', name: 'Recorder' });
+    }
+
+    return directions;
+});
 
 const statusOptions = [
     { name: 'Answered', value: 'answered' },

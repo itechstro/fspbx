@@ -8,6 +8,7 @@ use App\Models\DefaultSettings;
 use App\Services\FreeswitchEslService;
 use Illuminate\Support\Facades\Session;
 use App\Services\DialplanProvisioningService;
+use App\Services\SrsRecorderDialplanService;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -20,6 +21,7 @@ class DomainObserver
     public function __construct(
         protected DialplanProvisioningService $dialplanProvisioningService,
         protected FreeswitchEslService $eslService,
+        protected SrsRecorderDialplanService $srsRecorderDialplanService,
     ) {}
 
     public function created(Domain $domain): void
@@ -34,6 +36,14 @@ class DomainObserver
 
         // directories should exist regardless of dialplan success
         $this->dialplanProvisioningService->ensureSwitchDirectories($domain->domain_name);
+
+        try {
+            $this->srsRecorderDialplanService->syncForDomain($domain);
+        } catch (\Throwable $e) {
+            logger('DomainObserver: failed to sync recorder dialplans for domain '
+                . $domain->domain_name . ' - '
+                . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
+        }
 
         try {
             FusionCache::flushAll();

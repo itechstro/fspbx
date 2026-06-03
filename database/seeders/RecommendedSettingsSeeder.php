@@ -835,6 +835,14 @@ class RecommendedSettingsSeeder extends Seeder
                 'default_setting_enabled'       => true,
                 'default_setting_description'   => "",
             ],
+            [
+                'default_setting_category'      => 'xml_cdr',
+                'default_setting_subcategory'   => 'show_recorder_filter',
+                'default_setting_name'          => 'boolean',
+                'default_setting_value'         => 'true',
+                'default_setting_enabled'       => true,
+                'default_setting_description'   => 'Show recorder calls in Call History and provision srs_recorder plus recorder_catch_<domain> dialplans for this domain.',
+            ],
 
             // Add more settings here...
         ];

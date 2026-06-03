@@ -6,6 +6,7 @@ use App\Models\DefaultSettings;
 use App\Models\Domain;
 use App\Models\DomainSettings;
 use App\Models\FusionCache;
+use App\Services\SrsRecorderDialplanService;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -331,6 +332,7 @@ class SettingsManagementService
                 'subcategory' => $setting->domain_setting_subcategory,
                 'name' => $setting->domain_setting_name,
                 'value' => $setting->domain_setting_value,
+                'setting_row_enabled' => $setting->domain_setting_enabled,
             ]);
 
             return $setting;
@@ -355,9 +357,11 @@ class SettingsManagementService
             ->whereIn('domain_setting_uuid', $uuids)
             ->get();
 
-        $settings->each(function (DomainSettings $setting) {
+        $settings->each(function (DomainSettings $setting) use ($domain) {
             $setting->domain_setting_enabled = ! $this->boolValue($setting->domain_setting_enabled);
             $setting->save();
+
+            $this->maybeSyncRecorderDialplans($domain, $setting);
         });
 
         return $settings->count();
@@ -370,10 +374,21 @@ class SettingsManagementService
 
     public function revertDomain(Domain $domain, array $uuids): int
     {
-        return DomainSettings::query()
+        $reverted = DomainSettings::query()
+            ->where('domain_uuid', $domain->domain_uuid)
+            ->whereIn('domain_setting_uuid', $uuids)
+            ->get();
+
+        $deleted = DomainSettings::query()
             ->where('domain_uuid', $domain->domain_uuid)
             ->whereIn('domain_setting_uuid', $uuids)
             ->delete();
+
+        $reverted->each(function (DomainSettings $setting) use ($domain) {
+            $this->maybeSyncRecorderDialplans($domain, $setting);
+        });
+
+        return $deleted;
     }
 
     public function copyDefaultsToDomain(array $defaultUuids, Domain $targetDomain): int
@@ -767,5 +782,46 @@ class SettingsManagementService
                 FusionCache::clear('dialplan:public');
             }
         }
+
+        if (
+            $scope === 'domain'
+            && ($setting['category'] ?? '') === 'xml_cdr'
+            && ($setting['subcategory'] ?? '') === SrsRecorderDialplanService::SETTING_SUBCATEGORY
+            && ($setting['name'] ?? '') === 'boolean'
+            && ! empty($setting['domain_uuid'])
+        ) {
+            $domain = Domain::query()->find($setting['domain_uuid']);
+
+            if ($domain) {
+                app(SrsRecorderDialplanService::class)->syncForDomain(
+                    $domain,
+                    $this->recorderSettingIsActive($setting)
+                );
+            }
+        }
+    }
+
+    private function maybeSyncRecorderDialplans(Domain $domain, DomainSettings $setting): void
+    {
+        if (
+            $setting->domain_setting_category !== 'xml_cdr'
+            || $setting->domain_setting_subcategory !== SrsRecorderDialplanService::SETTING_SUBCATEGORY
+            || $setting->domain_setting_name !== 'boolean'
+        ) {
+            return;
+        }
+
+        app(SrsRecorderDialplanService::class)->syncForDomain($domain);
+    }
+
+    private function recorderSettingIsActive(array $setting): bool
+    {
+        $rowEnabled = $setting['setting_row_enabled'] ?? true;
+
+        if (! $this->boolValue($rowEnabled)) {
+            return false;
+        }
+
+        return filter_var($setting['value'] ?? 'false', FILTER_VALIDATE_BOOLEAN);
     }
 }

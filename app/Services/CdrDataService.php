@@ -70,8 +70,12 @@ class CdrDataService
                 AllowedFilter::callback('endPeriod', function ($query, $value) {
                     $query->where('start_epoch', '<=', $value);
                 }),
-                AllowedFilter::callback('direction', function ($query, $value) {
-                    $query->where('direction',  $value);
+                AllowedFilter::callback('direction', function ($query, $value) use ($currentDomain) {
+                    if ($value === 'recorder' && !$this->isRecorderFilterEnabled($currentDomain)) {
+                        return;
+                    }
+
+                    $query->where('direction', $value);
                 }),
                 AllowedFilter::callback('search', function ($query, $value) {
                     $query->where(function ($q) use ($value) {
@@ -162,7 +166,11 @@ class CdrDataService
             ])
             ->where('hangup_cause', '!=', 'LOSE_RACE')
             ->whereNull('cc_member_session_uuid')
-            ->whereNull('originating_leg_uuid')
+            ->whereNull('originating_leg_uuid');
+
+        $this->applyExcludeRecorderCdrs($cdrs, $currentDomain);
+
+        $cdrs = $cdrs
             // Sorting
             ->allowedSorts([
                 'direction',
@@ -378,7 +386,7 @@ class CdrDataService
 
     public function getApiIndexQuery(string $domainUuid): QueryBuilder
     {
-        return QueryBuilder::for(CDR::class)
+        $query = QueryBuilder::for(CDR::class)
             ->where('domain_uuid', $domainUuid)
             ->defaultSort('xml_cdr_uuid')
             ->reorder('xml_cdr_uuid')
@@ -409,6 +417,10 @@ class CdrDataService
                 'status',
             ])
             ->with('archive_recording:xml_cdr_uuid,object_key');
+
+        $this->applyExcludeRecorderCdrs($query, $domainUuid);
+
+        return $query;
     }
 
     public function applyApiIndexFilters(QueryBuilder $query, array $filters): QueryBuilder
@@ -431,7 +443,9 @@ class CdrDataService
         }
 
         if (!empty($filters['direction'])) {
-            $query->where('direction', $filters['direction']);
+            if ($filters['direction'] !== 'recorder' || $this->isRecorderFilterEnabled($filters['domain_uuid'] ?? null)) {
+                $query->where('direction', $filters['direction']);
+            }
         }
 
         if (!empty($filters['status'])) {
@@ -597,7 +611,7 @@ class CdrDataService
             ->with('archive_recording:xml_cdr_uuid,object_key')
             ->first();
 
-        if (! $cdr) {
+        if (! $cdr || ($cdr->direction === 'recorder' && ! $this->isRecorderFilterEnabled($domainUuid))) {
             throw new ApiException(404, 'invalid_request_error', 'CDR not found.', 'resource_missing', 'xml_cdr_uuid');
         }
 
@@ -1078,5 +1092,28 @@ class CdrDataService
         $row['dialplan_name'] = $row['destination_number'];
         $row['dialplan_description'] = null;
         return $row;
+    }
+
+    public function isRecorderFilterEnabled(?string $domainUuid = null): bool
+    {
+        $value = get_domain_setting('show_recorder_filter', $domainUuid);
+
+        if ($value === null) {
+            return true;
+        }
+
+        return filter_var($value, FILTER_VALIDATE_BOOLEAN);
+    }
+
+    protected function applyExcludeRecorderCdrs($query, ?string $domainUuid = null): void
+    {
+        if ($this->isRecorderFilterEnabled($domainUuid)) {
+            return;
+        }
+
+        $query->where(function ($q) {
+            $q->whereNull('direction')
+                ->orWhere('direction', '!=', 'recorder');
+        });
     }
 }
