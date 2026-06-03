@@ -310,29 +310,17 @@ class SrsRecorderDialplanService
             'conference_profile_uuid' => $profileUuid,
             'profile_name' => self::CONFERENCE_PROFILE_NAME,
             'profile_enabled' => 'true',
-            'profile_description' => 'SIPREC recorder bridge profile (silence, wideband)',
+            'profile_description' => 'SIPREC recorder bridge profile',
             'insert_date' => $isNew ? now() : ($profile->insert_date ?? now()),
             'insert_user' => $isNew ? session('user_uuid') : $profile->insert_user,
             'update_date' => $isNew ? null : now(),
             'update_user' => $isNew ? null : session('user_uuid'),
         ])->save();
 
+        // Leave the profile without parameters so FreeSWITCH uses its defaults.
         ConferenceProfileParam::query()
             ->where('conference_profile_uuid', $profileUuid)
             ->delete();
-
-        foreach ($this->recorderConferenceProfileParams() as $name => $value) {
-            ConferenceProfileParam::create([
-                'conference_profile_param_uuid' => (string) Str::uuid(),
-                'conference_profile_uuid' => $profileUuid,
-                'profile_param_name' => $name,
-                'profile_param_value' => $value,
-                'profile_param_enabled' => 'true',
-                'profile_param_description' => null,
-                'insert_date' => now(),
-                'insert_user' => session('user_uuid'),
-            ]);
-        }
 
         return $profile;
     }
@@ -361,38 +349,6 @@ class SrsRecorderDialplanService
         }
 
         return false;
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    protected function recorderConferenceProfileParams(): array
-    {
-        return [
-            'domain' => '',
-            'rate' => '48000',
-            'interval' => '20',
-            'energy-level' => '200',
-            'comfort-noise' => 'false',
-            'auto-gain-level' => '0',
-            'caller-controls' => 'default',
-            'moderator-controls' => 'moderator',
-            'caller-id-name' => '',
-            'caller-id-number' => '',
-            'moh-sound' => 'silence',
-            'enter-sound' => 'silence',
-            'exit-sound' => 'silence',
-            'alone-sound' => 'silence',
-            'muted-sound' => 'silence',
-            'unmuted-sound' => 'silence',
-            'pin-sound' => 'silence',
-            'bad-pin-sound' => 'silence',
-            'locked-sound' => 'silence',
-            'is-locked-sound' => 'silence',
-            'is-unlocked-sound' => 'silence',
-            'kicked-sound' => 'silence',
-            'min-required-recording-participants' => '1',
-        ];
     }
 
     protected function clearCaches(string $domainName): void
