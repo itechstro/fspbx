@@ -497,7 +497,26 @@
 
                                                         <div class="space-y-1">
                                                             <h4 class="text-sm font-semibold text-gray-700">Transcript</h4>
-                                                            <p class="whitespace-pre-wrap leading-relaxed text-gray-700">
+                                                            <div class="space-y-6"
+                                                                v-if="Array.isArray(groupedTranslation) && groupedTranslation.length">
+                                                                <div v-for="(g, i) in groupedTranslation" :key="`tr-${i}`"
+                                                                    class="flex items-start gap-4">
+                                                                    <div class="shrink-0 rounded-md px-2 py-0.5 text-sm font-medium"
+                                                                        :class="speakerClasses(g.speaker).timeChip">
+                                                                        {{ msToClock(g.start) }}
+                                                                    </div>
+                                                                    <div class="flex-1">
+                                                                        <p class="font-semibold"
+                                                                            :class="speakerClasses(g.speaker).name">
+                                                                            Speaker {{ g.speaker }}
+                                                                        </p>
+                                                                        <p class="mt-1 leading-relaxed text-gray-700">
+                                                                            {{ g.chunks.map(c => c.text).join(' ') }}
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <p v-else class="whitespace-pre-wrap leading-relaxed text-gray-700">
                                                                 {{ recordingOptions?.transcription?.translation_text }}
                                                             </p>
                                                         </div>
@@ -615,7 +634,11 @@ const displaySummaryStatus = computed(() => currentSummaryStatus.value ?? summar
 const translationStatus = computed(() => recordingOptions.value?.transcription?.translation_status ?? null)
 const currentTranslationStatus = ref(null)
 const displayTranslationStatus = computed(() => currentTranslationStatus.value ?? translationStatus.value ?? null)
-const hasTranslation = computed(() => displayTranslationStatus.value === 'completed' && Boolean(recordingOptions.value?.transcription?.translation_text))
+const translationUtterances = computed(() => recordingOptions.value?.transcription?.translation_utterances ?? [])
+const hasTranslation = computed(() =>
+    displayTranslationStatus.value === 'completed'
+    && (Boolean(recordingOptions.value?.transcription?.translation_text) || translationUtterances.value.length > 0)
+)
 
 const showTranscribeBtn = computed(() =>
     !hasTranscript.value && !transcriptRequested.value && !status.value
@@ -870,11 +893,10 @@ function speakerClasses(label) {
     return SPEAKER_PALETTES[speakerIndex(label)] || DEFAULT_PALETTE
 }
 
-// Group consecutive lines by speaker (cleaner bubbles)
-const grouped = computed(() => {
+function groupUtterances(list) {
     const out = []
     let cur = null
-    for (const u of utterances.value) {
+    for (const u of list) {
         if (!cur || cur.speaker !== u.speaker) {
             cur = { speaker: u.speaker, start: u.start, end: u.end, chunks: [u] }
             out.push(cur)
@@ -884,7 +906,11 @@ const grouped = computed(() => {
         }
     }
     return out
-})
+}
+
+// Group consecutive lines by speaker (cleaner bubbles)
+const grouped = computed(() => groupUtterances(utterances.value))
+const groupedTranslation = computed(() => groupUtterances(translationUtterances.value))
 
 watch(
     () => props.show,

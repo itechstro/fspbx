@@ -256,28 +256,28 @@ class CdrsController extends Controller
                                     'translation_payload' => ['raw_response' => $raw],
                                 ]);
                             } else {
-                                $decoded = json_decode($remoteText, true);
-                                $translatedTranscript = is_array($decoded)
-                                    ? trim((string) data_get($decoded, 'transcript_text', ''))
-                                    : '';
-                                $translatedSummary = is_array($decoded)
-                                    ? trim((string) data_get($decoded, 'summary_text', ''))
-                                    : '';
+                                $parsed = $openAiService->parseTranslationResponse(
+                                    $remoteText,
+                                    (array) data_get($ct->result_payload, 'utterances', [])
+                                );
 
-                                if ($translatedTranscript === '') {
-                                    $translatedTranscript = $remoteText;
+                                if (($parsed['text'] ?? '') === '' && ($parsed['utterances'] ?? []) === []) {
+                                    $ct->update([
+                                        'translation_status' => 'failed',
+                                        'translation_error' => 'OpenAI returned empty translation output.',
+                                        'translation_payload' => ['raw_response' => $raw],
+                                    ]);
+                                } else {
+                                    $ct->update([
+                                        'translation_status' => 'completed',
+                                        'translation_error' => null,
+                                        'translation_completed_at' => now(),
+                                        'translation_payload' => $openAiService->buildTranslationPayload(
+                                            $parsed,
+                                            $ct->translation_target_language
+                                        ),
+                                    ]);
                                 }
-
-                                $ct->update([
-                                    'translation_status' => 'completed',
-                                    'translation_error' => null,
-                                    'translation_completed_at' => now(),
-                                    'translation_payload' => [
-                                        'text' => $translatedTranscript,
-                                        'summary_text' => $translatedSummary !== '' ? $translatedSummary : null,
-                                        'target_language' => $ct->translation_target_language,
-                                    ],
-                                ]);
                             }
                         }
 
@@ -307,6 +307,7 @@ class CdrsController extends Controller
                     'translation_status' => $item->callTranscription->translation_status,
                     'translation_error' => $item->callTranscription->translation_error,
                     'translation_text' => data_get($item->callTranscription->translation_payload, 'text'),
+                    'translation_utterances' => data_get($item->callTranscription->translation_payload, 'utterances', []),
                     'translation_summary' => data_get($item->callTranscription->translation_payload, 'summary_text'),
                     'translation_target_language' => $item->callTranscription->translation_target_language ?? data_get($item->callTranscription->translation_payload, 'target_language'),
 

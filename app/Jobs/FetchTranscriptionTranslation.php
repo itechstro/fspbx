@@ -67,28 +67,28 @@ class FetchTranscriptionTranslation implements ShouldQueue
                     return;
                 }
 
-                $decoded = json_decode($outputText, true);
-                $translatedTranscript = is_array($decoded)
-                    ? trim((string) data_get($decoded, 'transcript_text', ''))
-                    : '';
-                $translatedSummary = is_array($decoded)
-                    ? trim((string) data_get($decoded, 'summary_text', ''))
-                    : '';
+                $parsed = $openAiService->parseTranslationResponse(
+                    $outputText,
+                    (array) data_get($row->result_payload, 'utterances', [])
+                );
 
-                if ($translatedTranscript === '') {
-                    // Backward-compatible fallback if model returned plain text instead of JSON.
-                    $translatedTranscript = $outputText;
+                if (($parsed['text'] ?? '') === '' && ($parsed['utterances'] ?? []) === []) {
+                    $row->update([
+                        'translation_status' => 'failed',
+                        'translation_error' => 'OpenAI returned empty translation output.',
+                        'translation_payload' => ['raw_response' => $raw],
+                    ]);
+                    return;
                 }
 
                 $row->update([
                     'translation_status' => 'completed',
                     'translation_error' => null,
                     'translation_completed_at' => now(),
-                    'translation_payload' => [
-                        'text' => $translatedTranscript,
-                        'summary_text' => $translatedSummary !== '' ? $translatedSummary : null,
-                        'target_language' => $row->translation_target_language,
-                    ],
+                    'translation_payload' => $openAiService->buildTranslationPayload(
+                        $parsed,
+                        $row->translation_target_language
+                    ),
                 ]);
 
                 $transcriptionService = app(\App\Services\CallTranscription\CallTranscriptionService::class);

@@ -139,7 +139,7 @@
         @endforeach
     </div>
 
-    @if(!empty($data['translation_text']))
+    @if(!empty($data['translation_utterances']) || !empty($data['translation_text']))
     <div class="section">
         <div class="section-title">
             Translation
@@ -147,9 +147,34 @@
                 ({{ $data['translation_target_language'] }})
             @endif
         </div>
-        <div class="summary-box" style="font-style: normal;">
-            {!! nl2br(e($data['translation_text'])) !!}
-        </div>
+
+        @if(!empty($data['translation_utterances']))
+            <div class="script-container">
+                @foreach($data['translation_utterances'] as $line)
+                    @php
+                        $speakerLabel = $line['speaker'];
+                        $speakerName = $data['speaker_map'][$speakerLabel] ?? "Speaker $speakerLabel";
+                        $isAgent = ($speakerLabel === $data['agent_label']);
+                        $rowClass = $isAgent ? 'is-agent' : 'is-customer';
+                        $time = gmdate("i:s", intval(($line['start'] ?? 0) / 1000));
+                    @endphp
+
+                    <div class="script-line {{ $rowClass }}">
+                        <span class="speaker-name">
+                            {{ $speakerName }}
+                            <span class="timestamp">{{ $time }}</span>
+                        </span>
+                        <div class="text">
+                            {{ $line['text'] }}
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        @else
+            <div class="summary-box" style="font-style: normal;">
+                {!! nl2br(e($data['translation_text'])) !!}
+            </div>
+        @endif
     </div>
     @endif
 

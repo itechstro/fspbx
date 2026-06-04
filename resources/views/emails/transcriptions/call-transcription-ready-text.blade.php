@@ -30,8 +30,16 @@ FULL TRANSCRIPTION
 
 @endforeach
 
-@if(!empty($data['translation_text']))
+@if(!empty($data['translation_utterances']) || !empty($data['translation_text']))
 TRANSLATION @if(!empty($data['translation_target_language']))({{ $data['translation_target_language'] }})@endif
 --------------------------------------------------------------------
+@if(!empty($data['translation_utterances']))
+@foreach($data['translation_utterances'] as $line)
+{{ $data['speaker_map'][$line['speaker']] ?? "Speaker ".$line['speaker'] }} [{{ gmdate("i:s", intval(($line['start'] ?? 0) / 1000)) }}]:
+{{ $line['text'] ?? '' }}
+
+@endforeach
+@else
 {{ $data['translation_text'] }}
+@endif
 @endif

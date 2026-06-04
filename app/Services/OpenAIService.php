@@ -249,40 +249,74 @@ class OpenAIService
     }
 
     /**
-     * Kick off a background translation task for transcript and summary text.
+     * Kick off a background translation task for speaker-labeled utterances (preferred) or flat transcript text.
      */
     public function createBackgroundTranslation(
-        string $transcriptText,
+        array $utterances,
         ?string $summaryText,
         string $targetLanguage,
+        ?string $fallbackTranscriptText = null,
         string $model = 'gpt-4.1-mini'
     ): array
     {
         $url = 'https://api.openai.com/v1/responses';
+        $summaryInput = trim((string) $summaryText) !== '' ? (string) $summaryText : '[none]';
+        $hasUtterances = count($utterances) > 0;
 
-        $instructions = implode("\n", [
-            'You are a precise translation assistant for call transcriptions.',
-            'Translate the provided transcript and summary to the requested target language.',
-            'Rules:',
-            '- Preserve meaning, speaker intent, and tone.',
-            '- Keep line breaks when they exist.',
-            '- Return ONLY valid JSON, no markdown and no commentary.',
-            '- If summary is missing, return summary_text as null.',
-            '',
-            'Output JSON schema:',
-            '{',
-            '  "transcript_text": "string",',
-            '  "summary_text": "string|null"',
-            '}',
-        ]);
+        if ($hasUtterances) {
+            $instructions = implode("\n", [
+                'You are a precise translation assistant for call transcriptions.',
+                'Translate each utterance and the optional summary to the requested target language.',
+                'Rules:',
+                '- Translate only the "text" field of each utterance.',
+                '- Keep speaker labels and numeric start/end values exactly as provided.',
+                '- Return one utterance per input utterance, in the same order.',
+                '- Preserve meaning, speaker intent, and tone.',
+                '- Return ONLY valid JSON, no markdown and no commentary.',
+                '- If summary is missing, return summary_text as null.',
+                '',
+                'Output JSON schema:',
+                '{',
+                '  "utterances": [',
+                '    {"speaker": "A|B|C...", "start": 0, "end": 0, "text": "translated line"}',
+                '  ],',
+                '  "summary_text": "string|null"',
+                '}',
+            ]);
 
-        $input = implode("\n\n", [
-            "Target language: {$targetLanguage}",
-            'Transcript:',
-            $transcriptText,
-            'Summary:',
-            trim((string) $summaryText) !== '' ? (string) $summaryText : '[none]',
-        ]);
+            $input = implode("\n\n", [
+                "Target language: {$targetLanguage}",
+                'Utterances JSON:',
+                json_encode($utterances, JSON_UNESCAPED_UNICODE),
+                'Summary:',
+                $summaryInput,
+            ]);
+        } else {
+            $transcriptText = trim((string) $fallbackTranscriptText);
+            $instructions = implode("\n", [
+                'You are a precise translation assistant for call transcriptions.',
+                'Translate the provided transcript and summary to the requested target language.',
+                'Rules:',
+                '- Preserve meaning, speaker intent, and tone.',
+                '- Keep line breaks when they exist.',
+                '- Return ONLY valid JSON, no markdown and no commentary.',
+                '- If summary is missing, return summary_text as null.',
+                '',
+                'Output JSON schema:',
+                '{',
+                '  "transcript_text": "string",',
+                '  "summary_text": "string|null"',
+                '}',
+            ]);
+
+            $input = implode("\n\n", [
+                "Target language: {$targetLanguage}",
+                'Transcript:',
+                $transcriptText,
+                'Summary:',
+                $summaryInput,
+            ]);
+        }
 
         $payload = [
             'model'        => $model,
@@ -302,5 +336,113 @@ class OpenAIService
             'id'     => data_get($resp, 'id'),
             'status' => data_get($resp, 'status'),
         ];
+    }
+
+    /**
+     * Parse a completed translation response into text, summary, and optional speaker utterances.
+     */
+    public function parseTranslationResponse(string $outputText, array $originalUtterances = []): array
+    {
+        $outputText = trim($outputText);
+        if ($outputText === '') {
+            return ['text' => '', 'summary_text' => null, 'utterances' => []];
+        }
+
+        $decoded = json_decode($outputText, true);
+        if (!is_array($decoded)) {
+            return ['text' => $outputText, 'summary_text' => null, 'utterances' => []];
+        }
+
+        $summaryText = data_get($decoded, 'summary_text');
+        $summaryText = $summaryText !== null && trim((string) $summaryText) !== ''
+            ? trim((string) $summaryText)
+            : null;
+
+        $rawUtterances = data_get($decoded, 'utterances');
+        if (is_array($rawUtterances) && count($rawUtterances) > 0) {
+            $utterances = $this->normalizeTranslatedUtterances($originalUtterances, $rawUtterances);
+            $text = $this->utterancesToTranscriptText($utterances);
+            if ($text === '') {
+                $text = trim((string) data_get($decoded, 'transcript_text', ''));
+            }
+
+            return [
+                'text' => $text,
+                'summary_text' => $summaryText,
+                'utterances' => $utterances,
+            ];
+        }
+
+        $text = trim((string) data_get($decoded, 'transcript_text', ''));
+        if ($text === '') {
+            $text = $outputText;
+        }
+
+        return [
+            'text' => $text,
+            'summary_text' => $summaryText,
+            'utterances' => [],
+        ];
+    }
+
+    /**
+     * Build a translation payload row for persistence.
+     */
+    public function buildTranslationPayload(array $parsed, ?string $targetLanguage): array
+    {
+        return [
+            'text' => $parsed['text'] ?? '',
+            'summary_text' => $parsed['summary_text'] ?? null,
+            'utterances' => $parsed['utterances'] ?? [],
+            'target_language' => $targetLanguage,
+        ];
+    }
+
+    private function normalizeTranslatedUtterances(array $original, array $translated): array
+    {
+        $out = [];
+
+        foreach ($translated as $i => $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+
+            $text = trim((string) data_get($item, 'text', ''));
+            if ($text === '') {
+                continue;
+            }
+
+            $orig = is_array($original[$i] ?? null) ? $original[$i] : null;
+
+            $out[] = [
+                'speaker' => data_get($item, 'speaker') ?? data_get($orig, 'speaker'),
+                'start'   => data_get($item, 'start', data_get($orig, 'start')),
+                'end'     => data_get($item, 'end', data_get($orig, 'end')),
+                'text'    => $text,
+            ];
+        }
+
+        return $out;
+    }
+
+    private function utterancesToTranscriptText(array $utterances): string
+    {
+        $lines = [];
+
+        foreach ($utterances as $u) {
+            if (!is_array($u)) {
+                continue;
+            }
+
+            $text = trim((string) data_get($u, 'text', ''));
+            if ($text === '') {
+                continue;
+            }
+
+            $speaker = data_get($u, 'speaker');
+            $lines[] = $speaker ? "{$speaker}: {$text}" : $text;
+        }
+
+        return implode("\n", $lines);
     }
 }
