@@ -39,7 +39,7 @@ class Update189
                 'default_setting_name' => 'text',
                 'default_setting_value' => '',
                 'default_setting_enabled' => true,
-                'default_setting_description' => 'Optional PHP time format override (e.g. H:i, g:i A). Leave blank to use the country setting.',
+                'default_setting_description' => '12-hour or 24-hour display: use 12h or 24h (FusionPBX style), or a PHP format such as g:i A or H:i. Leave blank to use the country setting.',
             ],
         ];
 

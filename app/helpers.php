@@ -884,7 +884,7 @@ if (!function_exists('get_local_time_zone')) {
         $cacheKey = "{$domain_uuid}_timeZone";
 
         return Cache::remember($cacheKey, 86400, function () use ($domain_uuid) {
-            return get_domain_setting('time_zone', $domain_uuid) ?? 'UTC';
+            return app(\App\Services\DomainPresentationService::class)->resolveTimezone($domain_uuid);
         });
     }
 }

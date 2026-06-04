@@ -58,6 +58,49 @@ class DomainPresentationService
     private const FALLBACK = ['date' => 'd/m/Y', 'time' => 'H:i', 'locale' => 'en-GB'];
 
     /**
+     * Used when domain time_zone is unset (FusionPBX-style country selection alone).
+     *
+     * @var array<string, string>
+     */
+    private const COUNTRY_TIME_ZONES = [
+        'SG' => 'Asia/Singapore',
+        'MY' => 'Asia/Kuala_Lumpur',
+        'HK' => 'Asia/Hong_Kong',
+        'IN' => 'Asia/Kolkata',
+        'TH' => 'Asia/Bangkok',
+        'VN' => 'Asia/Ho_Chi_Minh',
+        'ID' => 'Asia/Jakarta',
+        'PH' => 'Asia/Manila',
+        'CN' => 'Asia/Shanghai',
+        'TW' => 'Asia/Taipei',
+        'JP' => 'Asia/Tokyo',
+        'KR' => 'Asia/Seoul',
+        'AU' => 'Australia/Sydney',
+        'NZ' => 'Pacific/Auckland',
+        'GB' => 'Europe/London',
+        'IE' => 'Europe/Dublin',
+        'DE' => 'Europe/Berlin',
+        'AT' => 'Europe/Vienna',
+        'CH' => 'Europe/Zurich',
+        'FR' => 'Europe/Paris',
+        'ES' => 'Europe/Madrid',
+        'IT' => 'Europe/Rome',
+        'NL' => 'Europe/Amsterdam',
+        'BE' => 'Europe/Brussels',
+        'SE' => 'Europe/Stockholm',
+        'NO' => 'Europe/Oslo',
+        'DK' => 'Europe/Copenhagen',
+        'FI' => 'Europe/Helsinki',
+        'PL' => 'Europe/Warsaw',
+        'PT' => 'Europe/Lisbon',
+        'BR' => 'America/Sao_Paulo',
+        'MX' => 'America/Mexico_City',
+        'ZA' => 'Africa/Johannesburg',
+        'AE' => 'Asia/Dubai',
+        'IL' => 'Asia/Jerusalem',
+    ];
+
+    /**
      * @return array{
      *     country: string,
      *     locale: string,
@@ -74,11 +117,11 @@ class DomainPresentationService
         $country = $this->countryCode($domainUuid);
         $defaults = self::COUNTRY_DEFAULTS[$country] ?? self::FALLBACK;
 
-        $dateOverride = $this->settingValue(self::DATE_FORMAT_SETTING, $domainUuid);
-        $timeOverride = $this->settingValue(self::TIME_FORMAT_SETTING, $domainUuid);
+        $rawDateOverride = $this->settingValue(self::DATE_FORMAT_SETTING, $domainUuid);
+        $rawTimeOverride = $this->settingValue(self::TIME_FORMAT_SETTING, $domainUuid);
 
-        $dateFormat = $dateOverride ?? $defaults['date'];
-        $timeFormat = $timeOverride ?? $defaults['time'];
+        $dateFormat = $this->normalizeDateFormatOverride($rawDateOverride) ?? $defaults['date'];
+        $timeFormat = $this->resolveTimeFormat($rawTimeOverride, $defaults['time']);
         $locale = $defaults['locale'];
 
         if ($country !== 'US' && ! isset(self::COUNTRY_DEFAULTS[$country])) {
@@ -93,9 +136,23 @@ class DomainPresentationService
             'datetime_format' => trim($dateFormat . ' ' . $timeFormat),
             'datepicker_format' => $this->datepickerFormatFromPhp($dateFormat),
             'moment_format' => $this->momentFormatFromPhp($dateFormat, $timeFormat),
-            'date_format_source' => $dateOverride ? 'override' : 'country',
-            'time_format_source' => $timeOverride ? 'override' : 'country',
+            'date_format_source' => $rawDateOverride ? 'override' : 'country',
+            'time_format_source' => $rawTimeOverride ? 'override' : 'country',
+            'time_format_setting' => $rawTimeOverride ?? '',
         ];
+    }
+
+    public function resolveTimezone(?string $domainUuid = null): string
+    {
+        $configured = trim((string) (get_domain_setting('time_zone', $domainUuid) ?? ''));
+
+        if ($configured !== '') {
+            return $configured;
+        }
+
+        $country = $this->countryCode($domainUuid);
+
+        return self::COUNTRY_TIME_ZONES[$country] ?? 'UTC';
     }
 
     public function formatTimestamp(?int $epoch, ?string $domainUuid, string $part = 'datetime'): ?string
@@ -105,7 +162,7 @@ class DomainPresentationService
         }
 
         $presentation = $this->resolve($domainUuid);
-        $timezone = get_local_time_zone($domainUuid);
+        $timezone = $this->resolveTimezone($domainUuid);
         $carbon = Carbon::createFromTimestamp($epoch, 'UTC')->setTimezone($timezone);
 
         return match ($part) {
@@ -146,6 +203,58 @@ class DomainPresentationService
         $value = trim((string) (get_domain_setting($subcategory, $domainUuid) ?? ''));
 
         return $value !== '' ? $value : null;
+    }
+
+    /**
+     * FusionPBX-style time_format values (12h / 24h) plus optional PHP format overrides.
+     */
+    protected function resolveTimeFormat(?string $override, string $countryDefault): string
+    {
+        if ($override === null) {
+            return $countryDefault;
+        }
+
+        $key = strtolower(preg_replace('/[\s_-]+/', '', $override) ?? $override);
+
+        return match ($key) {
+            '12h', '12hr', '12hour', '12hours', 'ampm' => $this->phpTwelveHourFormat($countryDefault),
+            '24h', '24hr', '24hour', '24hours' => $this->phpTwentyFourHourFormat($countryDefault),
+            default => $override,
+        };
+    }
+
+    protected function phpTwelveHourFormat(string $countryDefault): string
+    {
+        if (preg_match('/[hga]/i', $countryDefault) && preg_match('/[Aa]/', $countryDefault)) {
+            return $countryDefault;
+        }
+
+        return 'g:i A';
+    }
+
+    protected function phpTwentyFourHourFormat(string $countryDefault): string
+    {
+        if (preg_match('/H/', $countryDefault) && ! preg_match('/[Aa]/', $countryDefault)) {
+            return $countryDefault;
+        }
+
+        return 'H:i';
+    }
+
+    protected function normalizeDateFormatOverride(?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $key = strtolower(preg_replace('/[\s_-]+/', '', $value) ?? $value);
+
+        return match ($key) {
+            'dmy', 'ddmmyyyy' => 'd/m/Y',
+            'mdy', 'mmddyyyy' => 'm/d/Y',
+            'ymd', 'yyyymmdd' => 'Y-m-d',
+            default => $value,
+        };
     }
 
     protected function momentFormatFromPhp(string $dateFormat, string $timeFormat): string

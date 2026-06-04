@@ -785,6 +785,15 @@ class SettingsManagementService
 
         if (
             $scope === 'domain'
+            && $setting['category'] === 'domain'
+            && in_array($setting['subcategory'], ['country', 'time_zone'], true)
+            && ! empty($setting['domain_uuid'])
+        ) {
+            \Illuminate\Support\Facades\Cache::forget("{$setting['domain_uuid']}_timeZone");
+        }
+
+        if (
+            $scope === 'domain'
             && ($setting['category'] ?? '') === 'xml_cdr'
             && ($setting['subcategory'] ?? '') === SrsRecorderDialplanService::SETTING_SUBCATEGORY
             && ($setting['name'] ?? '') === 'boolean'
