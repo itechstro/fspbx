@@ -924,6 +924,25 @@ if (!function_exists('get_domain_setting')) {
     }
 }
 
+if (!function_exists('get_domain_presentation')) {
+    /**
+     * Resolved date/time presentation for a domain (country defaults with optional overrides).
+     *
+     * @return array<string, mixed>
+     */
+    function get_domain_presentation(?string $domain_uuid = null): array
+    {
+        return app(\App\Services\DomainPresentationService::class)->resolve($domain_uuid);
+    }
+}
+
+if (!function_exists('format_domain_timestamp')) {
+    function format_domain_timestamp(?int $epoch, ?string $domain_uuid = null, string $part = 'datetime'): ?string
+    {
+        return app(\App\Services\DomainPresentationService::class)->formatTimestamp($epoch, $domain_uuid, $part);
+    }
+}
+
 if (!function_exists('generate_password')) {
     /**
      * Generate a secure password

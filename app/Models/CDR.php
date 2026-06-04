@@ -48,7 +48,11 @@ class CDR extends Model
     {
         if (!$this->created_at || !$this->domain_uuid) return null;
         $timeZone = get_local_time_zone($this->domain_uuid);
-        return Carbon::parse($this->created_at)->setTimezone($timeZone)->format('g:i:s A M d, Y');
+
+        return format_domain_timestamp(
+            Carbon::parse($this->created_at)->setTimezone($timeZone)->timestamp,
+            $this->domain_uuid
+        );
     }
 
     public function getCallerIdNumberFormattedAttribute()
@@ -88,15 +92,15 @@ class CDR extends Model
     public function getStartDateAttribute()
     {
         if (!$this->start_epoch || !$this->domain_uuid) return null;
-        $timeZone = get_local_time_zone($this->domain_uuid);
-        return Carbon::createFromTimestamp($this->start_epoch, 'UTC')->setTimezone($timeZone)->format('M d, Y');
+
+        return format_domain_timestamp((int) $this->start_epoch, $this->domain_uuid, 'date');
     }
 
     public function getStartTimeAttribute()
     {
         if (!$this->start_epoch || !$this->domain_uuid) return null;
-        $timeZone = get_local_time_zone($this->domain_uuid);
-        return Carbon::createFromTimestamp($this->start_epoch, 'UTC')->setTimezone($timeZone)->format('g:i:s A');
+
+        return format_domain_timestamp((int) $this->start_epoch, $this->domain_uuid, 'time');
     }
 
     public function getDurationFormattedAttribute()

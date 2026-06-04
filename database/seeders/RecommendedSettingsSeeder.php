@@ -836,6 +836,22 @@ class RecommendedSettingsSeeder extends Seeder
                 'default_setting_description'   => "",
             ],
             [
+                'default_setting_category'      => 'domain',
+                'default_setting_subcategory'   => 'date_format',
+                'default_setting_name'          => 'text',
+                'default_setting_value'         => '',
+                'default_setting_enabled'       => true,
+                'default_setting_description'   => 'Optional PHP date format override (e.g. d/m/Y, M j Y). Leave blank to use the country setting.',
+            ],
+            [
+                'default_setting_category'      => 'domain',
+                'default_setting_subcategory'   => 'time_format',
+                'default_setting_name'          => 'text',
+                'default_setting_value'         => '',
+                'default_setting_enabled'       => true,
+                'default_setting_description'   => 'Optional PHP time format override (e.g. H:i, g:i A). Leave blank to use the country setting.',
+            ],
+            [
                 'default_setting_category'      => 'xml_cdr',
                 'default_setting_subcategory'   => 'show_recorder_filter',
                 'default_setting_name'          => 'boolean',

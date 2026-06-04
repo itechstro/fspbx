@@ -59,6 +59,8 @@ class HandleInertiaRequests extends Middleware
                 'message' => fn() => $request->session()->get('message'),
                 'error' =>  fn() => $request->session()->get('error'),
             ],
+
+            'presentation' => fn() => get_domain_presentation(session('domain_uuid')),
         ]);
     }
 
