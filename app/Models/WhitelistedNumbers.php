@@ -55,11 +55,11 @@ class WhitelistedNumbers extends Model
         static::retrieved(function ($model) {
             $model->destroy_route = route('whitelisted-numbers.destroy', $model);
 
-            $time_zone = get_local_time_zone($model->domain_uuid);
             if ($model->created_at) {
-                $model->created_at_formatted = $model->created_at
-                    ->timezone($time_zone)
-                    ->format('M d, Y g:i:s A');
+                $model->created_at_formatted = format_domain_datetime(
+                    $model->created_at,
+                    $model->domain_uuid
+                );
             }
         });
     }

@@ -92,6 +92,7 @@ class DomainPresentationService
             'time_format' => $timeFormat,
             'datetime_format' => trim($dateFormat . ' ' . $timeFormat),
             'datepicker_format' => $this->datepickerFormatFromPhp($dateFormat),
+            'moment_format' => $this->momentFormatFromPhp($dateFormat, $timeFormat),
             'date_format_source' => $dateOverride ? 'override' : 'country',
             'time_format_source' => $timeOverride ? 'override' : 'country',
         ];
@@ -145,6 +146,33 @@ class DomainPresentationService
         $value = trim((string) (get_domain_setting($subcategory, $domainUuid) ?? ''));
 
         return $value !== '' ? $value : null;
+    }
+
+    protected function momentFormatFromPhp(string $dateFormat, string $timeFormat): string
+    {
+        return trim($this->phpDateFormatToMoment($dateFormat) . ' ' . $this->phpDateFormatToMoment($timeFormat));
+    }
+
+    protected function phpDateFormatToMoment(string $phpFormat): string
+    {
+        return strtr($phpFormat, [
+            'Y' => 'YYYY',
+            'y' => 'YY',
+            'm' => 'MM',
+            'n' => 'M',
+            'd' => 'DD',
+            'j' => 'D',
+            'F' => 'MMMM',
+            'M' => 'MMM',
+            'H' => 'HH',
+            'G' => 'H',
+            'h' => 'hh',
+            'g' => 'h',
+            'i' => 'mm',
+            's' => 'ss',
+            'A' => 'A',
+            'a' => 'a',
+        ]);
     }
 
     protected function datepickerFormatFromPhp(string $phpFormat): string

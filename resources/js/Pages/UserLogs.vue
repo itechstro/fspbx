@@ -165,7 +165,7 @@
 
                         <!-- Timestamp (localized) -->
                         <TableField class="whitespace-nowrap px-2 py-2 text-sm text-gray-500"
-                            :text="moment.tz(row.timestamp, filterData.timezone).format('YYYY-MM-DD HH:mm:ss')" />
+                            :text="row.timestamp_formatted ?? moment.tz(row.timestamp, filterData.timezone).format($page.props.presentation?.moment_format ?? 'YYYY-MM-DD HH:mm:ss')" />
 
                         <!-- IP Address -->
                         <TableField class="whitespace-nowrap px-2 py-2 text-sm text-gray-500" :text="row.remote_address" />

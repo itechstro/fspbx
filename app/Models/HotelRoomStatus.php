@@ -73,11 +73,12 @@ class HotelRoomStatus extends Model
         return $this->formatLocal($this->departure_date);
     }
 
-    private function formatLocal(?Carbon $dt, string $format = 'Y-m-d H:i:s'): ?string
+    private function formatLocal(?Carbon $dt): ?string
     {
-        if (!$dt) return null;
-        $tz = get_local_time_zone($this->domain_uuid) ?: 'UTC';
-        // $dt is a Carbon (cast from DB). Assume stored as UTC; convert to local tz for display.
-        return $dt->copy()->setTimezone($tz)->format($format);
+        if (!$dt) {
+            return null;
+        }
+
+        return format_domain_datetime($dt, $this->domain_uuid);
     }
 }

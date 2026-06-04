@@ -33,8 +33,10 @@ class Activity extends SpatieActivity implements ActivityContract
 
         static::retrieved(function ($model) {
             if ($model->created_at) {
-                $time_zone = $model->domain_uuid ? get_local_time_zone($model->domain_uuid) : 'UTC';
-                $model->created_at_formatted = Carbon::parse($model->created_at)->setTimezone($time_zone)->format('g:i:s A M d, Y');
+                $model->created_at_formatted = format_domain_datetime(
+                    $model->created_at,
+                    $model->domain_uuid ?? session('domain_uuid')
+                );
             }
             // $model->destroy_route = route('devices.destroy', $model);
 

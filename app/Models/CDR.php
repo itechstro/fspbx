@@ -47,12 +47,8 @@ class CDR extends Model
     public function getCreatedAtFormattedAttribute()
     {
         if (!$this->created_at || !$this->domain_uuid) return null;
-        $timeZone = get_local_time_zone($this->domain_uuid);
 
-        return format_domain_timestamp(
-            Carbon::parse($this->created_at)->setTimezone($timeZone)->timestamp,
-            $this->domain_uuid
-        );
+        return format_domain_datetime($this->created_at, $this->domain_uuid);
     }
 
     public function getCallerIdNumberFormattedAttribute()

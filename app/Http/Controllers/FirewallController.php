@@ -272,7 +272,7 @@ class FirewallController extends Controller
 
         $pageItems = $pageItems->map(function ($item) {
             $item['date'] = !empty($item['date'])
-                ? Carbon::parse($item['date'])->format('M j, Y g:i A')
+                ? format_domain_datetime($item['date'], session('domain_uuid'))
                 : null;
 
             return $item;

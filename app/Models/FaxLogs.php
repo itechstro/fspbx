@@ -45,11 +45,7 @@ class FaxLogs extends Model
             return null;
         }
 
-        $timeZone = get_local_time_zone($this->domain_uuid);
-
-        return Carbon::createFromTimestamp($this->fax_epoch, 'UTC')
-            ->setTimezone($timeZone)
-            ->format('g:i:s A M d, Y');
+        return format_domain_timestamp((int) $this->fax_epoch, $this->domain_uuid);
     }
 
     public function getSourceFormattedAttribute()

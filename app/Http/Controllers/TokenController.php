@@ -44,15 +44,11 @@ class TokenController extends Controller
             return [
                 'id' => $token->id,
                 'name' => $token->name,
-                'created_at' => $token->created_at
-                    ? Carbon::parse($token->created_at)->format('M d, Y H:i')
-                    : null,
+                'created_at' => format_domain_datetime($token->created_at, session('domain_uuid')),
                 'last_used_at' => $token->last_used_at
                     ? Carbon::parse($token->last_used_at)->diffForHumans()
                     : null,
-                'expires_at' => $token->expires_at
-                    ? Carbon::parse($token->expires_at)->format('M d, Y H:i')
-                    : null,
+                'expires_at' => format_domain_datetime($token->expires_at, session('domain_uuid')),
             ];
         });
 

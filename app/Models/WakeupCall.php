@@ -72,10 +72,7 @@ class WakeupCall extends Model
             return null;
         }
 
-        $timeZone = get_local_time_zone($this->domain_uuid);
-        return Carbon::parse($timestamp)
-            ->setTimezone($timeZone)
-            ->format('g:i:s A M d, Y');
+        return format_domain_datetime($timestamp, $this->domain_uuid);
     }
 
 

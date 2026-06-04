@@ -135,8 +135,6 @@ class EmailQueueController extends Controller
             ->defaultSort('-email_date')
             ->paginate($params['paginate'])
             ->through(function ($item) {
-                $timezone = get_local_time_zone(session('domain_uuid'));
-
                 return [
                     'email_queue_uuid' => $item->email_queue_uuid,
                     'domain_uuid' => $item->domain_uuid,
@@ -148,9 +146,7 @@ class EmailQueueController extends Controller
                         : null,
                     'email_status' => blank($item->email_status) ? 'blank' : $item->email_status,
                     'email_date' => $item->email_date,
-                    'email_date_formatted' => $item->email_date
-                        ? Carbon::parse($item->email_date)->setTimezone($timezone)->format('M j, Y g:i A')
-                        : null,
+                    'email_date_formatted' => format_domain_datetime($item->email_date, $item->domain_uuid),
                     'domain' => $item->domain ? [
                         'domain_uuid' => $item->domain->domain_uuid,
                         'domain_name' => $item->domain->domain_name,

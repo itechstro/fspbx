@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use Carbon\Carbon;
 use App\Models\Traits\TraitUuid;
 use libphonenumber\PhoneNumberFormat;
 use Illuminate\Database\Eloquent\Model;
@@ -51,11 +50,7 @@ class FaxFiles extends Model
             return null;
         }
 
-        $timeZone = get_local_time_zone($this->domain_uuid);
-
-        return Carbon::createFromTimestamp($this->fax_epoch, 'UTC')
-            ->setTimezone($timeZone)
-            ->format('g:i:s A M d, Y');
+        return format_domain_timestamp((int) $this->fax_epoch, $this->domain_uuid);
     }
 
     public function getFaxCallerIdNumberFormattedAttribute()

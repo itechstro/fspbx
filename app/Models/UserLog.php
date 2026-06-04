@@ -99,6 +99,10 @@ class UserLog extends Model
         'update_date' => 'datetime',
     ];
 
+    protected $appends = [
+        'timestamp_formatted',
+    ];
+
     /**
      * Relationship: the user who generated this log.
      *
@@ -118,6 +122,11 @@ class UserLog extends Model
     public function domain()
     {
         return $this->belongsTo(Domain::class, 'domain_uuid', 'domain_uuid');
+    }
+
+    public function getTimestampFormattedAttribute(): ?string
+    {
+        return format_domain_datetime($this->timestamp, $this->domain_uuid);
     }
 
 }

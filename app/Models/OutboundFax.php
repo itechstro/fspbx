@@ -98,11 +98,7 @@ class OutboundFax extends Model
             return null;
         }
 
-        $timeZone = get_local_time_zone($this->domain_uuid);
-
-        return Carbon::parse($this->created_at, 'UTC')
-            ->setTimezone($timeZone)
-            ->format('g:i:s A M d, Y');
+        return format_domain_datetime($this->created_at, $this->domain_uuid);
     }
 
     public function getSourceFormattedAttribute(): ?string

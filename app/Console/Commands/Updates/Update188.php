@@ -8,7 +8,7 @@ use Throwable;
 
 class Update188
 {
-    private const VERSION = '1.8.8';
+    private const VERSION = '1.8.7.1';
 
     public function apply(): bool
     {

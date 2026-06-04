@@ -58,11 +58,7 @@ class Messages extends Model
                     return null;
                 }
 
-                $time_zone = get_local_time_zone($this->domain_uuid);
-
-                return Carbon::parse($this->created_at)
-                    ->setTimezone($time_zone)
-                    ->format('g:i:s A M d, Y');
+                return format_domain_datetime($this->created_at, $this->domain_uuid);
             }
         );
     }

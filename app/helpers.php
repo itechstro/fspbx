@@ -943,6 +943,34 @@ if (!function_exists('format_domain_timestamp')) {
     }
 }
 
+if (!function_exists('format_domain_datetime')) {
+    /**
+     * Format a Unix timestamp or datetime value using domain presentation settings.
+     */
+    function format_domain_datetime(
+        \Carbon\Carbon|string|int|float|null $value,
+        ?string $domain_uuid = null,
+        string $part = 'datetime'
+    ): ?string {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        $service = app(\App\Services\DomainPresentationService::class);
+
+        if (is_int($value) || (is_string($value) && ctype_digit($value))) {
+            return $service->formatTimestamp((int) $value, $domain_uuid, $part);
+        }
+
+        $timezone = get_local_time_zone($domain_uuid);
+        $carbon = $value instanceof \Carbon\Carbon
+            ? $value->copy()
+            : \Carbon\Carbon::parse($value);
+
+        return $service->formatCarbon($carbon->setTimezone($timezone), $domain_uuid, $part);
+    }
+}
+
 if (!function_exists('generate_password')) {
     /**
      * Generate a secure password
