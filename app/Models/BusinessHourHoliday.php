@@ -13,6 +13,22 @@ class BusinessHourHoliday extends Model
 {
     use HasFactory, TraitUuid;
 
+    public static function templatedHolidayTypes(): array
+    {
+        return [
+            'us_holiday',
+            'ca_holiday',
+            'sg_holiday',
+            'my_holiday',
+            'id_holiday',
+            'th_holiday',
+            'ph_holiday',
+            'tw_holiday',
+            'hk_holiday',
+            'kr_holiday',
+        ];
+    }
+
     protected $table = 'business_hour_holidays';
     protected $primaryKey = 'uuid';
     public $incrementing = false;
@@ -175,7 +191,16 @@ class BusinessHourHoliday extends Model
     {
         switch ($this->holiday_type) {
             case 'us_holiday':
-                $next = $this->getNextUsHolidayDate()->format('F j, Y');
+            case 'ca_holiday':
+            case 'sg_holiday':
+            case 'my_holiday':
+            case 'id_holiday':
+            case 'th_holiday':
+            case 'ph_holiday':
+            case 'tw_holiday':
+            case 'hk_holiday':
+            case 'kr_holiday':
+                $next = $this->getNextTemplatedHolidayDate()->format('F j, Y');
                 return "Every year (next: {$next})";
 
             case 'single_date':
@@ -325,7 +350,7 @@ class BusinessHourHoliday extends Model
      *  - weekday-in-range patterns ("15-21" + wday)
      *  - Nth/last weekday (mweek)
      */
-    protected function getNextUsHolidayDate(int $year = null): Carbon
+    protected function getNextTemplatedHolidayDate(int $year = null): Carbon
     {
         $today = Carbon::today();
         $year  = $year ?: $today->year;
@@ -356,7 +381,7 @@ class BusinessHourHoliday extends Model
                 }
                 if ($d->dayOfWeekIso === $targetIso) {
                     return $d->lt($today)
-                        ? $this->getNextUsHolidayDate($year + 1)
+                        ? $this->getNextTemplatedHolidayDate($year + 1)
                         : $d;
                 }
             }

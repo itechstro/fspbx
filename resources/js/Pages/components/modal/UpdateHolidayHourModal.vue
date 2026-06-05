@@ -17,61 +17,10 @@
                             class="relative transform  rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-2xl sm:p-6">
 
                             <Vueform ref="form$" :endpoint="submitForm" @success="handleSuccess" @error="handleError"
-                                @response="handleResponse" :display-errors="false" :default="{
-                                    holiday_type: options.item.holiday_type,
-                                    description: options.item.description,
-                                    start_date: options.item.start_date,
-                                    start_time: options.item.start_time,
-                                    end_date: options.item.end_date,
-                                    end_time: options.item.end_time,
-                                    mday: options.item.mday,
-                                    mon: options.item.mon,
-                                    mweek: options.item.mweek,
-                                    wday: options.item.wday,
-                                    week: options.item.week,
-                                    action: options.item.action,
-                                    target: { value: options.item.target_id },
-                                    us_holiday:
-                                        usHolidays.find(h =>
-                                            (h.value.mon ?? '') === (options.item.mon ?? '') &&
-                                            (h.value.mday ?? '') === (options.item.mday ?? '') &&
-                                            (h.value.wday ?? '') === (options.item.wday ?? '') &&
-                                            (h.value.mweek ?? '') === (options.item.mweek ?? '')
-                                        )
-                                        ?? null,
-                                    ca_holiday:
-                                        caHolidays.find(h =>
-                                            (h.value.mon ?? '') === (options.item.mon ?? '') &&
-                                            (h.value.mday ?? '') === (options.item.mday ?? '') &&
-                                            (h.value.wday ?? '') === (options.item.wday ?? '') &&
-                                            (h.value.mweek ?? '') === (options.item.mweek ?? '')
-                                        )
-                                        ?? null
-                                }">
+                                @response="handleResponse" :display-errors="false" :default="formDefaults">
                                 <HiddenElement name="business_hour_uuid" :meta="true" />
                                 <StaticElement name="h4" tag="h4" content="Update Holiday" />
-                                <SelectElement name="holiday_type" :items="[
-                                    {
-                                        value: 'us_holiday',
-                                        label: 'US Holiday',
-                                    },
-                                    {
-                                        value: 'ca_holiday',
-                                        label: 'Canadian Holiday',
-                                    },
-                                    {
-                                        value: 'single_date',
-                                        label: 'Single Date',
-                                    },
-                                    {
-                                        value: 'date_range',
-                                        label: 'Date Range',
-                                    },
-                                    {
-                                        value: 'recurring_pattern',
-                                        label: 'Recurring Pattern',
-                                    },
-                                ]" :search="true" :native="false" label="Holiday Type" input-type="search"
+                                <SelectElement name="holiday_type" :items="holidayTypeItems" :search="true" :native="false" label="Holiday Type" input-type="search"
                                     @change="handleHolidayTypeChange" autocomplete="off"
                                     placeholder="Select Holiday Type" :floating="false" />
 
@@ -80,10 +29,7 @@
                                     [
                                         'holiday_type',
                                         'in',
-                                        [
-                                            'us_holiday',
-                                            'ca_holiday',
-                                        ],
+                                        templatedHolidayTypeValues,
                                     ],
                                 ]">
 
@@ -198,31 +144,29 @@
 
                                 </StaticElement>
 
-                                <SelectElement name="us_holiday" :search="true" :native="false" label="US Holiday"
-                                    :items="usHolidays" input-type="search" autocomplete="off" :object="true"
-                                    @change="handleUSHolidayUpdate" placeholder="Select US Holiday" :floating="false"
+                                <SelectElement
+                                    v-for="country in holidayTemplateCountries"
+                                    :key="country.value"
+                                    :name="country.fieldName"
+                                    :search="true"
+                                    :native="false"
+                                    :label="country.label"
+                                    :submit="false"
+                                    :items="country.holidays"
+                                    input-type="search"
+                                    autocomplete="off"
+                                    :object="true"
+                                    :placeholder="`Select ${country.label}`"
+                                    :floating="false"
                                     :conditions="[
                                         [
                                             'holiday_type',
                                             'in',
-                                            [
-                                                'us_holiday',
-                                            ],
+                                            [country.value],
                                         ],
-                                    ]" />
-
-                                <SelectElement name="ca_holiday" :search="true" :native="false" label="Canadian Holiday"
-                                    :submit="false" :items="caHolidays" input-type="search" autocomplete="off"
-                                    :object="true" @change="handleCAHolidayUpdate" placeholder="Select Canadian Holiday"
-                                    :floating="false" :conditions="[
-                                        [
-                                            'holiday_type',
-                                            'in',
-                                            [
-                                                'ca_holiday',
-                                            ],
-                                        ],
-                                    ]" />
+                                    ]"
+                                    @change="(newValue, oldValue, el$) => handleTemplateHolidayUpdate(country.holidays, newValue, oldValue, el$)"
+                                />
 
                                 <TextElement name="description" label="Holiday Description"
                                     description="Enter a clear, descriptive name for this holiday (e.g. ‘Company Annual Picnic’)."
@@ -465,9 +409,17 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot } from '@headlessui/vue'
 import { InformationCircleIcon } from '@heroicons/vue/20/solid'
+import {
+    buildTemplateHolidayDefaults,
+    holidayTemplateCountries,
+    holidayTypeItems,
+    handleTemplateHolidayUpdate,
+    stripTemplateHolidayFields,
+    templatedHolidayTypeValues,
+} from '../../../lib/holidayTemplates.js'
 
 const emits = defineEmits(['close', 'confirm', 'success', 'error', 'refresh-data'])
 
@@ -479,13 +431,30 @@ const props = defineProps({
 
 const form$ = ref(null)
 
+const formDefaults = computed(() => ({
+    holiday_type: props.options.item.holiday_type,
+    description: props.options.item.description,
+    start_date: props.options.item.start_date,
+    start_time: props.options.item.start_time,
+    end_date: props.options.item.end_date,
+    end_time: props.options.item.end_time,
+    mday: props.options.item.mday,
+    mon: props.options.item.mon,
+    mweek: props.options.item.mweek,
+    wday: props.options.item.wday,
+    week: props.options.item.week,
+    action: props.options.item.action,
+    target: { value: props.options.item.target_id },
+    ...buildTemplateHolidayDefaults(props.options.item),
+}))
+
 const submitForm = async (FormData, form$) => {
     // Using form$.requestData will EXCLUDE conditional elements and it 
     // will submit the form as Content-Type: application/json . 
     const requestData = form$.data
     // console.log(requestData);
 
-    delete requestData.us_holiday;
+    stripTemplateHolidayFields(requestData);
 
     requestData.business_hour_uuid = props.business_hour_uuid
 
@@ -582,55 +551,6 @@ const handleHolidayTypeChange = (newValue, oldValue, el$) => {
 
 }
 
-const handleUSHolidayUpdate = (newValue, oldValue, el$) => {
-
-    if (newValue != oldValue) {
-
-        // find the holiday whose value matches newValue
-        const match = usHolidays.find(h =>
-            h.value.mon === newValue.value.mon
-            && h.value.mday === newValue.value.mday
-            && h.value.mweek === newValue.value.mweek
-            && h.value.wday === newValue.value.wday
-        );
-
-        // pull its label (or fall back to an empty string)
-        const label = match?.label ?? '';
-
-        el$.form$.update({
-            mday: newValue.value.mday,
-            mon: newValue.value.mon,
-            mweek: newValue.value.mweek,
-            wday: newValue.value.wday,
-            description: label,
-        })
-    }
-
-}
-
-const handleCAHolidayUpdate = (newValue, oldValue, el$) => {
-    if (newValue != oldValue) {
-        // find the holiday whose value matches newValue
-        const match = caHolidays.find(h =>
-            h.value.mon === newValue.value.mon
-            && h.value.mday === newValue.value.mday
-            && h.value.mweek === newValue.value.mweek
-            && h.value.wday === newValue.value.wday
-        );
-
-        // pull its label (or fall back to an empty string)
-        const label = match?.label ?? '';
-
-        el$.form$.update({
-            mday: newValue.value.mday,
-            mon: newValue.value.mon,
-            mweek: newValue.value.mweek,
-            wday: newValue.value.wday,
-            description: label,
-        })
-    }
-}
-
 // Month (1=Jan … 12=Dec)
 const monthOptions = [
     { value: '1', label: 'January' },
@@ -678,157 +598,6 @@ const dayOfWeekOptions = [
     { value: '5', label: 'Thursday' },
     { value: '6', label: 'Friday' },
     { value: '7', label: 'Saturday' },
-];
-
-const usHolidays = [
-    {
-        label: "New Year's Eve (December 31)",
-        value: { mon: "12", wday: "", mday: "31", mweek: "" }
-    },
-    {
-        label: "New Year's Day (January 1)",
-        value: { mon: "1", wday: "", mday: "1", mweek: "" }
-    },
-    {
-        label: "Martin Luther King Jr. Day (3rd Monday in January)",
-        value: { mon: "1", wday: "2", mday: "15-21", mweek: "" }
-    },
-    {
-        label: "Valentine's Day (February 14)",
-        value: { mon: "2", wday: "", mday: "14", mweek: "" }
-    },
-    {
-        label: "Presidents' Day (3rd Monday in February)",
-        value: { mon: "2", wday: "2", mday: "15-21", mweek: "" }
-    },
-    {
-        label: "St. Patrick's Day (March 17)",
-        value: { mon: "3", wday: "", mday: "17", mweek: "" }
-    },
-    {
-        label: "Memorial Day (last Monday in May)",
-        value: { mon: "5", wday: "2", mday: "25-31", mweek: "" }
-    },
-    {
-        label: "Juneteenth (June 19)",
-        value: { mon: "6", wday: "", mday: "19", mweek: "" }
-    },
-    {
-        label: "Independence Day (July 4)",
-        value: { mon: "7", wday: "", mday: "4", mweek: "" }
-    },
-    {
-        label: "Labor Day (1st Monday in September)",
-        value: { mon: "9", wday: "2", mday: "1-7", mweek: "" }
-    },
-    {
-        label: "Columbus Day (2nd Monday in October)",
-        value: { mon: "10", wday: "2", mday: "8-14", mweek: "" }
-    },
-    {
-        label: "Halloween (October 31)",
-        value: { mon: "10", wday: "", mday: "31", mweek: "" }
-    },
-    {
-        label: "Veterans Day (November 11)",
-        value: { mon: "11", wday: "", mday: "11", mweek: "" }
-    },
-    {
-        label: "Thanksgiving Day (4th Thursday in November)",
-        value: { mon: "11", wday: "5", mday: "22-28", mweek: "" }
-    },
-    {
-        label: "Black Friday (4th Friday in November)",
-        value: { mon: "11", wday: "6", mday: "23-29", mweek: "" }
-    },
-    {
-        label: "Christmas Eve (December 24)",
-        value: { mon: "12", wday: "", mday: "24", mweek: "" }
-    },
-    {
-        label: "Christmas Day (December 25)",
-        value: { mon: "12", wday: "", mday: "25", mweek: "" }
-    },
-    {
-        label: "Mother's Day (2nd Sunday in May)",
-        value: { mon: "5", wday: "1", mday: "8-14", mweek: "" }
-    },
-    {
-        label: "Father's Day (3rd Sunday in June)",
-        value: { mon: "6", wday: "1", mday: "15-21", mweek: "" }
-    }
-];
-
-const caHolidays = [
-    {
-        label: "New Year's Day (January 1)",
-        value: { mon: "1", wday: "", mday: "1", mweek: "" }
-    },
-    {
-        label: "Family Day (3rd Monday in February)",
-        value: { mon: "2", wday: "2", mday: "15-21", mweek: "" }
-    },
-    {
-        label: "Good Friday (Friday before Easter Sunday)",
-        value: { mon: "4", wday: "6", mday: "2-8", mweek: "" }
-    },
-    {
-        label: "Easter Monday (Monday after Easter Sunday)",
-        value: { mon: "4", wday: "2", mday: "1-7", mweek: "" }
-    },
-    {
-        label: "Victoria Day (Last Monday before May 25)",
-        value: { mon: "5", wday: "2", mday: "18-24", mweek: "" }
-    },
-    {
-        label: "Canada Day (July 1)",
-        value: { mon: "7", wday: "", mday: "1", mweek: "" }
-    },
-    {
-        label: "Civic Holiday (First Monday in August)",
-        value: { mon: "8", wday: "2", mday: "1-7", mweek: "" }
-    },
-    {
-        label: "Labour Day (First Monday in September)",
-        value: { mon: "9", wday: "2", mday: "1-7", mweek: "" }
-    },
-    {
-        label: "National Day for Truth and Reconciliation (September 30)",
-        value: { mon: "9", wday: "", mday: "30", mweek: "" }
-    },
-    {
-        label: "Thanksgiving Day (Second Monday in October)",
-        value: { mon: "10", wday: "2", mday: "8-14", mweek: "" }
-    },
-    {
-        label: "Remembrance Day (November 11)",
-        value: { mon: "11", wday: "", mday: "11", mweek: "" }
-    },
-    {
-        label: "Christmas Day (December 25)",
-        value: { mon: "12", wday: "", mday: "25", mweek: "" }
-    },
-    {
-        label: "Boxing Day (December 26)",
-        value: { mon: "12", wday: "", mday: "26", mweek: "" }
-    },
-    // Additional observances
-    {
-        label: "St. Patrick's Day (March 17)",
-        value: { mon: "3", wday: "", mday: "17", mweek: "" }
-    },
-    {
-        label: "Mother's Day (Second Sunday in May)",
-        value: { mon: "5", wday: "1", mday: "8-14", mweek: "" }
-    },
-    {
-        label: "Father's Day (Third Sunday in June)",
-        value: { mon: "6", wday: "1", mday: "15-21", mweek: "" }
-    },
-    {
-        label: "Halloween (October 31)",
-        value: { mon: "10", wday: "", mday: "31", mweek: "" }
-    }
 ];
 
 </script>

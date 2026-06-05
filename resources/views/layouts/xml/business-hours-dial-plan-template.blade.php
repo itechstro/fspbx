@@ -209,6 +209,14 @@ $makeTimeRangeRegex = function ($start, $end) {
 
                     case 'us_holiday':
                     case 'ca_holiday':
+                    case 'sg_holiday':
+                    case 'my_holiday':
+                    case 'id_holiday':
+                    case 'th_holiday':
+                    case 'ph_holiday':
+                    case 'tw_holiday':
+                    case 'hk_holiday':
+                    case 'kr_holiday':
                         // 1) a fixed calendar date (e.g. January 1)
                         if (!empty($h->mon) && !empty($h->mday) && empty($h->wday) && empty($h->mweek)) {
                             $useAttrs = [

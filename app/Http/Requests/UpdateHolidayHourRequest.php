@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\BusinessHourHoliday;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Foundation\Http\FormRequest;
@@ -15,13 +16,14 @@ class UpdateHolidayHourRequest extends FormRequest
 
     public function rules(): array
     {
-        $types = [
-            'us_holiday',
-            'ca_holiday',
-            'single_date',
-            'date_range',
-            'recurring_pattern',
-        ];
+        $types = array_merge(
+            BusinessHourHoliday::templatedHolidayTypes(),
+            [
+                'single_date',
+                'date_range',
+                'recurring_pattern',
+            ]
+        );
 
         return [
             'business_hour_uuid' => 'present',
@@ -100,14 +102,13 @@ class UpdateHolidayHourRequest extends FormRequest
             $startTime = $this->input('start_time');
             $endTime = $this->input('end_time');
 
-            // US holiday must be fixed‐date (mday) OR floating (wday + mweek)
-            if ($type === 'us_holiday' || $type === 'ca_holiday') {
+            if (in_array($type, BusinessHourHoliday::templatedHolidayTypes(), true)) {
                 $hasFixed    = filled($this->input('mday'));
                 $hasFloating = filled($this->input('wday')) && filled($this->input('mweek'));
 
                 if (! $hasFixed && ! $hasFloating) {
                     $validator->errors()->add(
-                        'us_holiday',
+                        'holiday_type',
                         'You must select a holiday from the list.'
                     );
                 }
