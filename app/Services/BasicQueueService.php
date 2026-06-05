@@ -186,6 +186,11 @@ class BasicQueueService
         });
     }
 
+    public function syncTiersForQueue(CallCenterQueues $queue, array $tiers): array
+    {
+        return $this->syncTiers($queue, $tiers);
+    }
+
     private function syncTiers(CallCenterQueues $queue, array $tiers): array
     {
         $incoming = collect($tiers)
@@ -255,7 +260,7 @@ class BasicQueueService
         ];
     }
 
-    private function buildQueueTimeoutAction(array $validated, string $domainName): ?string
+    public function buildQueueTimeoutAction(array $validated, string $domainName): ?string
     {
         if (blank($validated['timeout_action'] ?? null)) {
             return null;

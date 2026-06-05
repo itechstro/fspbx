@@ -1,0 +1,21 @@
+{
+    "name": "ContactCenter",
+    "alias": "contact-center",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\ContactCenter\\Providers\\ContactCenterServiceProvider",
+        "Modules\\ContactCenter\\Providers\\EventServiceProvider"
+    ],
+    "aliases": {},
+    "files": [
+        "helpers.php"
+    ],
+    "requires": [],
+    "migration": {
+        "seeds": [
+            "Modules\\ContactCenter\\Database\\Seeders\\ContactCenterDatabaseSeeder"
+        ]
+    }
+}

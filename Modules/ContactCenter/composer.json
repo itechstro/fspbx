@@ -1,0 +1,22 @@
+{
+    "name": "nemerald-voip/contact-center-module",
+    "description": "A contact center module for FS PBX.",
+    "authors": [
+        {
+            "name": "Dexter Allen"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {
+
+            }
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\ContactCenter\\": "src/"
+        }
+    }
+}
