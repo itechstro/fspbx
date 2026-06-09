@@ -422,7 +422,7 @@ import {
 const emits = defineEmits(['close', 'confirm', 'success', 'error', 'refresh-data'])
 
 const page = usePage()
-const dateDisplayFormat = computed(() => page.props.presentation?.datepicker_format ?? 'MM/dd/yyyy')
+const dateDisplayFormat = computed(() => page.props.presentation?.moment_date_format ?? 'DD/MM/YYYY')
 
 const props = defineProps({
     show: Boolean,

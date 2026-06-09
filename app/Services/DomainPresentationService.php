@@ -135,6 +135,7 @@ class DomainPresentationService
             'time_format' => $timeFormat,
             'datetime_format' => trim($dateFormat . ' ' . $timeFormat),
             'datepicker_format' => $this->datepickerFormatFromPhp($dateFormat),
+            'moment_date_format' => $this->phpDateFormatToMoment($dateFormat),
             'moment_format' => $this->momentFormatFromPhp($dateFormat, $timeFormat),
             'date_format_source' => $rawDateOverride ? 'override' : 'country',
             'time_format_source' => $rawTimeOverride ? 'override' : 'country',
