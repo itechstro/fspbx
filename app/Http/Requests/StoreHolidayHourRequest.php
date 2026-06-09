@@ -102,14 +102,15 @@ class StoreHolidayHourRequest extends FormRequest
             $startTime = $this->input('start_time');
             $endTime = $this->input('end_time');
 
-            if (in_array($type, BusinessHourHoliday::templatedHolidayTypes(), true)) {
-                $hasFixed    = filled($this->input('mday'));
-                $hasFloating = filled($this->input('wday')) && filled($this->input('mweek'));
+            if (BusinessHourHoliday::isTemplatedHolidayType($type)) {
+                $hasFixed      = filled($this->input('mday'));
+                $hasFloating   = filled($this->input('wday')) && filled($this->input('mweek'));
+                $hasManualDate = filled($this->input('start_date'));
 
-                if (! $hasFixed && ! $hasFloating) {
+                if (! $hasFixed && ! $hasFloating && ! $hasManualDate) {
                     $validator->errors()->add(
                         'holiday_type',
-                        'You must select a holiday from the list.'
+                        'Select a holiday from the list. For variable-date holidays, also choose the date.'
                     );
                 }
             }
@@ -160,7 +161,19 @@ class StoreHolidayHourRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        if ($this->input('holiday_type') === 'single_date') {
+        $type = $this->input('holiday_type');
+
+        if ($type === 'single_date') {
+            $this->merge([
+                'end_date' => $this->input('start_date'),
+            ]);
+        }
+
+        if (
+            BusinessHourHoliday::isTemplatedHolidayType($type)
+            && $this->filled('start_date')
+            && ! filled($this->input('mday'))
+        ) {
             $this->merge([
                 'end_date' => $this->input('start_date'),
             ]);

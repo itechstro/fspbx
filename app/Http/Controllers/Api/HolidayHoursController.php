@@ -26,7 +26,7 @@ class HolidayHoursController extends Controller
     public function index()
     {
 
-        $holidays = BusinessHourHoliday::with('target')
+        $holidays = BusinessHourHoliday::with(['target', 'businessHour'])
             ->where('business_hour_uuid', request('uuid'))
             ->orderBy('created_at', 'desc')
             ->get();

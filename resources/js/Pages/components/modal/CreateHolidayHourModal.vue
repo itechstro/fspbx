@@ -19,6 +19,7 @@
                             <Vueform ref="form$" :endpoint="submitForm" @success="handleSuccess" @error="handleError"
                                 @response="handleResponse" :display-errors="false">
                                 <HiddenElement name="business_hour_uuid" :meta="true" />
+                                <HiddenElement name="template_date_mode" default="no" />
                                 <StaticElement name="h4" tag="h4" content="Add New Holiday" />
                                 <SelectElement name="holiday_type" :items="holidayTypeItems" :search="true" :native="false" label="Holiday Type" input-type="search"
                                     @change="handleHolidayTypeChange" autocomplete="off" placeholder="Select Holiday Type"
@@ -40,8 +41,9 @@
                                             </div>
 
                                             <div class="ml-3">
-                                                Choose from the list of holidays. Each selection automatically
-                                                applies the exception on that exact holiday date.
+                                                Choose from the list of holidays. Fixed holidays apply automatically
+                                                each year. Holidays marked as date varies need you to pick the date
+                                                for the current year below.
 
                                             </div>
                                         </div>
@@ -136,6 +138,21 @@
 
                                 </StaticElement>
 
+                                <StaticElement name="p_manual_date" tag="p" :conditions="manualTemplateDateInfoConditions">
+                                    <div class="rounded-md bg-blue-50 p-4">
+                                        <div class="flex">
+                                            <div class="shrink-0">
+                                                <InformationCircleIcon class="size-5 text-blue-400" aria-hidden="true" />
+                                            </div>
+
+                                            <div class="ml-3">
+                                                This holiday falls on a different date each year. Pick the date for
+                                                the year you are configuring.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </StaticElement>
+
                                 <SelectElement
                                     v-for="country in holidayTemplateCountries"
                                     :key="country.value"
@@ -148,6 +165,7 @@
                                     input-type="search"
                                     autocomplete="off"
                                     :object="true"
+                                    track-by="label"
                                     :placeholder="`Select ${country.label}`"
                                     :floating="false"
                                     :conditions="[
@@ -158,6 +176,7 @@
                                         ],
                                     ]"
                                     @change="(newValue, oldValue, el$) => handleTemplateHolidayUpdate(country.holidays, newValue, oldValue, el$)"
+                                    @select="(newValue, oldValue, el$) => handleTemplateHolidayUpdate(country.holidays, newValue, oldValue, el$)"
                                 />
 
                                 <TextElement name="description" label="Holiday Description"
@@ -174,7 +193,11 @@
                                         ],
                                     ]" />
 
-                                <DateElement name="start_date" display-format="MMMM DD, YYYY" :label="(el$) => {
+                                <DateElement name="start_date" :display-format="dateDisplayFormat" :label="(el$) => {
+                                    if (el$.form$.el$('template_date_mode')?.value === 'yes') {
+                                        return 'Date'
+                                    }
+
                                     if (el$.form$.el$('holiday_type').value == 'single_date') {
                                         return 'Date'
                                     }
@@ -190,16 +213,7 @@
     sm: {
         container: 4,
     },
-}" :conditions="[
-    [
-        'holiday_type',
-        'in',
-        [
-            'single_date',
-            'date_range',
-        ],
-    ],
-]" />
+}" :conditions="[templateHolidayStartDateConditions]" />
                                 <DateElement name="start_time" label="Start Time" :date="false" :time="true" :hour24="false"
                                     value-format="HH:mm" :columns="{
                                         default: {
@@ -208,16 +222,7 @@
                                         sm: {
                                             container: 4,
                                         },
-                                    }" :conditions="[
-    [
-        'holiday_type',
-        'in',
-        [
-            'single_date',
-            'date_range',
-        ],
-    ],
-]" />
+                                    }" :conditions="[templateHolidayStartDateConditions]" />
                                 <GroupElement name="container" :conditions="[
                                     [
                                         'holiday_type',
@@ -227,7 +232,7 @@
                                         ],
                                     ],
                                 ]" />
-                                <DateElement name="end_date" display-format="MMMM DD, YYYY" label="End Date" :columns="{
+                                <DateElement name="end_date" :display-format="dateDisplayFormat" label="End Date" :columns="{
                                     default: {
                                         container: 6,
                                     },
@@ -400,18 +405,24 @@
 </template>
 
 <script setup>
-import { ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
+import { usePage } from '@inertiajs/vue3';
 import { Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot } from '@headlessui/vue'
 import { InformationCircleIcon } from '@heroicons/vue/20/solid'
 import {
     holidayTemplateCountries,
     holidayTypeItems,
     handleTemplateHolidayUpdate,
+    manualTemplateDateInfoConditions,
     stripTemplateHolidayFields,
+    templateHolidayStartDateConditions,
     templatedHolidayTypeValues,
 } from '../../../lib/holidayTemplates.js'
 
 const emits = defineEmits(['close', 'confirm', 'success', 'error', 'refresh-data'])
+
+const page = usePage()
+const dateDisplayFormat = computed(() => page.props.presentation?.datepicker_format ?? 'MM/dd/yyyy')
 
 const props = defineProps({
     show: Boolean,
@@ -517,7 +528,8 @@ const handleHolidayTypeChange = (newValue, oldValue, el$) => {
     if (newValue != oldValue) {
         el$.form$.clear()
         el$.form$.update({
-            holiday_type: newValue
+            holiday_type: newValue,
+            template_date_mode: 'no',
         })
     }
 

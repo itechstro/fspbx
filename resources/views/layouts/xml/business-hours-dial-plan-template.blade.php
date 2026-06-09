@@ -217,8 +217,17 @@ $makeTimeRangeRegex = function ($start, $end) {
                     case 'tw_holiday':
                     case 'hk_holiday':
                     case 'kr_holiday':
+                        // 0) a manually chosen date for variable holidays (e.g. Chinese New Year)
+                        if ($h->start_date && empty($h->mday) && empty($h->mweek)) {
+                            $dt = $h->start_date;
+                            $useAttrs = [
+                                'year' => $dt->format('Y'),
+                                'mon' => $dt->format('n'),
+                                'mday' => $dt->format('j'),
+                            ];
+                        }
                         // 1) a fixed calendar date (e.g. January 1)
-                        if (!empty($h->mon) && !empty($h->mday) && empty($h->wday) && empty($h->mweek)) {
+                        elseif (!empty($h->mon) && !empty($h->mday) && empty($h->wday) && empty($h->mweek)) {
                             $useAttrs = [
                                 'mon' => $h->mon,
                                 'mday' => $h->mday,

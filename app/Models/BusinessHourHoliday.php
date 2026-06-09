@@ -13,6 +13,22 @@ class BusinessHourHoliday extends Model
 {
     use HasFactory, TraitUuid;
 
+    public static function isTemplatedHolidayType(?string $type): bool
+    {
+        return in_array($type, self::templatedHolidayTypes(), true);
+    }
+
+    public function usesManualTemplateDate(): bool
+    {
+        if (! self::isTemplatedHolidayType($this->holiday_type)) {
+            return false;
+        }
+
+        $hasPattern = filled($this->mday) || (filled($this->wday) && filled($this->mweek));
+
+        return ! $hasPattern && $this->start_date !== null;
+    }
+
     public static function templatedHolidayTypes(): array
     {
         return [
@@ -200,39 +216,30 @@ class BusinessHourHoliday extends Model
             case 'tw_holiday':
             case 'hk_holiday':
             case 'kr_holiday':
-                $next = $this->getNextTemplatedHolidayDate()->format('F j, Y');
+                if ($this->usesManualTemplateDate()) {
+                    return $this->formatHolidayDateWithOptionalTime($this->start_date);
+                }
+
+                $next = $this->formatHolidayDate($this->getNextTemplatedHolidayDate());
                 return "Every year (next: {$next})";
 
             case 'single_date':
-                $date = $this->start_date->format('F j, Y');
-                if ($this->start_time && $this->end_time) {
-                    $from = $this->start_time instanceof Carbon
-                        ? $this->start_time->format('H:i')
-                        : $this->start_time;
-                    $to   = $this->end_time   instanceof Carbon
-                        ? $this->end_time->format('H:i')
-                        : $this->end_time;
-                    $date .= " {$from}–{$to}";
-                }
-                return $date;
+                return $this->formatHolidayDateWithOptionalTime($this->start_date);
 
             case 'date_range':
-                // If both times are set, show the full span
                 if ($this->start_time && $this->end_time) {
-                    $fromDate = $this->start_date->format('F j, Y');
-                    $toDate   = $this->end_date->format('F j, Y');
-                    $fromTime = $this->start_time instanceof Carbon
-                        ? $this->start_time->format('H:i')
-                        : $this->start_time;
-                    $toTime   = $this->end_time   instanceof Carbon
-                        ? $this->end_time->format('H:i')
-                        : $this->end_time;
-
-                    return "{$fromDate} {$fromTime} – {$toDate} {$toTime}";
+                    return sprintf(
+                        '%s %s – %s %s',
+                        $this->formatHolidayDate($this->start_date),
+                        $this->formatHolidayTime($this->start_time),
+                        $this->formatHolidayDate($this->end_date),
+                        $this->formatHolidayTime($this->end_time),
+                    );
                 }
 
-                // Otherwise just dates
-                return "{$this->start_date->format('F j, Y')} – {$this->end_date->format('F j, Y')}";
+                return $this->formatHolidayDate($this->start_date)
+                    . ' – '
+                    . $this->formatHolidayDate($this->end_date);
 
 
             case 'recurring_pattern':
@@ -302,15 +309,12 @@ class BusinessHourHoliday extends Model
                     $recurrence = (string) $this->description;
                 }
 
-                // append time span if both times are set
                 if ($this->start_time && $this->end_time) {
-                    $from = $this->start_time instanceof Carbon
-                        ? $this->start_time->format('H:i')
-                        : $this->start_time;
-                    $to   = $this->end_time   instanceof Carbon
-                        ? $this->end_time->format('H:i')
-                        : $this->end_time;
-                    $recurrence .= " ({$from}–{$to})";
+                    $recurrence .= sprintf(
+                        ' (%s–%s)',
+                        $this->formatHolidayTime($this->start_time),
+                        $this->formatHolidayTime($this->end_time),
+                    );
                 }
 
                 return $recurrence;
@@ -320,6 +324,46 @@ class BusinessHourHoliday extends Model
             default:
                 return (string) $this->description;
         }
+    }
+
+    protected function holidayDomainUuid(): ?string
+    {
+        return $this->businessHour?->domain_uuid ?? session('domain_uuid');
+    }
+
+    protected function formatHolidayDate(?Carbon $date): string
+    {
+        if (! $date) {
+            return '';
+        }
+
+        return format_domain_datetime($date, $this->holidayDomainUuid(), 'date') ?? '';
+    }
+
+    protected function formatHolidayTime(mixed $time): string
+    {
+        if (! $time) {
+            return '';
+        }
+
+        $carbon = $time instanceof Carbon ? $time : Carbon::parse($time);
+
+        return format_domain_datetime($carbon, $this->holidayDomainUuid(), 'time') ?? '';
+    }
+
+    protected function formatHolidayDateWithOptionalTime(?Carbon $date): string
+    {
+        $formatted = $this->formatHolidayDate($date);
+
+        if ($this->start_time && $this->end_time) {
+            $formatted .= sprintf(
+                ' %s–%s',
+                $this->formatHolidayTime($this->start_time),
+                $this->formatHolidayTime($this->end_time),
+            );
+        }
+
+        return $formatted;
     }
 
     /**

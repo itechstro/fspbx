@@ -1,3 +1,33 @@
+function manualDateHoliday(label) {
+    const key = label
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '');
+
+    return {
+        label,
+        manualDate: true,
+        value: {
+            manualDate: true,
+            key,
+        },
+    };
+}
+
+export function isManualDateHoliday(holiday) {
+    return holiday?.manualDate === true || holiday?.value?.manualDate === true;
+}
+
+export function isManualTemplateHolidayItem(item) {
+    if (!item || !templatedHolidayTypeValues.includes(item.holiday_type)) {
+        return false;
+    }
+
+    const hasPattern = Boolean(item.mday) || (Boolean(item.wday) && Boolean(item.mweek));
+
+    return !hasPattern && Boolean(item.start_date);
+}
+
 const usHolidays = [
     {
         label: "New Year's Eve (December 31)",
@@ -169,6 +199,11 @@ const sgHolidays = [
         label: 'Christmas Day (December 25)',
         value: { mon: '12', wday: '', mday: '25', mweek: '' },
     },
+    manualDateHoliday('Chinese New Year (date varies)'),
+    manualDateHoliday('Hari Raya Puasa (date varies)'),
+    manualDateHoliday('Hari Raya Haji (date varies)'),
+    manualDateHoliday('Deepavali (date varies)'),
+    manualDateHoliday('Vesak Day (date varies)'),
 ];
 
 const myHolidays = [
@@ -192,6 +227,12 @@ const myHolidays = [
         label: 'Christmas Day (December 25)',
         value: { mon: '12', wday: '', mday: '25', mweek: '' },
     },
+    manualDateHoliday('Chinese New Year (date varies)'),
+    manualDateHoliday('Hari Raya Puasa (date varies)'),
+    manualDateHoliday('Hari Raya Haji (date varies)'),
+    manualDateHoliday('Deepavali (date varies)'),
+    manualDateHoliday('Wesak Day (date varies)'),
+    manualDateHoliday('Thaipusam (date varies)'),
 ];
 
 const idHolidays = [
@@ -219,6 +260,12 @@ const idHolidays = [
         label: 'Christmas Day (December 25)',
         value: { mon: '12', wday: '', mday: '25', mweek: '' },
     },
+    manualDateHoliday('Chinese New Year / Imlek (date varies)'),
+    manualDateHoliday('Idul Fitri (date varies)'),
+    manualDateHoliday('Idul Adha (date varies)'),
+    manualDateHoliday('Waisak Day (date varies)'),
+    manualDateHoliday('Islamic New Year (date varies)'),
+    manualDateHoliday("Prophet Muhammad's Birthday (date varies)"),
 ];
 
 const thHolidays = [
@@ -266,6 +313,10 @@ const thHolidays = [
         label: "New Year's Eve (December 31)",
         value: { mon: '12', wday: '', mday: '31', mweek: '' },
     },
+    manualDateHoliday('Makha Bucha (date varies)'),
+    manualDateHoliday('Visakha Bucha (date varies)'),
+    manualDateHoliday('Asarnha Bucha (date varies)'),
+    manualDateHoliday('Buddhist Lent Day (date varies)'),
 ];
 
 const phHolidays = [
@@ -305,6 +356,9 @@ const phHolidays = [
         label: 'Christmas Day (December 25)',
         value: { mon: '12', wday: '', mday: '25', mweek: '' },
     },
+    manualDateHoliday('Chinese New Year (date varies)'),
+    manualDateHoliday("Eid'l Fitr (date varies)"),
+    manualDateHoliday("Eid'l Adha (date varies)"),
 ];
 
 const twHolidays = [
@@ -324,6 +378,10 @@ const twHolidays = [
         label: 'National Day (October 10)',
         value: { mon: '10', wday: '', mday: '10', mweek: '' },
     },
+    manualDateHoliday('Chinese New Year (date varies)'),
+    manualDateHoliday('Tomb Sweeping Day (date varies)'),
+    manualDateHoliday('Dragon Boat Festival (date varies)'),
+    manualDateHoliday('Mid-Autumn Festival (date varies)'),
 ];
 
 const hkHolidays = [
@@ -359,6 +417,12 @@ const hkHolidays = [
         label: 'Boxing Day (December 26)',
         value: { mon: '12', wday: '', mday: '26', mweek: '' },
     },
+    manualDateHoliday('Chinese New Year (date varies)'),
+    manualDateHoliday('Ching Ming Festival (date varies)'),
+    manualDateHoliday("Buddha's Birthday (date varies)"),
+    manualDateHoliday('Dragon Boat Festival (date varies)'),
+    manualDateHoliday('Mid-Autumn Festival (date varies)'),
+    manualDateHoliday('Chung Yeung Festival (date varies)'),
 ];
 
 const krHolidays = [
@@ -394,6 +458,9 @@ const krHolidays = [
         label: 'Christmas Day (December 25)',
         value: { mon: '12', wday: '', mday: '25', mweek: '' },
     },
+    manualDateHoliday('Seollal / Lunar New Year (date varies)'),
+    manualDateHoliday('Chuseok (date varies)'),
+    manualDateHoliday("Buddha's Birthday (date varies)"),
 ];
 
 export const holidayTemplateCountries = [
@@ -416,6 +483,35 @@ export const templatedHolidayTypeItems = holidayTemplateCountries.map((country) 
 
 export const templatedHolidayTypeValues = holidayTemplateCountries.map((country) => country.value);
 
+export function selectedTemplateHoliday(form$) {
+    const type = form$?.el$('holiday_type')?.value;
+
+    if (!templatedHolidayTypeValues.includes(type)) {
+        return null;
+    }
+
+    const country = holidayTemplateCountries.find((entry) => entry.value === type);
+
+    if (!country) {
+        return null;
+    }
+
+    return form$?.el$(country.fieldName)?.value ?? null;
+}
+
+export const templateHolidayStartDateConditions = [
+    [
+        ['holiday_type', ['single_date', 'date_range']],
+    ],
+    [
+        ['template_date_mode', 'yes'],
+    ],
+];
+
+export const manualTemplateDateInfoConditions = [
+    ['template_date_mode', 'yes'],
+];
+
 export const holidayTypeItems = [
     ...templatedHolidayTypeItems,
     { value: 'single_date', label: 'Single Date' },
@@ -428,8 +524,19 @@ export function findMatchingHoliday(holidays, item) {
         return null;
     }
 
+    if (isManualTemplateHolidayItem(item)) {
+        return holidays.find((holiday) =>
+            isManualDateHoliday(holiday)
+            && (
+                holiday.label === item.description
+                || holiday.value?.key === item.template_holiday_key
+            )
+        ) ?? null;
+    }
+
     return holidays.find((holiday) =>
-        (holiday.value.mon ?? '') === (item.mon ?? '')
+        !isManualDateHoliday(holiday)
+        && (holiday.value.mon ?? '') === (item.mon ?? '')
         && (holiday.value.mday ?? '') === (item.mday ?? '')
         && (holiday.value.wday ?? '') === (item.wday ?? '')
         && (holiday.value.mweek ?? '') === (item.mweek ?? '')
@@ -447,8 +554,51 @@ export function findMatchingHolidayLabel(holidays, value) {
     return match?.label ?? '';
 }
 
+export function resolveTemplateHolidayLabel(holidays, selected) {
+    if (!selected) {
+        return '';
+    }
+
+    if (selected.label) {
+        return selected.label;
+    }
+
+    const match = holidays.find((holiday) =>
+        isManualDateHoliday(holiday)
+        && isManualDateHoliday(selected)
+        && holiday.value?.key === selected.value?.key
+    );
+
+    return match?.label ?? selected.label ?? '';
+}
+
 export function handleTemplateHolidayUpdate(holidays, newValue, oldValue, el$) {
-    if (newValue === oldValue) {
+    if (newValue == oldValue) {
+        return;
+    }
+
+    if (!newValue) {
+        el$.form$.update({
+            template_date_mode: 'no',
+            template_holiday_key: null,
+        });
+        return;
+    }
+
+    if (isManualDateHoliday(newValue)) {
+        el$.form$.update({
+            mday: null,
+            mon: null,
+            mweek: null,
+            wday: null,
+            template_holiday_key: newValue.value?.key ?? null,
+            description: resolveTemplateHolidayLabel(holidays, newValue),
+            template_date_mode: 'yes',
+            start_date: null,
+            end_date: null,
+            start_time: null,
+            end_time: null,
+        });
         return;
     }
 
@@ -457,7 +607,13 @@ export function handleTemplateHolidayUpdate(holidays, newValue, oldValue, el$) {
         mon: newValue.value.mon,
         mweek: newValue.value.mweek,
         wday: newValue.value.wday,
+        template_holiday_key: null,
         description: findMatchingHolidayLabel(holidays, newValue),
+        template_date_mode: 'no',
+        start_date: null,
+        end_date: null,
+        start_time: null,
+        end_time: null,
     });
 }
 
@@ -465,6 +621,9 @@ export function stripTemplateHolidayFields(requestData) {
     holidayTemplateCountries.forEach((country) => {
         delete requestData[country.fieldName];
     });
+
+    delete requestData.template_holiday_key;
+    delete requestData.template_date_mode;
 }
 
 export function buildTemplateHolidayDefaults(item) {
