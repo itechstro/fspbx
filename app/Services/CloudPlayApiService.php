@@ -128,6 +128,7 @@ class CloudPlayApiService implements MobileAppProviderInterface
     {
         $request = Http::timeout($this->timeout)
             ->acceptJson()
+            ->asJson()
             ->baseUrl($baseUrl ?? $this->ensureApiUrl());
 
         if ($token) {
@@ -494,8 +495,11 @@ class CloudPlayApiService implements MobileAppProviderInterface
             'username' => $data['usr_username'] ?? $this->buildMobileAppUsername($domainUuid, $extension),
             'password' => $plainPassword ?? ($data['usr_password'] ?? $params['app_password'] ?? ''),
             'domain' => $credentials['username'],
-            'status' => (($data['usr_status'] ?? 'Y') === 'Y') ? 1 : -1,
+            'status' => strtoupper((string) ($data['usr_status'] ?? 'Y')) === 'Y' ? 1 : -1,
             'email' => $data['usr_email'] ?? ($params['email'] ?? ''),
+            'name' => $params['name'] ?? '',
+            'extension' => $extension,
+            'domain_uuid' => $domainUuid,
         ];
     }
 
@@ -547,27 +551,44 @@ class CloudPlayApiService implements MobileAppProviderInterface
     {
         $domainUuid = $params['domain_uuid'] ?? session('domain_uuid');
         $token = $this->getCustomerToken($domainUuid);
+        $profileId = $params['profile_id'] ?? $this->getProfileId($domainUuid);
 
+        // CloudPLAY requires these fields to be present; empty strings keep existing values.
         $payload = [
             'user_id' => (int) $params['user_id'],
             'usr_status' => (($params['status'] ?? 1) == 1) ? 'Y' : 'N',
-            'usr_account_name' => $params['name'] ?? null,
-            'usr_email' => $params['email'] ?? '',
-            'encrypt_password' => 'FALSE',
+            'usr_password' => '',
+            'usr_email' => '',
+            'usr_country_phonecode' => '',
+            'usr_mobile_number' => '',
+            'usr_account_name' => $params['name'] ?? '',
             'send_qr_code' => 'N',
+            'encrypt_password' => 'FALSE',
         ];
 
-        if (!empty($params['password'])) {
+        if (empty($profileId)) {
+            throw new \Exception('CloudPLAY profile is not configured for this domain.');
+        }
+
+        $payload['profile_id'] = (int) $profileId;
+
+        if (!empty($params['app_password'])) {
+            $payload['usr_password'] = $params['app_password'];
+        } elseif (!empty($params['password'])) {
             $payload['usr_password'] = $params['app_password'] ?? Str::password(12);
         }
 
-        $this->request('post', '/customer/user/update', array_filter($payload, fn ($value) => $value !== null), $token);
+        if (isset($params['email']) && $params['email'] !== '') {
+            $payload['usr_email'] = $params['email'];
+        }
 
-        if (!empty($params['password'])) {
+        $this->request('post', '/customer/user/update', $payload, $token);
+
+        if (!empty($params['password']) || !empty($params['update_sip_configurations'])) {
             $this->request('post', '/customer/user/update-configurations', [
                 'user_id' => (int) $params['user_id'],
                 'configurations' => $this->buildSipConfigurations($params)['sip_configurations'],
-                'send_push_notification' => 'false',
+                'send_push_notification' => $params['send_push_notification'] ?? 'false',
             ], $token);
         }
 
@@ -579,7 +600,7 @@ class CloudPlayApiService implements MobileAppProviderInterface
             ),
             'usr_status' => (($params['status'] ?? 1) == 1) ? 'Y' : 'N',
             'usr_email' => $params['email'] ?? '',
-        ], $params, $payload['usr_password'] ?? null);
+        ], $params, $payload['usr_password'] !== '' ? $payload['usr_password'] : null);
     }
 
     public function deleteUser(array $params): mixed
@@ -606,8 +627,10 @@ class CloudPlayApiService implements MobileAppProviderInterface
 
     public function deactivateUser(array $params): mixed
     {
+        // CloudPLAY rejects an empty usr_password; rotate the app login password while suspending.
         return $this->updateUser(array_merge($params, [
             'status' => -1,
+            'app_password' => Str::password(16),
         ]));
     }
 

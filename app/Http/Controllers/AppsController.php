@@ -18,6 +18,7 @@ use App\Services\MobileApp\MobileAppProviderResolver;
 use App\Services\RingotelApiService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\URL;
 use Spatie\QueryBuilder\QueryBuilder;
 use App\Models\MobileAppPasswordResetLinks;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
@@ -858,8 +859,10 @@ class AppsController extends Controller
                     $includePasswordUrl = route('appsGetPasswordByToken', $passwordToken);
                     $user['password_url'] = $includePasswordUrl;
                 }
-                if ($extension->email) {
-                    SendAppCredentials::dispatch($user)->onQueue('emails');
+                if ($extension->email && (int) request('status') === 1) {
+                    SendAppCredentials::dispatch(
+                        $this->prepareMobileAppCredentialsEmail($user, $extension, $currentDomain, 1)
+                    )->onQueue('emails');
                 }
             }
 
@@ -957,6 +960,7 @@ class AppsController extends Controller
                     'extension_uuid',
                     'domain_uuid',
                     'extension',
+                    'effective_caller_id_name',
                 ])
                 ->with([
                     'voicemail' => function ($query) use ($currentDomain) {
@@ -1015,7 +1019,9 @@ class AppsController extends Controller
                     $user['password_url'] = $includePasswordUrl;
                 }
                 if ($email) {
-                    SendAppCredentials::dispatch($user)->onQueue('emails');
+                    SendAppCredentials::dispatch(
+                        $this->prepareMobileAppCredentialsEmail($user, $extension, $currentDomain, 1)
+                    )->onQueue('emails');
                 }
             }
 
@@ -1230,7 +1236,9 @@ class AppsController extends Controller
                             $user['password_url'] = route('appsGetPasswordByToken', $passwordToken);
                         }
 
-                        SendAppCredentials::dispatch($user)->onQueue('emails');
+                        SendAppCredentials::dispatch(
+                            $this->prepareMobileAppCredentialsEmail($user, $extension, session('domain_uuid'), 1)
+                        )->onQueue('emails');
                     }
 
                     $processed++;
@@ -1252,6 +1260,11 @@ class AppsController extends Controller
                         'org_id' => $mobileApp->org_id,
                         'user_id' => $mobileApp->user_id,
                         'domain_uuid' => session('domain_uuid'),
+                        'name' => $extension->effective_caller_id_name,
+                        'email' => $extension->email ?: '',
+                        'ext' => $extension->extension,
+                        'username' => $extension->extension,
+                        'authname' => $extension->extension,
                     ]);
                     app(CloudPlayEnterpriseDirectorySync::class)->sync($provider, $extension, $mobileApp, false);
 
@@ -1317,7 +1330,9 @@ class AppsController extends Controller
                             $user['password_url'] = route('appsGetPasswordByToken', $passwordToken);
                         }
 
-                        SendAppCredentials::dispatch($user)->onQueue('emails');
+                        SendAppCredentials::dispatch(
+                            $this->prepareMobileAppCredentialsEmail($user, $extension, session('domain_uuid'), 1)
+                        )->onQueue('emails');
                     }
 
                     $processed++;
@@ -1434,7 +1449,9 @@ class AppsController extends Controller
                     $user['password_url'] = $includePasswordUrl;
                 }
                 if ($extension->email) {
-                    SendAppCredentials::dispatch($user)->onQueue('emails');
+                    SendAppCredentials::dispatch(
+                        $this->prepareMobileAppCredentialsEmail($user, $extension, $currentDomain, 1)
+                    )->onQueue('emails');
                 }
             }
 
@@ -1471,16 +1488,30 @@ class AppsController extends Controller
         $provider = $providerResolver->resolve();
 
         try {
-            $mobile_app = MobileAppUsers::find(request('mobile_app_user_uuid'));
+            $mobile_app = MobileAppUsers::with('extension')->find(request('mobile_app_user_uuid'));
+
+            if (!$mobile_app) {
+                return response()->json([
+                    'success' => false,
+                    'errors' => ['error' => ['Mobile app user not found.']],
+                ], 404);
+            }
+
+            $extension = $mobile_app->extension;
 
             $params = [
                 'org_id' => request('org_id'),
                 'user_id' => request('user_id'),
                 'domain_uuid' => session('domain_uuid'),
+                'name' => $extension?->effective_caller_id_name ?? '',
+                'email' => $extension?->email ?? '',
+                'ext' => $extension?->extension ?? request('ext'),
+                'username' => $extension?->extension ?? request('ext'),
+                'authname' => $extension?->extension ?? request('ext'),
             ];
 
             $provider->deactivateUser($params);
-            app(CloudPlayEnterpriseDirectorySync::class)->sync($provider, null, $mobile_app, false);
+            app(CloudPlayEnterpriseDirectorySync::class)->sync($provider, $extension, $mobile_app, false);
 
             if ($provider->getProviderKey() === 'ringotel') {
                 $users = app(RingotelApiService::class)->getUsers(request('org_id'), request('conn_id'));
@@ -1500,14 +1531,12 @@ class AppsController extends Controller
             return response()->json([
                 'messages' => ['success' => ['Mobile app has been deactivated']]
             ], 200);
-        } catch (\Exception $e) {
-            logger('ExtensionsController@deactivateUser error: ' . $e->getMessage() . " at " . $e->getFile() . ":" . $e->getLine());
+        } catch (\Throwable $e) {
+            logger('AppsController@deactivateUser error: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
             return response()->json([
-                'status' => 500,
-                'error' => [
-                    'message' => 'An unexpected error occurred. Please try again later.',
-                ],
-            ]);
+                'success' => false,
+                'errors' => ['error' => [$e->getMessage()]],
+            ], 422);
         }
     }
 
@@ -2078,33 +2107,89 @@ class AppsController extends Controller
         ];
     }
 
+    protected function prepareMobileAppCredentialsEmail(
+        array $user,
+        Extensions $extension,
+        ?string $domainUuid = null,
+        int $status = 1
+    ): array {
+        $user['name'] = $user['name'] ?? $extension->effective_caller_id_name ?? '';
+        $user['extension'] = $user['extension'] ?? $extension->extension ?? '';
+        $domainUuid = $user['domain_uuid'] ?? $domainUuid ?? $extension->domain_uuid ?? session('domain_uuid');
+        $user['domain_uuid'] = $domainUuid;
+        $user['status'] = $status;
+
+        $hidePassInEmail = get_domain_setting('dont_send_user_credentials', $domainUuid);
+        if ($hidePassInEmail === null) {
+            $hidePassInEmail = 'false';
+        }
+
+        if ($status === 1 && $hidePassInEmail === 'false' && empty($user['qrCodeUrl'])) {
+            $user['qrCodeUrl'] = $this->buildMobileAppQrCodeUrl($user, $domainUuid);
+        }
+
+        return $user;
+    }
+
+    protected function buildMobileAppQrCodeUrl(array $user, ?string $domainUuid = null): ?string
+    {
+        $payload = $this->resolveMobileAppQrPayload($user, $domainUuid);
+        if ($payload === '') {
+            return null;
+        }
+
+        try {
+            return URL::temporarySignedRoute(
+                'appsMobileAppQr',
+                now()->addDays(30),
+                ['payload' => Crypt::encryptString($payload)]
+            );
+        } catch (\Throwable $e) {
+            logger('AppsController@buildMobileAppQrCodeUrl error: ' . $e->getMessage());
+
+            return null;
+        }
+    }
+
+    protected function resolveMobileAppQrPayload(array $user, ?string $domainUuid = null): string
+    {
+        $domainUuid = $domainUuid ?? $user['domain_uuid'] ?? session('domain_uuid');
+
+        if (get_mobile_app_provider() === 'cloudplay') {
+            $userId = (int) ($user['id'] ?? 0);
+
+            if ($domainUuid && $userId > 0) {
+                try {
+                    $qrCode = app(CloudPlayApiService::class)->getQrCode($domainUuid, $userId);
+
+                    if (!empty($qrCode)) {
+                        return $qrCode;
+                    }
+                } catch (\Throwable $e) {
+                    logger('AppsController@resolveMobileAppQrPayload getQrCode failed: ' . $e->getMessage());
+                }
+            }
+        }
+
+        return json_encode([
+            'domain' => $user['domain'] ?? '',
+            'username' => $user['username'] ?? '',
+            'password' => $user['password'] ?? '',
+        ]);
+    }
+
     protected function buildMobileAppQrCode($provider, array $user, $hidePassInEmail, int $status): ?string
     {
         if ($hidePassInEmail != 'false' || $status != 1) {
             return null;
         }
 
-        if ($provider->getProviderKey() === 'cloudplay') {
-            $qrValue = app(CloudPlayApiService::class)->getQrCode(
-                session('domain_uuid'),
-                (int) ($user['id'] ?? 0)
-            );
-
-            if (empty($qrValue)) {
-                $qrValue = json_encode([
-                    'domain' => $user['domain'] ?? '',
-                    'username' => $user['username'] ?? '',
-                    'password' => $user['password'] ?? '',
-                ]);
-            }
-
-            $qrcode = QrCode::format('png')->generate($qrValue);
-
-            return base64_encode($qrcode);
+        $payload = $this->resolveMobileAppQrPayload($user);
+        if ($payload === '') {
+            return null;
         }
 
-        $qrcode = QrCode::format('png')->generate('{"domain":"' . $user['domain'] .
-            '","username":"' . $user['username'] . '","password":"' .  $user['password'] . '"}');
+        $qrcode = QrCode::format('png')->size(180)->margin(1)->generate($payload);
 
         return base64_encode($qrcode);
     }

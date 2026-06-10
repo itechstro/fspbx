@@ -20,11 +20,13 @@ Password: {{ $attributes['password_url'] }}
 Password: {{ $attributes['password'] }}
 @endif
 
-Once you have logged in, start communicating with the users within your organization. You can make and receive phone calls through your extension, put calls on hold, transfer calls, park calls, and much more.
+@if(!empty($attributes['qrCodeUrl']))
+Scan the QR code in the HTML version of this email to sign in with the CloudPLAY app.
+@endif
 
-If you have any questions, email our customer success team at {{ $attributes['support_email'] ?? '' }} . (We are lightning quick at replying.)
+Once you have logged in, start communicating with the users within your organization. You can make and receive phone calls through your extension, put calls on hold, transfer calls, and much more.
+
+If you have any questions, email our customer success team at {{ $attributes['support_email'] ?? '' }}.
 
 Thanks,
 {{ config('app.name', 'Laravel') }} Team
-
-P.S. Need immediate help getting started? The {{ config('app.name', 'Laravel') }} support team is always ready to help! Just reply to this email.
