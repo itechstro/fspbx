@@ -81,6 +81,7 @@ class Extensions extends Model
         'follow_me_enabled',
         'enabled',
         'description',
+        'cloudplay_ed_id',
         'absolute_codec_string',
         'force_ping',
         'insert_date',

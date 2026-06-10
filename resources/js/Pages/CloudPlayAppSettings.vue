@@ -63,6 +63,11 @@
                             <div class="flex items-center justify-end gap-1">
                                 <PowerIcon v-if="row.ringotel_status == 'false'" @click="handleActivateButtonClick(row.domain_uuid)"
                                     class="h-9 w-9 py-2 rounded-full text-gray-400 hover:bg-gray-200 cursor-pointer" title="Activate tenant" />
+                                <BookOpenIcon v-if="row.ringotel_status == 'true'"
+                                    @click="handleSyncEnterprisePhonebookClick(row.domain_uuid)"
+                                    class="h-9 w-9 py-2 rounded-full text-gray-400 hover:bg-gray-200 cursor-pointer"
+                                    :class="{ 'opacity-50 pointer-events-none': syncingPhonebookDomainUuid === row.domain_uuid }"
+                                    title="Sync enterprise phonebook" />
                                 <Cog6ToothIcon v-if="row.ringotel_status == 'true'" @click="handleEditCustomerButtonClick(row.domain_uuid)"
                                     class="h-9 w-9 py-2 rounded-full text-gray-400 hover:bg-gray-200 cursor-pointer" title="Edit tenant connection" />
                                 <XCircleIcon v-if="row.ringotel_status == 'true'" @click="handleDeactivateButtonClick(row.domain_uuid)"
@@ -148,7 +153,7 @@ import CreateCloudPlayCustomerForm from './components/forms/CreateCloudPlayCusto
 import PairCloudPlayCustomerForm from './components/forms/PairCloudPlayCustomerForm.vue';
 import UpdateCloudPlaySettingsForm from './components/forms/UpdateCloudPlaySettingsForm.vue';
 import UpdateCloudPlayCustomerForm from './components/forms/UpdateCloudPlayCustomerForm.vue';
-import { Cog6ToothIcon, PowerIcon, XCircleIcon } from '@heroicons/vue/24/outline';
+import { BookOpenIcon, Cog6ToothIcon, PowerIcon, XCircleIcon } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
     data: Object,
@@ -184,6 +189,7 @@ const cloudPlaySettings = ref({});
 const cloudPlayCustomer = ref({});
 const cloudPlayProfiles = ref([]);
 const selectedAccount = ref(null);
+const syncingPhonebookDomainUuid = ref(null);
 
 const filterData = ref({ search: null });
 const sortData = ref({ name: 'domain_name', order: 'asc' });
@@ -262,6 +268,25 @@ const handlePairRequest = (form) => {
         .catch(handleFormErrorResponse)
         .finally(() => {
             pairFormSubmiting.value = false;
+        });
+};
+
+const handleSyncEnterprisePhonebookClick = (domainUuid) => {
+    syncingPhonebookDomainUuid.value = domainUuid;
+    axios.post(props.routes.sync_enterprise_phonebook, { domain_uuid: domainUuid })
+        .then((response) => {
+            showNotification('success', response.data.messages);
+        })
+        .catch((error) => {
+            const messages = error.response?.data?.messages;
+            if (messages) {
+                showNotification('error', messages);
+                return;
+            }
+            handleFormErrorResponse(error);
+        })
+        .finally(() => {
+            syncingPhonebookDomainUuid.value = null;
         });
 };
 

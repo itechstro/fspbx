@@ -656,6 +656,31 @@ class CloudPlayApiService implements MobileAppProviderInterface
         ], $token);
     }
 
+    public function listEnterpriseDirectory(string $domainUuid): array
+    {
+        $token = $this->getCustomerToken($domainUuid);
+        $entries = [];
+        $page = 1;
+        $perPage = 500;
+
+        do {
+            $response = $this->request('post', '/customer/enterprise/list', [
+                'page_num' => $page,
+                'data_per_page' => $perPage,
+            ], $token);
+
+            $batch = $response['data'] ?? [];
+            if (!is_array($batch) || $batch === []) {
+                break;
+            }
+
+            $entries = array_merge($entries, $batch);
+            $page++;
+        } while (count($batch) >= $perPage);
+
+        return $entries;
+    }
+
     protected function buildEnterpriseDirectoryPayload(string $domainUuid, array $params): array
     {
         [$firstName, $lastName] = $this->splitContactName($params['name'] ?? '');

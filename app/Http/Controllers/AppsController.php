@@ -81,6 +81,7 @@ class AppsController extends Controller
                     'get_profiles' => route('apps.cloudplay.profiles.all'),
                     'get_settings' => route('apps.cloudplay.settings.get'),
                     'update_settings' => route('apps.cloudplay.settings.update'),
+                    'sync_enterprise_phonebook' => route('apps.cloudplay.enterprise-phonebook.sync'),
                 ],
             ]
         );
@@ -873,6 +874,7 @@ class AppsController extends Controller
             $appUser->conn_id = $this->mobileAppConnIdForStorage(request('connection'), $provider);
             $appUser->user_id = $user['id'];
             $appUser->status = $user['status'];
+            app(CloudPlayEnterpriseDirectorySync::class)->adoptExtensionEdId($extension, $appUser);
             $appUser->save();
 
             if ((int) request('status') === 1) {
@@ -1186,6 +1188,7 @@ class AppsController extends Controller
                         $appUser->conn_id = $this->mobileAppConnIdForStorage($data['connection'] ?? null, $provider);
                         $appUser->user_id = $user['id'];
                         $appUser->status = $user['status'];
+                        app(CloudPlayEnterpriseDirectorySync::class)->adoptExtensionEdId($extension, $appUser);
                         $appUser->save();
                         app(CloudPlayEnterpriseDirectorySync::class)->sync($provider, $extension, $appUser, true);
                     } elseif ((int) $mobileApp->status !== 1) {
@@ -1204,6 +1207,7 @@ class AppsController extends Controller
                             'password' => $extension->password,
                         ]);
 
+                        app(CloudPlayEnterpriseDirectorySync::class)->adoptExtensionEdId($extension, $mobileApp);
                         $mobileApp->status = 1;
                         $mobileApp->save();
                         app(CloudPlayEnterpriseDirectorySync::class)->sync($provider, $extension, $mobileApp, true);
@@ -1402,6 +1406,7 @@ class AppsController extends Controller
 
             $user = $provider->updateUser($params);
 
+            app(CloudPlayEnterpriseDirectorySync::class)->adoptExtensionEdId($extension, $extension->mobile_app);
             $extension->mobile_app->status = 1;
             $extension->mobile_app->save();
             app(CloudPlayEnterpriseDirectorySync::class)->sync($provider, $extension, $extension->mobile_app, true);
@@ -1750,6 +1755,72 @@ class AppsController extends Controller
                 'success' => false,
                 'errors' => ['server' => [$e->getMessage()]],
             ], 500);
+        }
+    }
+
+    public function syncEnterprisePhonebook(Request $request, CloudPlayEnterpriseDirectorySync $directorySync)
+    {
+        if (!userCheckPermission('extension_mobile_app_settings')) {
+            return response()->json([
+                'messages' => ['error' => ['You do not have permission to sync the enterprise phonebook.']],
+            ], 403);
+        }
+
+        $data = $request->validate([
+            'domain_uuid' => ['required', 'uuid'],
+        ]);
+
+        $domain = Domain::query()
+            ->where('domain_uuid', $data['domain_uuid'])
+            ->where('domain_enabled', 'true')
+            ->first();
+
+        if (!$domain) {
+            return response()->json([
+                'messages' => ['error' => ['Tenant not found or is disabled.']],
+            ], 404);
+        }
+
+        $accessibleDomains = collect(session('domains') ?: []);
+
+        if ($accessibleDomains->isNotEmpty() && !$accessibleDomains->pluck('domain_uuid')->contains($data['domain_uuid'])) {
+            return response()->json([
+                'messages' => ['error' => ['You do not have access to this tenant.']],
+            ], 403);
+        }
+
+        try {
+            $result = $directorySync->bulkSyncPhonebookOnlyExtensions($data['domain_uuid']);
+
+            $messages = [
+                sprintf(
+                    'Synced %d extension(s) to CloudPLAY enterprise phonebook.',
+                    $result['synced']
+                ),
+            ];
+
+            if (($result['removed'] ?? 0) > 0) {
+                $messages[] = sprintf('%d stale enterprise phonebook entry(ies) removed.', $result['removed']);
+            }
+
+            if ($result['skipped'] > 0) {
+                $messages[] = sprintf('%d extension(s) were skipped.', $result['skipped']);
+            }
+
+            if (!empty($result['failed'])) {
+                $messages[] = sprintf('%d extension(s) failed to sync or remove.', count($result['failed']));
+            }
+
+            return response()->json([
+                'messages' => ['success' => $messages],
+                'result' => $result,
+            ], 200);
+        } catch (\Throwable $e) {
+            logger('AppsController@syncEnterprisePhonebook error: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
+
+            return response()->json([
+                'messages' => ['error' => [$e->getMessage()]],
+            ], 422);
         }
     }
 

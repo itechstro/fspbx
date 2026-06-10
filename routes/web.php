@@ -362,6 +362,7 @@ Route::group(['middleware' => 'auth'], function () {
     Route::post('/apps/cloudplay/customer/update', [AppsController::class, 'updateCloudPlayCustomer'])->name('apps.cloudplay.customer.update');
     Route::post('/apps/cloudplay/customer/pair', [AppsController::class, 'pairCloudPlayCustomer'])->name('apps.cloudplay.customer.pair');
     Route::post('/apps/cloudplay/customer/destroy', [AppsController::class, 'destroyCloudPlayCustomer'])->name('apps.cloudplay.customer.destroy');
+    Route::post('/apps/cloudplay/enterprise-phonebook/sync', [AppsController::class, 'syncEnterprisePhonebook'])->name('apps.cloudplay.enterprise-phonebook.sync');
     Route::post('/apps/user/create', [AppsController::class, 'createUser'])->name('apps.user.create');
     Route::post('/apps/user/delete', [AppsController::class, 'deleteUser'])->name('apps.user.delete');
     Route::post('/apps/user/activate', [AppsController::class, 'activateUser'])->name('apps.user.activate');
