@@ -255,7 +255,7 @@
                                                     :native="false" label="Connection" label-prop="name"
                                                     value-prop="id" input-type="search" autocomplete="off"
                                                     placeholder="Choose Connection" :floating="false" :columns="{ container: 12 }"
-                                                    :conditions="[['mobile_app_action', 'in', ['enable', 'add_contact']]]" />
+                                                    :conditions="[['mobile_app_action', 'in', ['enable', 'add_contact']], () => props.options.mobile_app?.requires_connection !== false]" />
 
                                                 <StaticElement name="mobile_app_unavailable"
                                                     :conditions="[() => !(options.mobile_app?.org_id)]">
@@ -402,13 +402,20 @@ const mobileAppElements = [
     'submit_mobile_app',
 ];
 
-const mobileAppActionOptions = [
-    { value: 'enable', label: 'Enable/Activate' },
-    { value: 'add_contact', label: 'Add As BLF Contact' },
-    { value: 'deactivate', label: 'Deactivate' },
-    { value: 'remove', label: 'Remove' },
-    { value: 'reset_credentials', label: 'Reset Credentials' },
-];
+const mobileAppActionOptions = computed(() => {
+    const options = [
+        { value: 'enable', label: 'Enable/Activate' },
+        { value: 'deactivate', label: 'Deactivate' },
+        { value: 'remove', label: 'Remove' },
+        { value: 'reset_credentials', label: 'Reset Credentials' },
+    ];
+
+    if (props.options.mobile_app?.supports_contact_only !== false) {
+        options.splice(1, 0, { value: 'add_contact', label: 'Add As BLF Contact' });
+    }
+
+    return options;
+});
 
 const recordingOptions = [
     { value: 'all', label: 'All' },
@@ -580,7 +587,11 @@ const handleBulkMobileAppActionButtonClick = async () => {
         return;
     }
 
-    if (['enable', 'add_contact'].includes(action) && !connection) {
+    if (
+        props.options.mobile_app?.requires_connection !== false
+        && ['enable', 'add_contact'].includes(action)
+        && !connection
+    ) {
         form$.value?.el$('mobile_app_connection')?.messageBag?.append('Choose a mobile app connection.');
         return;
     }

@@ -1386,7 +1386,7 @@
                                                     label="OR Step 1: Add to Address Book (BLF)" :secondary="true"
                                                     @click="handleMobileAppContactButtonClick"
                                                     description="Create a new contact entry for this extension in the company address book."
-                                                    :conditions="[() => !mobileAppOptions?.mobile_app && mobileAppOptions && !creatingInitiated]" />
+                                                    :conditions="[() => !mobileAppOptions?.mobile_app && mobileAppOptions && !creatingInitiated && mobileAppOptions?.supports_contact_only !== false]" />
 
 
                                                 <SelectElement name="mobile_app_connection"
@@ -1398,7 +1398,7 @@
                                                             wrapper: 6,
                                                         },
                                                     }"
-                                                    :conditions="[() => !!mobileAppOptions?.connections && creatingInitiated]" />
+                                                    :conditions="[() => !!mobileAppOptions?.requires_connection && !!mobileAppOptions?.connections?.length && creatingInitiated]" />
 
                                                 <StaticElement name="mobile_app_credentials"
                                                     :conditions="[() => !!mobileApp]">
@@ -1467,7 +1467,7 @@
                                                 <ButtonElement name="submit_enabling_mobile_app" button-label="Submit"
                                                     @click="handleMobileAppSubmitButtonClick"
                                                     :loading="isMobileAppLoading.submit"
-                                                    :conditions="[() => !mobileAppOptions?.mobile_app && mobileAppOptions && creatingInitiated]" />
+                                                    :conditions="[() => !mobileAppOptions?.mobile_app && mobileAppOptions && creatingInitiated && (!mobileAppOptions?.requires_connection || !!form$?.el$('mobile_app_connection')?.value)]" />
 
                                                 <ButtonElement name="reset_mobile_app_password"
                                                     button-label="Reset Credentials" label="Reset Mobile App Login"
@@ -2221,8 +2221,9 @@ const getMobileAppOptions = async () => {
     )
         .then((response) => {
             mobileAppOptions.value = response.data;
-            // console.log(mobileAppOptions.value);
-            form$.value.el$('mobile_app_connection').update(mobileAppOptions?.value?.connections[0]?.id)
+            if (mobileAppOptions?.value?.requires_connection && mobileAppOptions?.value?.connections?.length) {
+                form$.value.el$('mobile_app_connection').update(mobileAppOptions.value.connections[0]?.id)
+            }
 
         }).catch((error) => {
             emit('error', error)
@@ -2249,7 +2250,9 @@ const handleMobileAppSubmitButtonClick = async () => {
 
         const response = await axios.post(props.options.routes.create_mobile_app, {
             extension_uuid: props.options.item.extension_uuid,
-            connection: form$.value.el$('mobile_app_connection').value,
+            connection: mobileAppOptions.value?.requires_connection
+                ? form$.value.el$('mobile_app_connection').value
+                : null,
             org_id: mobileAppOptions.value.org_id,
             app_domain: mobileAppOptions.value.app_domain,
             status: mobileAppContactOnly.value ? -1 : 1,

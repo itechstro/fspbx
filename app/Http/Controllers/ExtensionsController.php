@@ -25,6 +25,7 @@ use App\Jobs\SendEventNotify;
 use App\Models\MobileAppUsers;
 use App\Data\ExtensionListData;
 use App\Jobs\UpdateAppSettings;
+use App\Jobs\SyncCloudPlayEnterpriseDirectory;
 use App\Data\ExtensionDetailData;
 use App\Imports\ExtensionsImport;
 use Illuminate\Support\Facades\DB;
@@ -797,7 +798,9 @@ class ExtensionsController extends Controller
 
             if (!empty($mobileAppOrgId)) {
                 try {
-                    $mobileAppConnections = app(\App\Services\RingotelApiService::class)->getConnections($mobileAppOrgId);
+                    $mobileAppConnections = app(\App\Services\MobileApp\MobileAppProviderResolver::class)
+                        ->resolve()
+                        ->getConnections($mobileAppOrgId);
                 } catch (\Throwable $e) {
                     logger('ExtensionsController@getItemOptions mobile app bulk options error: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
                     $mobileAppConnections = [];
@@ -830,6 +833,13 @@ class ExtensionsController extends Controller
             'mobile_app' => [
                 'org_id' => $mobileAppOrgId ?? null,
                 'connections' => $mobileAppConnections ?? [],
+                'provider' => get_mobile_app_provider(),
+                'requires_connection' => app(\App\Services\MobileApp\MobileAppProviderResolver::class)
+                    ->resolve()
+                    ->requiresConnectionSelection(),
+                'supports_contact_only' => app(\App\Services\MobileApp\MobileAppProviderResolver::class)
+                    ->resolve()
+                    ->supportsContactOnlyUsers(),
             ],
             'forwarding_types' => $forwardingTypes ?? null,
             'follow_me_destination_options' => $followMeDestinationOptions ?? null,
@@ -1376,6 +1386,11 @@ public function store(StoreExtensionRequest $request)
             }
 
             DB::commit();
+
+            if ($extension->mobile_app && get_mobile_app_provider() === 'cloudplay') {
+                SyncCloudPlayEnterpriseDirectory::dispatch($extension->extension_uuid)
+                    ->onQueue('default');
+            }
 
             //clear fusionpbx cache
             FusionCache::clear("directory:" . $extension->extension . "@" . $extension->user_context);

@@ -82,7 +82,7 @@
                             <h2 class="text-base font-semibold text-gray-900">{{ selectedCategoryLabel }}</h2>
                             <p class="text-xs text-gray-500">{{ displayedRows.length }} setting{{ displayedRows.length === 1 ? '' : 's' }} shown</p>
                         </div>
-                        <div class="flex items-center gap-2">
+                        <div class="flex flex-wrap items-center gap-2">
                             <button v-if="displayedRows.length" type="button" class="text-xs text-gray-500 hover:text-gray-900" @click="toggleSelectAllVisible">
                                 {{ allVisibleSelected ? 'Clear selection' : 'Select visible' }}
                             </button>
@@ -105,7 +105,7 @@
 
                             <div class="min-w-0 flex-1">
                                 <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-                                    <h3 class="text-sm font-semibold text-gray-900">{{ formatLabel(row.subcategory) }}</h3>
+                                    <h3 class="text-sm font-semibold text-gray-900">{{ row.subcategory_label || formatLabel(row.subcategory) }}</h3>
                                     <button type="button" class="inline-flex items-center rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-indigo-700 ring-1 ring-inset ring-indigo-600/20 hover:bg-indigo-100" :title="`Filter by ${row.category_label}`" @click="selectedCategory = row.category">{{ row.category_label }}</button>
                                     <span class="font-mono text-xs text-gray-400">{{ row.subcategory }}</span>
                                     <span class="text-xs text-gray-300">·</span>
@@ -295,10 +295,12 @@ const displayedRows = computed(() => {
     const rows = selectedCategory.value
         ? filteredRows.value.filter(row => row.category === selectedCategory.value)
         : filteredRows.value
+
     return [...rows].sort((a, b) => {
         const ca = String(a.category || '').toLowerCase()
         const cb = String(b.category || '').toLowerCase()
         if (ca !== cb) return ca.localeCompare(cb)
+
         const sa = String(a.subcategory || '').toLowerCase()
         const sb = String(b.subcategory || '').toLowerCase()
         return sa.localeCompare(sb)

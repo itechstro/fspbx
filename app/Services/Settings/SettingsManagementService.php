@@ -7,6 +7,7 @@ use App\Models\Domain;
 use App\Models\DomainSettings;
 use App\Models\FusionCache;
 use App\Services\SrsRecorderDialplanService;
+use App\Support\MobileAppSettingsCatalog;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -131,6 +132,10 @@ class SettingsManagementService
                 'default_setting_description',
             ])
             ->get()
+            ->reject(function (DefaultSettings $row) {
+                return $row->default_setting_category === 'mobile_apps'
+                    && MobileAppSettingsCatalog::isHidden((string) $row->default_setting_subcategory);
+            })
             ->map(fn (DefaultSettings $row) => $this->serializeDefaultRow($row));
 
         return $this->paginateRows(
@@ -610,20 +615,27 @@ class SettingsManagementService
 
         $overrideCount = $overrideQuery->count();
 
+        $subcategory = (string) $row->default_setting_subcategory;
+        $category = (string) $row->default_setting_category;
         return [
             'id' => $row->default_setting_uuid,
             'default_setting_uuid' => $row->default_setting_uuid,
             'category' => $row->default_setting_category,
-            'category_label' => $this->formatCategory((string) $row->default_setting_category),
+            'category_label' => $this->formatCategory($category),
             'subcategory' => $row->default_setting_subcategory,
+            'subcategory_label' => $category === 'mobile_apps'
+                ? MobileAppSettingsCatalog::label($subcategory)
+                : null,
             'type' => $row->default_setting_name,
             'type_label' => self::TYPE_OPTIONS[strtolower((string) $row->default_setting_name)] ?? ucfirst((string) $row->default_setting_name),
             'value' => $row->default_setting_value,
             'enabled' => $this->boolValue($row->default_setting_enabled),
-            'description' => $row->default_setting_description,
+            'description' => $category === 'mobile_apps'
+                ? MobileAppSettingsCatalog::description($subcategory, $row->default_setting_description)
+                : $row->default_setting_description,
             'order' => $row->default_setting_order,
             'override_count' => $overrideCount,
-            'is_secret' => $this->isSecret((string) $row->default_setting_subcategory),
+            'is_secret' => $this->isSecret($subcategory),
         ];
     }
 
@@ -756,6 +768,7 @@ class SettingsManagementService
             'cdr' => 'CDR',
             'ldap' => 'LDAP',
             'ivr_menu' => 'IVR Menu',
+            'mobile_apps' => 'Mobile Apps',
             default => Str::of($category)->replace(['_', '-'], ' ')->title()->toString(),
         };
     }
@@ -763,8 +776,10 @@ class SettingsManagementService
     private function isSecret(string $subcategory): bool
     {
         return $subcategory === 'password'
+            || $subcategory === 'ringotel_api_token'
             || str_contains($subcategory, '_password')
-            || str_contains($subcategory, '_secret');
+            || str_contains($subcategory, '_secret')
+            || str_contains($subcategory, '_token');
     }
 
     private function applySettingSideEffects(string $scope, array $setting): void

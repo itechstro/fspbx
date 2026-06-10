@@ -924,6 +924,13 @@ if (!function_exists('get_domain_setting')) {
     }
 }
 
+if (!function_exists('get_mobile_app_provider')) {
+    function get_mobile_app_provider(): string
+    {
+        return 'cloudplay';
+    }
+}
+
 if (!function_exists('get_domain_presentation')) {
     /**
      * Resolved date/time presentation for a domain (country defaults with optional overrides).

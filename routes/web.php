@@ -353,6 +353,15 @@ Route::group(['middleware' => 'auth'], function () {
     Route::get('/apps/connection/update', [AppsController::class, 'updateConnection'])->name('appsUpdateConnection');
     Route::post('/apps/token/get', [AppsController::class, 'getToken'])->name('apps.token.get');
     Route::post('/apps/token/update', [AppsController::class, 'updateToken'])->name('apps.token.update');
+    Route::post('/apps/cloudplay/settings/get', [AppsController::class, 'getCloudPlaySettings'])->name('apps.cloudplay.settings.get');
+    Route::post('/apps/cloudplay/settings/update', [AppsController::class, 'updateCloudPlaySettings'])->name('apps.cloudplay.settings.update');
+    Route::post('/apps/cloudplay/customer/all', [AppsController::class, 'getCloudPlayCustomers'])->name('apps.cloudplay.customer.all');
+    Route::post('/apps/cloudplay/customer/create', [AppsController::class, 'createCloudPlayCustomer'])->name('apps.cloudplay.customer.create');
+    Route::post('/apps/cloudplay/customer/get', [AppsController::class, 'getCloudPlayCustomer'])->name('apps.cloudplay.customer.get');
+    Route::post('/apps/cloudplay/profiles/all', [AppsController::class, 'getCloudPlayProfiles'])->name('apps.cloudplay.profiles.all');
+    Route::post('/apps/cloudplay/customer/update', [AppsController::class, 'updateCloudPlayCustomer'])->name('apps.cloudplay.customer.update');
+    Route::post('/apps/cloudplay/customer/pair', [AppsController::class, 'pairCloudPlayCustomer'])->name('apps.cloudplay.customer.pair');
+    Route::post('/apps/cloudplay/customer/destroy', [AppsController::class, 'destroyCloudPlayCustomer'])->name('apps.cloudplay.customer.destroy');
     Route::post('/apps/user/create', [AppsController::class, 'createUser'])->name('apps.user.create');
     Route::post('/apps/user/delete', [AppsController::class, 'deleteUser'])->name('apps.user.delete');
     Route::post('/apps/user/activate', [AppsController::class, 'activateUser'])->name('apps.user.activate');

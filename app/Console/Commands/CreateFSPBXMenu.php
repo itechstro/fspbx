@@ -152,7 +152,7 @@ class CreateFSPBXMenu extends Command
             [
                 'title' => 'Advanced',
                 'link' => null,
-                'groups' => ['superadmin'],
+                'groups' => ['superadmin', 'admin'],
                 'subcategories' => [
                     ['title' => 'Access Control', 'link' => '/access-controls', 'groups' => ['superadmin']],
                     ['title' => 'Default Settings', 'link' => '/default-settings', 'groups' => ['superadmin']],
@@ -164,7 +164,7 @@ class CreateFSPBXMenu extends Command
                     ['title' => 'Modules', 'link' => '/modules', 'groups' => ['superadmin']],
                     ['title' => 'Pro Features', 'link' => '/pro-features', 'groups' => ['superadmin']],
                     ['title' => 'Provision Templates', 'link' => '/app/edit/index.php?dir=provision', 'groups' => ['superadmin']],
-                    ['title' => 'Ringotel App Settings', 'link' => '/apps', 'groups' => ['superadmin', 'admin']],
+                    ['title' => 'Mobile Apps', 'link' => '/apps', 'groups' => ['superadmin', 'admin']],
                     ['title' => 'SIP Profiles', 'link' => '/app/sip_profiles/sip_profiles.php', 'groups' => ['superadmin']],
                     ['title' => 'System Settings', 'link' => '/system-settings', 'groups' => ['superadmin']],
                     ['title' => 'Transactions', 'link' => '/app/database_transactions/database_transactions.php', 'groups' => ['superadmin']],

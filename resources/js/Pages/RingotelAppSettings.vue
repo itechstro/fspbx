@@ -3,7 +3,7 @@
 
     <div class="m-3">
         <DataTable @search-action="handleSearchButtonClick" @reset-filters="handleFiltersReset">
-            <template #title>Ringotel App Settings</template>
+            <template #title>Mobile Apps</template>
 
             <template #filters>
                 <div class="relative min-w-64 focus-within:z-10 mb-2 sm:mr-4">
@@ -22,6 +22,12 @@
             </template>
 
             <template #action>
+                <select v-model="selectedProvider" @change="handleProviderChange"
+                    class="rounded-md border-gray-300 text-sm mr-2">
+                    <option value="ringotel">Ringotel</option>
+                    <option value="cloudplay">CloudPLAY Softphone</option>
+                </select>
+
                 <button type="button" @click.prevent="handleApiTokenButtonClick()"
                     class="rounded-md bg-indigo-600 px-2.5 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
                     API Token
@@ -288,6 +294,7 @@ const props = defineProps({
     routes: Object,
     itemData: Object,
     pagination: Object,
+    mobileAppProvider: String,
 });
 
 const perPage = ref(props.pagination?.per_page);
@@ -307,6 +314,7 @@ const itemOptions = ref({})
 const ringotelOrganizations = ref({})
 const selectedAccount =  ref(null)
 const apiToken = ref(null)
+const selectedProvider = ref(props.mobileAppProvider || 'ringotel')
 
 // Computed property for bulk actions based on permissions
 const bulkActions = computed(() => {
@@ -321,7 +329,18 @@ const bulkActions = computed(() => {
     return actions;
 });
 
+const handleProviderChange = () => {
+    axios.post(props.routes.update_provider, { provider: selectedProvider.value })
+        .then(() => {
+            router.visit(props.routes.current_page);
+        })
+        .catch((error) => {
+            handleFormErrorResponse(error);
+        });
+};
+
 onMounted(() => {
+    selectedProvider.value = props.mobileAppProvider || 'ringotel';
 });
 
 const handleActivateButtonClick = (itemUuid) => {
