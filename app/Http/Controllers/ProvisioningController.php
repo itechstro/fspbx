@@ -10,6 +10,7 @@ use App\Models\DomainSettings;
 use Illuminate\Support\Carbon;
 use App\Models\DefaultSettings;
 use App\Models\ProvisioningTemplate;
+use App\Services\Provisioning\FanvilTemplateVarBuilder;
 use App\Services\Provisioning\ProvisioningContactDirectoryService;
 use Illuminate\Support\Facades\Blade;
 
@@ -266,7 +267,7 @@ class ProvisioningController extends Controller
 
         $view = match (true) {
             in_array($vendor, ['snom'], true) => 'provisioning.directory.snom',
-            in_array($vendor, ['fanvil'], true) => 'provisioning.directory.fanvil',
+            in_array($vendor, ['fanvil', 'ibratro'], true) => 'provisioning.directory.fanvil',
             default => 'provisioning.directory.yealink',
         };
 
@@ -786,7 +787,7 @@ class ProvisioningController extends Controller
             'expansion_key_count' => count($keyAreas['expansion'] ?? []),
         ]);
 
-        return [
+        $vars = [
             'device_uuid'   => (string) $device->device_uuid,
             'domain_uuid'   => (string) $device->domain_uuid,
             'vendor'        => $device->device_vendor ?? null,
@@ -816,6 +817,8 @@ class ProvisioningController extends Controller
             'line_count'  => count($lines),
             'settings'    => $settings,
         ];
+
+        return FanvilTemplateVarBuilder::enrich($vars, $device);
     }
 
     /**

@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use App\Models\PaymentGateway;
 use App\Models\GatewaySetting;
+use App\Services\Provisioning\IbratroProvisionSettings;
 
 class DatabaseSeeder extends Seeder
 {
@@ -1400,8 +1401,7 @@ class DatabaseSeeder extends Seeder
                 'default_setting_enabled'       => false,
                 'default_setting_description'   => "It configures the password of a specific wireless network.",
             ],
-
-
+            ...IbratroProvisionSettings::definitions(),
 
         ];
 
