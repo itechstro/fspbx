@@ -22,6 +22,7 @@ use App\Http\Controllers\ConferenceControlController;
 use App\Http\Controllers\ConferenceProfileController;
 use App\Http\Controllers\ConferenceRoomController;
 use App\Http\Controllers\ContactController;
+use App\Http\Controllers\ContactSyncController;
 use App\Http\Controllers\ContactsController;
 use App\Http\Controllers\CustomerNotesController;
 use App\Http\Controllers\DashboardController;
@@ -648,6 +649,10 @@ Route::group(['middleware' => ['auth:sanctum', 'api.cookie.auth']], function () 
     Route::post('phonebook-contacts/{v_contact}/attachments', [ContactsController::class, 'storeAttachment'])->name('phonebook-contacts.attachments.store');
     Route::delete('phonebook-contacts/{v_contact}/attachments/{attachment}', [ContactsController::class, 'destroyAttachment'])->name('phonebook-contacts.attachments.destroy');
     Route::get('phonebook-contacts/{v_contact}/attachments/{attachment}/download', [ContactsController::class, 'downloadAttachment'])->name('phonebook-contacts.attachments.download');
+    Route::get('phonebook-contacts/sync/status', [ContactSyncController::class, 'status'])->name('phonebook-contacts.sync.status');
+    Route::post('phonebook-contacts/sync/{provider}/disconnect', [ContactSyncController::class, 'disconnect'])->name('phonebook-contacts.sync.disconnect');
+    Route::post('phonebook-contacts/sync/{provider}/run', [ContactSyncController::class, 'syncNow'])->name('phonebook-contacts.sync.run');
+    Route::post('phonebook-contacts/sync/{provider}/toggle', [ContactSyncController::class, 'toggle'])->name('phonebook-contacts.sync.toggle');
 
     // Email Queue
     Route::get('/emailqueue/data', [EmailQueueController::class, 'getData'])->name('emailqueue.data');

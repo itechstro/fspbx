@@ -80,6 +80,12 @@
                     </button>
                 </template>
 
+                <button v-if="permissions.sync_connect || permissions.sync_run" type="button"
+                    @click.prevent="showSyncModal = true"
+                    class="ml-2 sm:ml-4 rounded-md bg-white px-2.5 py-1.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
+                    Sync
+                </button>
+
                 <button v-if="permissions.create" type="button" @click.prevent="handleCreateButtonClick"
                     class="ml-2 sm:ml-4 rounded-md bg-indigo-600 px-2.5 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
                     Create
@@ -294,12 +300,16 @@
         @download-template="uploadFormat === 'speed-dial' ? downloadSpeedDialTemplate : downloadCsvTemplate"
         :is-submitting="isUploadingFile" :errors="uploadErrors" />
 
+    <ContactSyncModal :show="showSyncModal" :routes="routes" :permissions="permissions" @close="showSyncModal = false"
+        @success="showNotification" @error="handleErrorResponse" @synced="refreshCurrentPage" />
+
     <Notification :show="notificationShow" :type="notificationType" :messages="notificationMessages"
         @update:show="hideNotification" />
 </template>
 
 <script setup>
 import { computed, onMounted, ref } from "vue";
+import { usePage } from "@inertiajs/vue3";
 import axios from "axios";
 import DataTable from "./components/general/DataTable.vue";
 import TableColumnHeader from "./components/general/TableColumnHeader.vue";
@@ -309,6 +319,7 @@ import ConfirmationModal from "./components/modal/ConfirmationModal.vue";
 import Loading from "./components/general/Loading.vue";
 import Notification from "./components/notifications/Notification.vue";
 import ContactForm from "./components/forms/ContactForm.vue";
+import ContactSyncModal from "./components/modal/ContactSyncModal.vue";
 import UploadModal from "./components/modal/UploadModal.vue";
 import MainLayout from "../Layouts/MainLayout.vue";
 import { ChevronDownIcon, ChevronUpIcon, MagnifyingGlassIcon, PencilSquareIcon, TrashIcon } from "@heroicons/vue/24/solid";
@@ -322,7 +333,13 @@ const props = defineProps({
         type: Boolean,
         default: false,
     },
+    openSyncModal: {
+        type: Boolean,
+        default: false,
+    },
 });
+
+const page = usePage();
 
 const speedDialMode = computed(() => props.speedDialMode);
 
@@ -343,6 +360,7 @@ const showForm = ref(false);
 const formMode = ref("create");
 const loadingForm = ref(false);
 const showUploadModal = ref(false);
+const showSyncModal = ref(false);
 const uploadFormat = ref("csv");
 const isUploadingFile = ref(false);
 const uploadErrors = ref(null);
@@ -416,6 +434,18 @@ const formHeader = computed(() => {
 
 onMounted(() => {
     getData();
+
+    if (props.openSyncModal) {
+        showSyncModal.value = true;
+    }
+
+    if (page.props.flash?.message) {
+        showNotification("success", { success: [page.props.flash.message] });
+    }
+
+    if (page.props.flash?.error) {
+        showNotification("error", { error: [page.props.flash.error] });
+    }
 });
 
 const displayName = (row) => {

@@ -58,6 +58,8 @@ class Kernel extends ConsoleKernel
             $schedule->command('storage:clear-export-directory')->daily();
         }
 
+        $schedule->command('contacts:sync-external')->hourly();
+
         // Horizon snapshot
         if (isset($jobSettings['horizon_snapshot']) && $jobSettings['horizon_snapshot'] === "true") {
             $schedule->command('horizon:snapshot')->everyFiveMinutes();

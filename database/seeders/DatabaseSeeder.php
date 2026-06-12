@@ -196,6 +196,8 @@ class DatabaseSeeder extends Seeder
             ['application_name' => 'Contacts', 'permission_name' => 'contact_group_add'],
             ['application_name' => 'Contacts', 'permission_name' => 'contact_group_edit'],
             ['application_name' => 'Contacts', 'permission_name' => 'contact_group_delete'],
+            ['application_name' => 'Contacts', 'permission_name' => 'contact_sync_connect'],
+            ['application_name' => 'Contacts', 'permission_name' => 'contact_sync_run'],
         ];
         $timestamp = date("Y-m-d H:i:s");
 
@@ -331,6 +333,8 @@ class DatabaseSeeder extends Seeder
                 'contact_group_add',
                 'contact_group_edit',
                 'contact_group_delete',
+                'contact_sync_connect',
+                'contact_sync_run',
             ],
             'admin' => [
                 'wakeup_calls_list_view',
@@ -395,6 +399,8 @@ class DatabaseSeeder extends Seeder
                 'contact_group_add',
                 'contact_group_edit',
                 'contact_group_delete',
+                'contact_sync_connect',
+                'contact_sync_run',
             ],
             'Message Admin' => [
                 'message_settings_list_view',

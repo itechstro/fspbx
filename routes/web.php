@@ -22,6 +22,7 @@ use App\Http\Controllers\ConferenceController;
 use App\Http\Controllers\ConferenceControlController;
 use App\Http\Controllers\ConferenceProfileController;
 use App\Http\Controllers\ConferenceRoomController;
+use App\Http\Controllers\ContactSyncController;
 use App\Http\Controllers\ContactsController;
 use App\Http\Controllers\CsrfTokenController;
 use App\Http\Controllers\DashboardController;
@@ -375,6 +376,10 @@ Route::group(['middleware' => 'auth'], function () {
 
     // Contacts
     Route::get('contacts', [ContactsController::class, 'index'])->name('contacts.index');
+    Route::get('contacts/sync/google/connect', [ContactSyncController::class, 'connectGoogle'])->name('contacts.sync.google.connect');
+    Route::get('contacts/sync/google/callback', [ContactSyncController::class, 'googleCallback'])->name('contacts.sync.google.callback');
+    Route::get('contacts/sync/microsoft/connect', [ContactSyncController::class, 'connectMicrosoft'])->name('contacts.sync.microsoft.connect');
+    Route::get('contacts/sync/microsoft/callback', [ContactSyncController::class, 'microsoftCallback'])->name('contacts.sync.microsoft.callback');
 
     // Speed Dial
     Route::get('speed-dial', [SpeedDialController::class, 'index'])->name('speed-dial.index');

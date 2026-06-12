@@ -51,9 +51,11 @@ class ContactsController extends Controller
         }
 
         $speedDialMode = $request->boolean('speed_dial');
+        $openSyncModal = $request->boolean('sync');
 
         return Inertia::render('Contacts', [
             'speedDialMode' => $speedDialMode,
+            'openSyncModal' => $openSyncModal,
             'visibility' => $this->visibilityProps(),
             'routes' => [
                 'current_page' => $speedDialMode
@@ -75,6 +77,12 @@ class ContactsController extends Controller
                 'download_speed_dial_template' => route('phonebook-contacts.export.speed-dial-template'),
                 'speed_dial' => route('contacts.index', ['speed_dial' => 1]),
                 'contacts' => route('contacts.index'),
+                'sync_status' => route('phonebook-contacts.sync.status'),
+                'sync_disconnect' => route('phonebook-contacts.sync.disconnect', ['provider' => ':provider']),
+                'sync_run' => route('phonebook-contacts.sync.run', ['provider' => ':provider']),
+                'sync_toggle' => route('phonebook-contacts.sync.toggle', ['provider' => ':provider']),
+                'connect_google' => route('contacts.sync.google.connect'),
+                'connect_microsoft' => route('contacts.sync.microsoft.connect'),
             ],
             'permissions' => $this->permissions(),
         ]);
@@ -892,6 +900,8 @@ class ContactsController extends Controller
             'attachment_view' => userCheckPermission('contact_attachment_view') || userCheckPermission('contact_view'),
             'attachment_add' => userCheckPermission('contact_attachment_add') || userCheckPermission('contact_edit'),
             'attachment_delete' => userCheckPermission('contact_attachment_delete') || userCheckPermission('contact_edit'),
+            'sync_connect' => userCheckPermission('contact_sync_connect'),
+            'sync_run' => userCheckPermission('contact_sync_run'),
         ];
     }
 }
