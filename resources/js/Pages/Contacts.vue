@@ -3,10 +3,15 @@
 
     <div class="m-3">
         <DataTable @search-action="handleSearchButtonClick" @reset-filters="handleFiltersReset">
-            <template #title>Contacts</template>
+            <template #title>{{ speedDialMode ? 'Speed Dial' : 'Contacts' }}</template>
 
             <template #subtitle>
-                Manage the domain phonebook on the legacy contact records used by provisioning and speed dial.
+                <span v-if="speedDialMode">
+                    Edit a row to change the speed-dial code on the Phones tab, or assigned users on the Visibility tab.
+                </span>
+                <span v-else>
+                    Manage the domain phonebook on the legacy contact records used by provisioning and speed dial.
+                </span>
             </template>
 
             <template #filters>
@@ -26,41 +31,61 @@
             </template>
 
             <template #action>
-                <a :href="routes.speed_dial"
+                <a v-if="speedDialMode" :href="routes.contacts"
+                    class="rounded-md bg-white px-2.5 py-1.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
+                    All Contacts
+                </a>
+                <a v-else :href="routes.speed_dial"
                     class="rounded-md bg-white px-2.5 py-1.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
                     Speed Dial
                 </a>
 
-                <button v-if="permissions.upload" type="button" @click.prevent="openUploadModal('csv')"
-                    class="inline-flex items-center gap-x-1.5 rounded-md bg-white px-2.5 py-1.5 ml-2 sm:ml-4 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
-                    <DocumentArrowUpIcon class="h-5 w-5" aria-hidden="true" />
-                    Upload CSV
-                </button>
+                <template v-if="speedDialMode">
+                    <button v-if="permissions.upload" type="button" @click.prevent="openUploadModal('speed-dial')"
+                        class="inline-flex items-center gap-x-1.5 rounded-md bg-white px-2.5 py-1.5 ml-2 sm:ml-4 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
+                        <DocumentArrowUpIcon class="h-5 w-5" aria-hidden="true" />
+                        Upload CSV
+                    </button>
 
-                <button v-if="permissions.upload" type="button" @click.prevent="openUploadModal('vcard')"
-                    class="inline-flex items-center gap-x-1.5 rounded-md bg-white px-2.5 py-1.5 ml-2 sm:ml-4 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
-                    <DocumentArrowUpIcon class="h-5 w-5" aria-hidden="true" />
-                    Upload vCard
-                </button>
+                    <button type="button" @click.prevent="handleExportSpeedDial"
+                        class="inline-flex items-center gap-x-1.5 rounded-md bg-white px-2.5 py-1.5 ml-2 sm:ml-4 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
+                        <DocumentArrowDownIcon class="h-5 w-5" aria-hidden="true" />
+                        Export
+                    </button>
+                </template>
 
-                <button type="button" @click.prevent="handleExportCsv"
-                    class="inline-flex items-center gap-x-1.5 rounded-md bg-white px-2.5 py-1.5 ml-2 sm:ml-4 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
-                    <DocumentArrowDownIcon class="h-5 w-5" aria-hidden="true" />
-                    Export CSV
-                </button>
+                <template v-else>
+                    <button v-if="permissions.upload" type="button" @click.prevent="openUploadModal('csv')"
+                        class="inline-flex items-center gap-x-1.5 rounded-md bg-white px-2.5 py-1.5 ml-2 sm:ml-4 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
+                        <DocumentArrowUpIcon class="h-5 w-5" aria-hidden="true" />
+                        Upload CSV
+                    </button>
 
-                <button type="button" @click.prevent="handleExportVcard"
-                    class="inline-flex items-center gap-x-1.5 rounded-md bg-white px-2.5 py-1.5 ml-2 sm:ml-4 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
-                    <DocumentArrowDownIcon class="h-5 w-5" aria-hidden="true" />
-                    Export vCard
-                </button>
+                    <button v-if="permissions.upload" type="button" @click.prevent="openUploadModal('vcard')"
+                        class="inline-flex items-center gap-x-1.5 rounded-md bg-white px-2.5 py-1.5 ml-2 sm:ml-4 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
+                        <DocumentArrowUpIcon class="h-5 w-5" aria-hidden="true" />
+                        Upload vCard
+                    </button>
+
+                    <button type="button" @click.prevent="handleExportCsv"
+                        class="inline-flex items-center gap-x-1.5 rounded-md bg-white px-2.5 py-1.5 ml-2 sm:ml-4 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
+                        <DocumentArrowDownIcon class="h-5 w-5" aria-hidden="true" />
+                        Export CSV
+                    </button>
+
+                    <button type="button" @click.prevent="handleExportVcard"
+                        class="inline-flex items-center gap-x-1.5 rounded-md bg-white px-2.5 py-1.5 ml-2 sm:ml-4 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
+                        <DocumentArrowDownIcon class="h-5 w-5" aria-hidden="true" />
+                        Export vCard
+                    </button>
+                </template>
 
                 <button v-if="permissions.create" type="button" @click.prevent="handleCreateButtonClick"
                     class="ml-2 sm:ml-4 rounded-md bg-indigo-600 px-2.5 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
                     Create
                 </button>
 
-                <button v-if="filterData.showGlobal && permissions.view_global" type="button"
+                <button v-if="!speedDialMode && filterData.showGlobal && permissions.view_global" type="button"
                     @click.prevent="handleShowLocal"
                     class="ml-2 sm:ml-4 rounded-md bg-white px-2.5 py-1.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
                     Show local
@@ -75,40 +100,66 @@
             </template>
 
             <template #table-header>
-                <TableColumnHeader
-                    class="flex whitespace-nowrap px-4 py-3.5 text-left text-sm font-semibold text-gray-900 items-center justify-start">
-                    <input type="checkbox" v-model="selectPageItems" @change="handleSelectPageItems"
-                        class="h-4 w-4 rounded border-gray-300 text-indigo-600">
-                    <div class="pl-4 flex items-center cursor-pointer select-none"
-                        @click="handleSortRequest('contact_name_given')">
-                        <span class="mr-2">Name</span>
-                        <ChevronUpIcon v-if="sortData.name === 'contact_name_given' && sortData.order === 'asc'"
-                            class="h-4 w-4 text-gray-500" />
-                        <ChevronDownIcon v-else-if="sortData.name === 'contact_name_given' && sortData.order === 'desc'"
-                            class="h-4 w-4 text-gray-500" />
-                    </div>
-                </TableColumnHeader>
+                <template v-if="speedDialMode">
+                    <TableColumnHeader
+                        class="flex whitespace-nowrap px-4 py-3.5 text-left text-sm font-semibold text-gray-900 items-center justify-start">
+                        <input type="checkbox" v-model="selectPageItems" @change="handleSelectPageItems"
+                            class="h-4 w-4 rounded border-gray-300 text-indigo-600">
+                        <div class="pl-4 flex items-center cursor-pointer select-none"
+                            @click="handleSortRequest('contact_organization')">
+                            <span class="mr-2">Speed Dial Name</span>
+                            <ChevronUpIcon v-if="sortData.name === 'contact_organization' && sortData.order === 'asc'"
+                                class="h-4 w-4 text-gray-500" />
+                            <ChevronDownIcon v-else-if="sortData.name === 'contact_organization' && sortData.order === 'desc'"
+                                class="h-4 w-4 text-gray-500" />
+                        </div>
+                    </TableColumnHeader>
 
-                <TableColumnHeader class="px-2 py-3.5 text-left text-sm font-semibold text-gray-900">
-                    <div class="flex items-center cursor-pointer select-none"
-                        @click="handleSortRequest('contact_organization')">
-                        <span class="mr-2">Organization</span>
-                        <ChevronUpIcon v-if="sortData.name === 'contact_organization' && sortData.order === 'asc'"
-                            class="h-4 w-4 text-gray-500" />
-                        <ChevronDownIcon v-else-if="sortData.name === 'contact_organization' && sortData.order === 'desc'"
-                            class="h-4 w-4 text-gray-500" />
-                    </div>
-                </TableColumnHeader>
+                    <TableColumnHeader header="Destination Number"
+                        class="px-2 py-3.5 text-left text-sm font-semibold text-gray-900" />
+                    <TableColumnHeader header="Speed Dial Code"
+                        class="px-2 py-3.5 text-left text-sm font-semibold text-gray-900" />
+                    <TableColumnHeader header="Assigned User"
+                        class="px-2 py-3.5 text-left text-sm font-semibold text-gray-900" />
+                    <TableColumnHeader header="" class="px-2 py-3.5 text-right text-sm font-semibold text-gray-900" />
+                </template>
 
-                <TableColumnHeader header="Type" class="px-2 py-3.5 text-left text-sm font-semibold text-gray-900" />
-                <TableColumnHeader header="Title" class="px-2 py-3.5 text-left text-sm font-semibold text-gray-900" />
-                <TableColumnHeader header="Category" class="px-2 py-3.5 text-left text-sm font-semibold text-gray-900" />
-                <TableColumnHeader header="Primary Phone" class="px-2 py-3.5 text-left text-sm font-semibold text-gray-900" />
-                <TableColumnHeader header="" class="px-2 py-3.5 text-right text-sm font-semibold text-gray-900" />
+                <template v-else>
+                    <TableColumnHeader
+                        class="flex whitespace-nowrap px-4 py-3.5 text-left text-sm font-semibold text-gray-900 items-center justify-start">
+                        <input type="checkbox" v-model="selectPageItems" @change="handleSelectPageItems"
+                            class="h-4 w-4 rounded border-gray-300 text-indigo-600">
+                        <div class="pl-4 flex items-center cursor-pointer select-none"
+                            @click="handleSortRequest('contact_name_given')">
+                            <span class="mr-2">Name</span>
+                            <ChevronUpIcon v-if="sortData.name === 'contact_name_given' && sortData.order === 'asc'"
+                                class="h-4 w-4 text-gray-500" />
+                            <ChevronDownIcon v-else-if="sortData.name === 'contact_name_given' && sortData.order === 'desc'"
+                                class="h-4 w-4 text-gray-500" />
+                        </div>
+                    </TableColumnHeader>
+
+                    <TableColumnHeader class="px-2 py-3.5 text-left text-sm font-semibold text-gray-900">
+                        <div class="flex items-center cursor-pointer select-none"
+                            @click="handleSortRequest('contact_organization')">
+                            <span class="mr-2">Organization</span>
+                            <ChevronUpIcon v-if="sortData.name === 'contact_organization' && sortData.order === 'asc'"
+                                class="h-4 w-4 text-gray-500" />
+                            <ChevronDownIcon v-else-if="sortData.name === 'contact_organization' && sortData.order === 'desc'"
+                                class="h-4 w-4 text-gray-500" />
+                        </div>
+                    </TableColumnHeader>
+
+                    <TableColumnHeader header="Type" class="px-2 py-3.5 text-left text-sm font-semibold text-gray-900" />
+                    <TableColumnHeader header="Title" class="px-2 py-3.5 text-left text-sm font-semibold text-gray-900" />
+                    <TableColumnHeader header="Category" class="px-2 py-3.5 text-left text-sm font-semibold text-gray-900" />
+                    <TableColumnHeader header="Primary Phone" class="px-2 py-3.5 text-left text-sm font-semibold text-gray-900" />
+                    <TableColumnHeader header="" class="px-2 py-3.5 text-right text-sm font-semibold text-gray-900" />
+                </template>
             </template>
 
             <template v-if="selectPageItems" v-slot:current-selection>
-                <td :colspan="7">
+                <td :colspan="speedDialMode ? 6 : 7">
                     <div class="text-sm text-center m-2">
                         <span class="font-semibold">{{ selectedItems.length }}</span> items are selected.
                         <button v-if="!selectAll && selectedItems.length !== data.total"
@@ -127,33 +178,68 @@
 
             <template #table-body>
                 <tr v-for="row in data.data" :key="row.contact_uuid">
-                    <TableField class="whitespace-nowrap px-4 py-2 text-sm text-gray-500">
-                        <div class="flex items-center">
-                            <input v-model="selectedItems" type="checkbox" name="action_box[]"
-                                :value="row.contact_uuid" class="h-4 w-4 rounded border-gray-300 text-indigo-600">
-                            <div class="ml-4"
-                                :class="{ 'cursor-pointer hover:text-gray-900': permissions.update }"
-                                @click="permissions.update && handleEditButtonClick(row.contact_uuid)">
-                                {{ displayName(row) }}
+                    <template v-if="speedDialMode">
+                        <TableField class="whitespace-nowrap px-4 py-2 text-sm text-gray-500">
+                            <div class="flex items-center">
+                                <input v-model="selectedItems" type="checkbox" name="action_box[]"
+                                    :value="row.contact_uuid" class="h-4 w-4 rounded border-gray-300 text-indigo-600">
+                                <div class="ml-4"
+                                    :class="{ 'cursor-pointer hover:text-gray-900': permissions.update }"
+                                    @click="permissions.update && handleEditButtonClick(row.contact_uuid)">
+                                    {{ speedDialName(row) }}
+                                </div>
                             </div>
-                        </div>
-                    </TableField>
+                        </TableField>
 
-                    <TableField class="whitespace-nowrap px-2 py-2 text-sm text-gray-500"
-                        :text="row.contact_organization" />
-                    <TableField class="whitespace-nowrap px-2 py-2 text-sm text-gray-500 capitalize"
-                        :text="row.contact_type" />
-                    <TableField class="whitespace-nowrap px-2 py-2 text-sm text-gray-500" :text="row.contact_title" />
-                    <TableField class="whitespace-nowrap px-2 py-2 text-sm text-gray-500"
-                        :text="row.contact_category" />
-                    <TableField class="whitespace-nowrap px-2 py-2 text-sm text-gray-500">
-                        <span v-if="row.primary_phone">
-                            <span v-if="row.primary_phone.phone_label" class="text-gray-400 mr-1">
-                                {{ row.primary_phone.phone_label }}:
+                        <TableField class="whitespace-nowrap px-2 py-2 text-sm text-gray-500">
+                            <span v-if="row.primary_phone">
+                                {{ row.primary_phone.phone_number_formatted || row.primary_phone.phone_number }}
                             </span>
-                            {{ row.primary_phone.phone_number }}
-                        </span>
-                    </TableField>
+                        </TableField>
+
+                        <TableField class="whitespace-nowrap px-2 py-2 text-sm text-gray-500">
+                            <span v-if="row.primary_phone">{{ row.primary_phone.phone_speed_dial }}</span>
+                        </TableField>
+
+                        <TableField class="whitespace-nowrap px-2 py-2 text-sm text-gray-500">
+                            <div v-if="row.contact_users?.length" class="flex flex-wrap gap-1">
+                                <Badge v-for="assignment in row.contact_users" :key="assignment.contact_user_uuid"
+                                    :text="assignedUserLabel(assignment)" backgroundColor="bg-gray-100"
+                                    textColor="text-gray-700" ringColor="ring-gray-400/20"
+                                    class="px-2 py-1 text-xs font-semibold" />
+                            </div>
+                        </TableField>
+                    </template>
+
+                    <template v-else>
+                        <TableField class="whitespace-nowrap px-4 py-2 text-sm text-gray-500">
+                            <div class="flex items-center">
+                                <input v-model="selectedItems" type="checkbox" name="action_box[]"
+                                    :value="row.contact_uuid" class="h-4 w-4 rounded border-gray-300 text-indigo-600">
+                                <div class="ml-4"
+                                    :class="{ 'cursor-pointer hover:text-gray-900': permissions.update }"
+                                    @click="permissions.update && handleEditButtonClick(row.contact_uuid)">
+                                    {{ displayName(row) }}
+                                </div>
+                            </div>
+                        </TableField>
+
+                        <TableField class="whitespace-nowrap px-2 py-2 text-sm text-gray-500"
+                            :text="row.contact_organization" />
+                        <TableField class="whitespace-nowrap px-2 py-2 text-sm text-gray-500 capitalize"
+                            :text="row.contact_type" />
+                        <TableField class="whitespace-nowrap px-2 py-2 text-sm text-gray-500" :text="row.contact_title" />
+                        <TableField class="whitespace-nowrap px-2 py-2 text-sm text-gray-500"
+                            :text="row.contact_category" />
+                        <TableField class="whitespace-nowrap px-2 py-2 text-sm text-gray-500">
+                            <span v-if="row.primary_phone">
+                                <span v-if="row.primary_phone.phone_label" class="text-gray-400 mr-1">
+                                    {{ row.primary_phone.phone_label }}:
+                                </span>
+                                {{ row.primary_phone.phone_number }}
+                            </span>
+                        </TableField>
+                    </template>
 
                     <TableField class="whitespace-nowrap px-2 py-1 text-sm text-gray-500">
                         <template #action-buttons>
@@ -198,12 +284,15 @@
         :confirm-button-label="confirmationButtonLabel" cancel-button-label="Cancel" />
 
     <ContactForm :show="showForm" :options="itemOptions" :mode="formMode" :loading="loadingForm"
-        :header="formHeader" @close="handleFormClose" @error="handleErrorResponse" @success="showNotification"
-        @refresh-data="refreshCurrentPage" />
+        :header="formHeader" :initial-tab="speedDialMode ? 'phones' : 'profile'" @close="handleFormClose"
+        @error="handleErrorResponse" @success="showNotification" @refresh-data="refreshCurrentPage" />
 
-    <UploadModal :show="showUploadModal" :header="uploadModalHeader" :show-template-download="uploadFormat === 'csv'"
-        template-label="Download CSV template" @close="closeUploadModal" @upload="uploadFile"
-        @download-template="downloadCsvTemplate" :is-submitting="isUploadingFile" :errors="uploadErrors" />
+    <UploadModal :show="showUploadModal" :header="uploadModalHeader"
+        :show-template-download="uploadFormat === 'csv' || uploadFormat === 'speed-dial'"
+        :template-label="uploadFormat === 'speed-dial' ? 'Download speed dial template' : 'Download CSV template'"
+        @close="closeUploadModal" @upload="uploadFile"
+        @download-template="uploadFormat === 'speed-dial' ? downloadSpeedDialTemplate : downloadCsvTemplate"
+        :is-submitting="isUploadingFile" :errors="uploadErrors" />
 
     <Notification :show="notificationShow" :type="notificationType" :messages="notificationMessages"
         @update:show="hideNotification" />
@@ -224,11 +313,18 @@ import UploadModal from "./components/modal/UploadModal.vue";
 import MainLayout from "../Layouts/MainLayout.vue";
 import { ChevronDownIcon, ChevronUpIcon, MagnifyingGlassIcon, PencilSquareIcon, TrashIcon } from "@heroicons/vue/24/solid";
 import { DocumentArrowDownIcon, DocumentArrowUpIcon } from "@heroicons/vue/24/outline";
+import Badge from "@generalComponents/Badge.vue";
 
 const props = defineProps({
     routes: Object,
     permissions: Object,
+    speedDialMode: {
+        type: Boolean,
+        default: false,
+    },
 });
+
+const speedDialMode = computed(() => props.speedDialMode);
 
 const loading = ref(false);
 const currentPage = ref(1);
@@ -275,6 +371,7 @@ const data = ref({
 const filterData = ref({
     search: null,
     showGlobal: false,
+    speedDial: props.speedDialMode,
 });
 
 const sortData = ref({
@@ -292,17 +389,29 @@ const bulkActions = computed(() => {
     return actions;
 });
 
-const uploadModalHeader = computed(() => uploadFormat.value === "vcard" ? "Upload vCard" : "Upload CSV");
+const uploadModalHeader = computed(() => {
+    if (uploadFormat.value === "vcard") {
+        return "Upload vCard";
+    }
+
+    if (uploadFormat.value === "speed-dial") {
+        return "Upload Speed Dial CSV";
+    }
+
+    return "Upload CSV";
+});
 
 const formHeader = computed(() => {
+    const label = speedDialMode.value ? "Speed Dial" : "Contact";
+
     if (formMode.value === "create") {
-        return "Create Contact";
+        return `Create ${label}`;
     }
 
     const item = itemOptions.value?.item;
-    const name = displayName(item);
+    const name = speedDialMode.value ? speedDialName(item) : displayName(item);
 
-    return `Update Contact${name ? ` - ${name}` : ""}`;
+    return `Update ${label}${name ? ` - ${name}` : ""}`;
 });
 
 onMounted(() => {
@@ -321,6 +430,22 @@ const displayName = (row) => {
     const name = [row.contact_name_given, row.contact_name_family].filter(Boolean).join(" ").trim();
 
     return name || row.contact_organization || "";
+};
+
+const speedDialName = (row) => {
+    if (!row) {
+        return "";
+    }
+
+    return row.contact_organization || displayName(row);
+};
+
+const assignedUserLabel = (assignment) => {
+    if (!assignment) {
+        return "";
+    }
+
+    return assignment.user?.name_formatted || assignment.user?.username || assignment.label || "";
 };
 
 const handleSortRequest = (column) => {
@@ -407,7 +532,12 @@ const uploadFile = (file) => {
     const formData = new FormData();
     formData.append("file", file);
 
-    const route = uploadFormat.value === "vcard" ? routes.import_vcard : routes.import_csv;
+    let route = routes.import_csv;
+    if (uploadFormat.value === "vcard") {
+        route = routes.import_vcard;
+    } else if (uploadFormat.value === "speed-dial") {
+        route = routes.import_speed_dial;
+    }
 
     axios.post(route, formData)
         .then((response) => {
@@ -467,6 +597,24 @@ const handleExportCsv = () => {
 
 const handleExportVcard = () => {
     downloadExport(routes.export_vcard, "phonebook-contacts.vcf", "text/vcard");
+};
+
+const handleExportSpeedDial = () => {
+    downloadExport(routes.export_speed_dial, "speed-dial.csv", "text/csv");
+};
+
+const downloadSpeedDialTemplate = () => {
+    axios.get(routes.download_speed_dial_template, { responseType: "blob" })
+        .then((response) => {
+            const fileUrl = window.URL.createObjectURL(new Blob([response.data], { type: "text/csv" }));
+            const link = document.createElement("a");
+            link.href = fileUrl;
+            link.setAttribute("download", "speed-dial-template.csv");
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        })
+        .catch(handleErrorResponse);
 };
 
 const handleCreateButtonClick = () => {

@@ -9,16 +9,29 @@ use Maatwebsite\Excel\Concerns\WithHeadings;
 
 class SpeedDialExport implements FromCollection, WithHeadings
 {
-    protected $contacts;
-    protected $maxUsers;
-    protected $searchable = ['contact_organization', 'primaryPhone.phone_number', 'primaryPhone.phone_speed_dial',];
+    protected Collection $contacts;
 
-    public function __construct()
+    protected int $maxUsers;
+
+    protected $searchable = ['contact_organization', 'primaryPhone.phone_number', 'primaryPhone.phone_speed_dial'];
+
+    public function __construct(?Collection $contacts = null)
     {
+        if ($contacts !== null) {
+            $this->contacts = $contacts;
+            $this->maxUsers = (int) $this->contacts->max(
+                fn ($contact) => $contact->relationLoaded('contactUsers')
+                    ? $contact->contactUsers->count()
+                    : ($contact->speedDialUser?->count() ?? 0)
+            );
+
+            return;
+        }
+
         $domainUuid = session('domain_uuid');
         $sortField = request()->get('sortField', 'contact_organization');
         $sortOrder = request()->get('sortOrder', 'asc');
-    
+
         $query = SpeedDial::query()
             ->where('domain_uuid', $domainUuid)
             ->with([
@@ -27,13 +40,12 @@ class SpeedDialExport implements FromCollection, WithHeadings
                 },
                 'speedDialUser.user' => function ($query) {
                     $query->select('user_uuid', 'username');
-                }
+                },
             ])
             ->orderBy($sortField, $sortOrder);
-    
-        // Get filter data as an array
+
         $filterData = request('filterData', []);
-        if (!empty($filterData['search'])) {
+        if (! empty($filterData['search'])) {
             $value = $filterData['search'];
             $query->where(function ($query) use ($value) {
                 foreach ($this->searchable as $field) {
@@ -48,13 +60,11 @@ class SpeedDialExport implements FromCollection, WithHeadings
                 }
             });
         }
-    
+
         $this->contacts = $query->get();
-    
-        // Determine maximum number of assigned users
-        $this->maxUsers = $this->contacts->max(function ($contact) {
-            return $contact->speedDialUser ? $contact->speedDialUser->count() : 0;
-        });
+        $this->maxUsers = (int) $this->contacts->max(
+            fn ($contact) => $contact->speedDialUser ? $contact->speedDialUser->count() : 0
+        );
     }
     
 
@@ -81,10 +91,13 @@ class SpeedDialExport implements FromCollection, WithHeadings
                 'speed_dial_code' => $speedDialCode,
             ];
 
-            // Gather all assigned usernames.
+            $assignments = $contact->relationLoaded('contactUsers')
+                ? $contact->contactUsers
+                : $contact->speedDialUser;
+
             $usernames = [];
-            if ($contact->speedDialUser && $contact->speedDialUser->isNotEmpty()) {
-                foreach ($contact->speedDialUser as $contactUser) {
+            if ($assignments && $assignments->isNotEmpty()) {
+                foreach ($assignments as $contactUser) {
                     if ($contactUser->user) {
                         $usernames[] = $contactUser->user->username;
                     }

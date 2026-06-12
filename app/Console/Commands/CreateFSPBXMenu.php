@@ -127,7 +127,7 @@ class CreateFSPBXMenu extends Command
                     ['title' => 'Music on Hold', 'link' => '/music-on-hold','groups' => ['superadmin']],
                     ['title' => 'Recordings Manager', 'link' => '/recordings-manager', 'groups' => ['superadmin', 'admin']],
                     ['title' => 'Ring Groups', 'link' => '/ring-groups', 'groups' => ['superadmin', 'admin']],
-                    ['title' => 'Speed Dial', 'link' => '/speed-dial', 'groups' => ['superadmin', 'admin', 'user']],
+                    ['title' => 'Speed Dial', 'link' => '/contacts?speed_dial=1', 'groups' => ['superadmin', 'admin', 'user']],
                     ['title' => 'Streams', 'link' => '/app/streams/streams.php', 'groups' => ['superadmin']],
                     ['title' => 'Business Hours', 'link' => '/business-hours', 'groups' => ['superadmin', 'admin']],
                     ['title' => 'Voicemails', 'link' => '/voicemails', 'groups' => ['superadmin', 'admin']],

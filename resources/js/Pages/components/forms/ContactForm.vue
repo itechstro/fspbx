@@ -459,7 +459,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import axios from "axios";
 import { Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot } from "@headlessui/vue";
 import { ClipboardDocumentIcon } from "@heroicons/vue/24/outline";
@@ -477,6 +477,10 @@ const props = defineProps({
         type: String,
         default: "create",
     },
+    initialTab: {
+        type: String,
+        default: "profile",
+    },
 });
 
 const emit = defineEmits(["close", "error", "success", "refresh-data"]);
@@ -485,6 +489,19 @@ const form$ = ref(null);
 const attachmentInput = ref(null);
 const selectedAttachmentFile = ref(null);
 const uploadingAttachment = ref(false);
+
+watch(
+    () => [props.show, props.loading, props.initialTab],
+    async ([show, loading, initialTab]) => {
+        if (!show || loading || !initialTab || initialTab === "profile") {
+            return;
+        }
+
+        await nextTick();
+
+        form$.value?.el$?.(initialTab)?.select?.();
+    }
+);
 
 const permissions = computed(() => props.options?.permissions ?? {});
 const formInstanceKey = computed(() => props.options?.item?.contact_uuid || props.mode || "new");

@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Exports\ContactCsvExport;
 use App\Exports\ContactCsvTemplate;
+use App\Exports\SpeedDialExport;
+use App\Exports\SpeedDialTemplate;
+use App\Imports\SpeedDialImport;
 use App\Http\Requests\StoreVContactRequest;
 use App\Http\Requests\UpdateVContactRequest;
 use App\Imports\ContactCsvImport;
@@ -41,16 +44,21 @@ class ContactsController extends Controller
         private ContactVcardService $contactVcardService,
     ) {}
 
-    public function index()
+    public function index(Request $request)
     {
         if (! userCheckPermission('contact_view')) {
             return redirect('/');
         }
 
+        $speedDialMode = $request->boolean('speed_dial');
+
         return Inertia::render('Contacts', [
+            'speedDialMode' => $speedDialMode,
             'visibility' => $this->visibilityProps(),
             'routes' => [
-                'current_page' => route('contacts.index'),
+                'current_page' => $speedDialMode
+                    ? route('contacts.index', ['speed_dial' => 1])
+                    : route('contacts.index'),
                 'data_route' => route('phonebook-contacts.data'),
                 'store' => route('phonebook-contacts.store'),
                 'destroy_template' => route('phonebook-contacts.destroy', ['v_contact' => ':uuid']),
@@ -62,7 +70,11 @@ class ContactsController extends Controller
                 'export_csv' => route('phonebook-contacts.export.csv'),
                 'export_vcard' => route('phonebook-contacts.export.vcard'),
                 'download_csv_template' => route('phonebook-contacts.export.csv-template'),
-                'speed_dial' => route('speed-dial.index'),
+                'import_speed_dial' => route('phonebook-contacts.import.speed-dial'),
+                'export_speed_dial' => route('phonebook-contacts.export.speed-dial'),
+                'download_speed_dial_template' => route('phonebook-contacts.export.speed-dial-template'),
+                'speed_dial' => route('contacts.index', ['speed_dial' => 1]),
+                'contacts' => route('contacts.index'),
             ],
             'permissions' => $this->permissions(),
         ]);
@@ -354,7 +366,7 @@ class ContactsController extends Controller
             ], 403);
         }
 
-        return $this->scopedContacts($request)
+        $query = $this->scopedContacts($request)
             ->select([
                 'contact_uuid',
                 'domain_uuid',
@@ -377,7 +389,16 @@ class ContactsController extends Controller
                     'phone_number',
                     'phone_speed_dial'
                 );
-            }])
+            }]);
+
+        if ($request->boolean('filter.speedDial')) {
+            $query->with(['contactUsers' => function ($query) {
+                $query->select('contact_user_uuid', 'contact_uuid', 'user_uuid')
+                    ->with(['user:user_uuid,username,domain_uuid']);
+            }]);
+        }
+
+        return $query
             ->allowedSorts([
                 'contact_organization',
                 'contact_name_given',
@@ -498,6 +519,60 @@ class ContactsController extends Controller
         return Excel::download(new ContactCsvTemplate, 'phonebook-contacts-template.csv', ExcelWriter::CSV);
     }
 
+    public function importSpeedDialCsv(Request $request): JsonResponse
+    {
+        if (! userCheckPermission('contact_upload') || ! userCheckPermission('contact_add')) {
+            return response()->json([
+                'messages' => ['error' => ['Access denied.']],
+            ], 403);
+        }
+
+        $request->validate([
+            'file' => ['required', 'file', 'max:10240'],
+        ]);
+
+        try {
+            $import = new SpeedDialImport;
+            $import->import($request->file('file'));
+
+            if ($import->failures()->isNotEmpty()) {
+                return response()->json([
+                    'errors' => $this->formatImportFailures($import->failures()),
+                ], 422);
+            }
+
+            return response()->json([
+                'messages' => ['success' => ['Speed dial entries imported successfully.']],
+            ]);
+        } catch (Throwable $e) {
+            logger('ContactsController@importSpeedDialCsv error: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
+
+            return response()->json([
+                'errors' => ['server' => [$e->getMessage()]],
+            ], 500);
+        }
+    }
+
+    public function exportSpeedDialCsv(Request $request)
+    {
+        if (! userCheckPermission('contact_view')) {
+            abort(403);
+        }
+
+        $contacts = $this->exportContacts($request);
+
+        return Excel::download(new SpeedDialExport($contacts), 'speed-dial.csv', ExcelWriter::CSV);
+    }
+
+    public function downloadSpeedDialTemplate()
+    {
+        if (! userCheckPermission('contact_upload')) {
+            abort(403);
+        }
+
+        return Excel::download(new SpeedDialTemplate, 'speed-dial-template.csv', ExcelWriter::CSV);
+    }
+
     public function exportVcard(Request $request)
     {
         if (! userCheckPermission('contact_view')) {
@@ -570,6 +645,7 @@ class ContactsController extends Controller
             ->with([
                 'phones',
                 'emails',
+                'primaryPhone:contact_phone_uuid,contact_uuid,phone_number,phone_speed_dial',
                 'contactUsers.user:user_uuid,username',
                 'contactGroups.group:group_uuid,group_name',
             ])
@@ -625,6 +701,7 @@ class ContactsController extends Controller
                     });
                 }),
                 AllowedFilter::callback('showGlobal', function ($query, $value) {}),
+                AllowedFilter::callback('speedDial', function ($query, $value) {}),
             ]);
     }
 

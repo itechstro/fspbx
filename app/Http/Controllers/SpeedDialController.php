@@ -15,7 +15,6 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Inertia\Inertia;
 use Maatwebsite\Excel\Excel as ExcelWriter;
 use Maatwebsite\Excel\Facades\Excel;
 use Maatwebsite\Excel\HeadingRowImport;
@@ -39,28 +38,11 @@ class SpeedDialController extends Controller
 
     public function index()
     {
-        if (!userCheckPermission("contact_view")) {
+        if (! userCheckPermission('contact_view')) {
             return redirect('/');
         }
 
-        return Inertia::render(
-            $this->viewName,
-            [
-                'data' => function () {
-                    return $this->getData();
-                },
-                'routes' => [
-                    'current_page' => route('speed-dial.index'),
-                    'store' => route('speed-dial.store'),
-                    'select_all' => route('speed-dial.select.all'),
-                    'bulk_delete' => route('speed-dial.bulk.delete'),
-                    'item_options' => route('speed-dial.item.options'),
-                    'import' => route('speed-dial.import'),
-                    'download_template' => route('speed-dial.download.template'),
-                    'export' => route('speed-dial.export'),
-                ]
-            ]
-        );
+        return redirect()->route('contacts.index', ['speed_dial' => 1]);
     }
 
     public function getData($paginate = 50)

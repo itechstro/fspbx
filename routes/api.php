@@ -641,6 +641,9 @@ Route::group(['middleware' => ['auth:sanctum', 'api.cookie.auth']], function () 
     Route::get('phonebook-contacts/export/csv', [ContactsController::class, 'exportCsv'])->name('phonebook-contacts.export.csv');
     Route::get('phonebook-contacts/export/vcard', [ContactsController::class, 'exportVcard'])->name('phonebook-contacts.export.vcard');
     Route::get('phonebook-contacts/export/csv-template', [ContactsController::class, 'downloadCsvTemplate'])->name('phonebook-contacts.export.csv-template');
+    Route::post('phonebook-contacts/import/speed-dial', [ContactsController::class, 'importSpeedDialCsv'])->name('phonebook-contacts.import.speed-dial');
+    Route::get('phonebook-contacts/export/speed-dial', [ContactsController::class, 'exportSpeedDialCsv'])->name('phonebook-contacts.export.speed-dial');
+    Route::get('phonebook-contacts/export/speed-dial-template', [ContactsController::class, 'downloadSpeedDialTemplate'])->name('phonebook-contacts.export.speed-dial-template');
     Route::get('phonebook-contacts/{v_contact}/export/vcard', [ContactsController::class, 'exportContactVcard'])->name('phonebook-contacts.export.contact-vcard');
     Route::post('phonebook-contacts/{v_contact}/attachments', [ContactsController::class, 'storeAttachment'])->name('phonebook-contacts.attachments.store');
     Route::delete('phonebook-contacts/{v_contact}/attachments/{attachment}', [ContactsController::class, 'destroyAttachment'])->name('phonebook-contacts.attachments.destroy');
