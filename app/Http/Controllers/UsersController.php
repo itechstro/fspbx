@@ -9,6 +9,9 @@ use App\Data\UserData;
 use App\Models\Domain;
 use App\Models\Groups;
 use App\Models\Extensions;
+use App\Models\SpeedDialUser;
+use App\Models\VContact;
+use App\Services\Contacts\ContactUserLinkService;
 use Illuminate\Support\Str;
 use App\Models\DomainGroups;
 use Illuminate\Http\Request;
@@ -31,8 +34,9 @@ class UsersController extends Controller
     protected $viewName = 'Users';
     protected $searchable = ['username', 'user_email', 'name_formatted'];
 
-    public function __construct()
-    {
+    public function __construct(
+        private ContactUserLinkService $contactUserLinkService,
+    ) {
         $this->model = new User();
     }
 
@@ -143,6 +147,10 @@ class UsersController extends Controller
             $select[] = 'extension_uuid';
         }
 
+        if (Schema::hasColumn('v_users', 'contact_uuid')) {
+            $select[] = 'contact_uuid';
+        }
+
         // 1) Base payload: either an existing user DTO or a “new user” stub
         if ($itemUuid) {
             $user = QueryBuilder::for(User::class)
@@ -200,6 +208,20 @@ class UsersController extends Controller
 
             $this->ensureCanManageTarget($user);
 
+            if (Schema::hasColumn('v_users', 'contact_uuid') && empty($user->contact_uuid)) {
+                $assignedContactUuid = SpeedDialUser::query()
+                    ->where('domain_uuid', $domain_uuid)
+                    ->where('user_uuid', $user->user_uuid)
+                    ->orderBy('insert_date')
+                    ->value('contact_uuid');
+
+                if ($assignedContactUuid) {
+                    $user->contact_uuid = $assignedContactUuid;
+                }
+            }
+
+            $user->makeVisible(['contact_uuid']);
+
             $userDto = UserData::from($user);
             $updateRoute = route('users.update', ['user' => $itemUuid]);
         } else {
@@ -229,6 +251,7 @@ class UsersController extends Controller
                 user_enabled: 'true',
                 domain_uuid: $domain_uuid,
                 extension_uuid: null,
+                contact_uuid: null,
             );
             $updateRoute = null;
         }
@@ -285,6 +308,21 @@ class UsersController extends Controller
                 ];
             })->toArray();
 
+        $phonebookContacts = VContact::query()
+            ->where('domain_uuid', $domain_uuid)
+            ->orderBy('contact_organization')
+            ->orderBy('contact_name_given')
+            ->get(['contact_uuid', 'contact_organization', 'contact_name_given', 'contact_name_family'])
+            ->map(function (VContact $contact) {
+                $name = trim("{$contact->contact_name_given} {$contact->contact_name_family}");
+
+                return [
+                    'value' => $contact->contact_uuid,
+                    'label' => $name !== '' ? $name : ($contact->contact_organization ?: $contact->contact_uuid),
+                ];
+            })
+            ->values()
+            ->all();
 
         // 3) Any routes your front end needs
         $routes = [
@@ -306,6 +344,7 @@ class UsersController extends Controller
             'domains' => $domains,
             'domain_groups' => $domain_groups,
             'extensions' => $extensions,
+            'phonebook_contacts' => $phonebookContacts,
         ]);
     }
 
@@ -348,6 +387,10 @@ class UsersController extends Controller
 
             if (Schema::hasColumn('v_users', 'extension_uuid')) {
                 $userAttributes['extension_uuid'] = $data['extension_uuid'] ?? null;
+            }
+
+            if (Schema::hasColumn('v_users', 'contact_uuid')) {
+                $userAttributes['contact_uuid'] = $data['contact_uuid'] ?? null;
             }
 
             $user = User::create($userAttributes);
@@ -396,6 +439,10 @@ class UsersController extends Controller
 
             DB::commit();
 
+            $freshUser = $user->fresh();
+            $this->contactUserLinkService->syncPhonebookContactAssignmentForUser($freshUser);
+            $this->contactUserLinkService->syncCloudPlayForUser($freshUser);
+
             return response()->json([
                 'messages' => ['success' => ['User created']],
                 'user_uuid' => $user->user_uuid,
@@ -440,6 +487,8 @@ class UsersController extends Controller
             $allowedGroups = $this->allowedGroupsForActor($validated['groups'], $user->domain_uuid);
         }
 
+        $previousExtensionUuid = $user->extension_uuid;
+
         try {
             DB::beginTransaction();
 
@@ -451,7 +500,30 @@ class UsersController extends Controller
                 ]
             );
 
-            $user->update($validated);
+            $userUpdate = collect($validated)->only([
+                'user_email',
+                'user_enabled',
+            ])->all();
+
+            if (Schema::hasColumn('v_users', 'extension_uuid') && array_key_exists('extension_uuid', $validated)) {
+                $userUpdate['extension_uuid'] = $validated['extension_uuid'] ?: null;
+            }
+
+            if (Schema::hasColumn('v_users', 'contact_uuid') && array_key_exists('contact_uuid', $validated)) {
+                $contactUuid = $validated['contact_uuid'] ?: null;
+
+                if ($contactUuid === null) {
+                    $contactUuid = SpeedDialUser::query()
+                        ->where('domain_uuid', $user->domain_uuid)
+                        ->where('user_uuid', $user->user_uuid)
+                        ->orderBy('insert_date')
+                        ->value('contact_uuid');
+                }
+
+                $userUpdate['contact_uuid'] = $contactUuid;
+            }
+
+            $user->update($userUpdate);
 
             foreach (['language', 'time_zone'] as $field) {
                 $user->settings()->updateOrCreate(
@@ -508,6 +580,15 @@ class UsersController extends Controller
             }
 
             DB::commit();
+
+            $freshUser = $user->fresh();
+            $this->contactUserLinkService->syncPhonebookContactAssignmentForUser($freshUser);
+            $extensionChanged = $previousExtensionUuid !== $freshUser->extension_uuid;
+
+            $this->contactUserLinkService->syncCloudPlayAfterUserExtensionChange(
+                $freshUser,
+                $extensionChanged ? $previousExtensionUuid : null,
+            );
 
             return response()->json([
                 'messages' => ['success' => ['User updated']]

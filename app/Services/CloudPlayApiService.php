@@ -17,6 +17,11 @@ class CloudPlayApiService implements MobileAppProviderInterface
 {
     protected int $timeout = 30;
 
+    protected ?string $enterpriseDirectoryCacheDomain = null;
+
+    /** @var array<int, array<string, mixed>>|null */
+    protected ?array $enterpriseDirectoryCache = null;
+
     public function getProviderKey(): string
     {
         return 'cloudplay';
@@ -644,15 +649,79 @@ class CloudPlayApiService implements MobileAppProviderInterface
         return $response['data']['qr_code'] ?? null;
     }
 
+    public function clearEnterpriseDirectoryCache(): void
+    {
+        $this->enterpriseDirectoryCacheDomain = null;
+        $this->enterpriseDirectoryCache = null;
+    }
+
+    public function enterpriseDirectoryEntryExists(string $domainUuid, int $edId): bool
+    {
+        if ($edId <= 0) {
+            return false;
+        }
+
+        foreach ($this->listEnterpriseDirectory($domainUuid) as $entry) {
+            if ((int) ($entry['ed_id'] ?? 0) === $edId) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function resolveEnterpriseDirectoryId(string $domainUuid, string $extension, ?int $storedEdId = null): int
+    {
+        $extension = trim($extension);
+        $storedEdId = (int) ($storedEdId ?? 0);
+
+        if ($extension !== '') {
+            $byExtension = $this->findEnterpriseDirectoryIdByExtension($domainUuid, $extension);
+
+            if ($byExtension > 0) {
+                return $byExtension;
+            }
+        }
+
+        if ($storedEdId <= 0) {
+            return 0;
+        }
+
+        if (! $this->enterpriseDirectoryEntryExists($domainUuid, $storedEdId)) {
+            return 0;
+        }
+
+        if ($extension !== '') {
+            foreach ($this->listEnterpriseDirectory($domainUuid) as $entry) {
+                if ((int) ($entry['ed_id'] ?? 0) !== $storedEdId) {
+                    continue;
+                }
+
+                $entryExtension = (string) ($entry['ed_extension'] ?? $entry['ed_blf_prefix'] ?? '');
+
+                if ($entryExtension !== '' && $entryExtension !== $extension) {
+                    return 0;
+                }
+
+                break;
+            }
+        }
+
+        return $storedEdId;
+    }
+
     public function syncEnterpriseDirectory(string $domainUuid, array $params): int
     {
         $token = $this->getCustomerToken($domainUuid);
         $payload = $this->buildEnterpriseDirectoryPayload($domainUuid, $params);
-        $edId = isset($params['ed_id']) ? (int) $params['ed_id'] : 0;
+        $extension = (string) ($params['extension'] ?? '');
+        $storedEdId = isset($params['ed_id']) ? (int) $params['ed_id'] : 0;
+        $edId = $this->resolveEnterpriseDirectoryId($domainUuid, $extension, $storedEdId);
 
         if ($edId > 0) {
             $payload['ed_id'] = (string) $edId;
             $response = $this->request('post', '/customer/enterprise/update', $payload, $token);
+            $this->clearEnterpriseDirectoryCache();
 
             return (int) ($response['data']['ed_id'] ?? $edId);
         }
@@ -663,6 +732,8 @@ class CloudPlayApiService implements MobileAppProviderInterface
         if ($createdId <= 0) {
             throw new \Exception('CloudPLAY did not return an enterprise directory ID.');
         }
+
+        $this->clearEnterpriseDirectoryCache();
 
         return $createdId;
     }
@@ -677,10 +748,15 @@ class CloudPlayApiService implements MobileAppProviderInterface
         $this->request('post', '/customer/enterprise/delete', [
             'ed_id' => $edId,
         ], $token);
+        $this->clearEnterpriseDirectoryCache();
     }
 
     public function listEnterpriseDirectory(string $domainUuid): array
     {
+        if ($this->enterpriseDirectoryCacheDomain === $domainUuid && $this->enterpriseDirectoryCache !== null) {
+            return $this->enterpriseDirectoryCache;
+        }
+
         $token = $this->getCustomerToken($domainUuid);
         $entries = [];
         $page = 1;
@@ -701,7 +777,92 @@ class CloudPlayApiService implements MobileAppProviderInterface
             $page++;
         } while (count($batch) >= $perPage);
 
+        $this->enterpriseDirectoryCacheDomain = $domainUuid;
+        $this->enterpriseDirectoryCache = $entries;
+
         return $entries;
+    }
+
+    public function findEnterpriseDirectoryIdByExtension(string $domainUuid, string $extension): int
+    {
+        $ids = $this->findEnterpriseDirectoryIdsByExtension($domainUuid, $extension);
+
+        if ($ids === []) {
+            return 0;
+        }
+
+        foreach ($this->listEnterpriseDirectory($domainUuid) as $entry) {
+            if ((int) ($entry['ed_id'] ?? 0) !== $ids[0]) {
+                continue;
+            }
+
+            if (($entry['ed_status'] ?? 'Y') === 'Y') {
+                return $ids[0];
+            }
+        }
+
+        return $ids[0];
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    public function findEnterpriseDirectoryIdsByExtension(string $domainUuid, string $extension): array
+    {
+        $extension = trim($extension);
+
+        if ($extension === '') {
+            return [];
+        }
+
+        $ids = [];
+
+        foreach ($this->listEnterpriseDirectory($domainUuid) as $entry) {
+            $entryExtension = (string) ($entry['ed_extension'] ?? $entry['ed_blf_prefix'] ?? '');
+
+            if ($entryExtension !== $extension) {
+                continue;
+            }
+
+            $edId = (int) ($entry['ed_id'] ?? 0);
+
+            if ($edId > 0) {
+                $ids[] = $edId;
+            }
+        }
+
+        return array_values(array_unique($ids));
+    }
+
+    /**
+     * @return array<int, array{extension: string, ed_id: int}>
+     */
+    public function duplicateEnterpriseDirectoryEntries(string $domainUuid): array
+    {
+        $seen = [];
+        $duplicates = [];
+
+        foreach ($this->listEnterpriseDirectory($domainUuid) as $entry) {
+            $edId = (int) ($entry['ed_id'] ?? 0);
+            $extension = (string) ($entry['ed_extension'] ?? $entry['ed_blf_prefix'] ?? '');
+
+            if ($edId <= 0 || $extension === '') {
+                continue;
+            }
+
+            if (! isset($seen[$extension])) {
+                $seen[$extension] = $edId;
+
+                continue;
+            }
+
+            $duplicates[] = [
+                'extension' => $extension,
+                'ed_id' => $edId,
+            ];
+        }
+
+        return $duplicates;
     }
 
     protected function buildEnterpriseDirectoryPayload(string $domainUuid, array $params): array
@@ -710,18 +871,24 @@ class CloudPlayApiService implements MobileAppProviderInterface
         $extension = (string) ($params['extension'] ?? '');
         $profileId = $params['profile_id'] ?? $this->getProfileId($domainUuid);
         $callerId = preg_replace('/\D+/', '', (string) ($params['caller_id_number'] ?? ''));
+        $businessPhone = $this->normalizePhoneDigits($params['business_phone'] ?? '');
+
+        if ($businessPhone === '' && ($params['active'] ?? true)) {
+            $businessPhone = $callerId;
+        }
+
         $company = Domain::where('domain_uuid', $domainUuid)->value('domain_description')
             ?? Domain::where('domain_uuid', $domainUuid)->value('domain_name')
             ?? '';
 
         return [
-            'ed_first_name' => $firstName !== '' ? $firstName : $extension,
+            'ed_first_name' => $firstName !== '' ? $firstName : ($extension !== '' ? $extension : 'Contact'),
             'ed_last_name' => $lastName,
             'ed_role' => '',
             'ed_directory' => 'Enterprise',
             'ed_title' => '',
             'ed_company' => $company,
-            'ed_business_phone_number' => $callerId,
+            'ed_business_phone_number' => $businessPhone,
             'ed_other_number' => '',
             'ed_blf_prefix' => $extension,
             'ed_email_id' => (string) ($params['email'] ?? ''),
@@ -748,23 +915,14 @@ class CloudPlayApiService implements MobileAppProviderInterface
 
     public function resolveExtensionMobileNumber(Extensions $extension): string
     {
-        $extension->loadMissing(['extension_users.user.contact.phones']);
+        return app(\App\Services\Contacts\ContactUserLinkService::class)
+            ->resolveMobileNumberForExtension($extension);
+    }
 
-        foreach ($extension->extension_users as $extensionUser) {
-            $phones = $extensionUser->user?->contact?->phones;
-
-            if (!$phones) {
-                continue;
-            }
-
-            $mobile = $phones->firstWhere('label', 'mobile')?->phone_number;
-
-            if ($mobile) {
-                return $this->normalizePhoneDigits($mobile);
-            }
-        }
-
-        return '';
+    public function resolveExtensionBusinessPhoneNumber(Extensions $extension): string
+    {
+        return app(\App\Services\Contacts\ContactUserLinkService::class)
+            ->resolveWorkNumberForExtension($extension);
     }
 
     protected function normalizePhoneDigits(?string $number): string

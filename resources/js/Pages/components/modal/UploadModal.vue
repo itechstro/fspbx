@@ -31,8 +31,8 @@
                                 <DragDropUpload @file-selected="onFileSelected" />
                             </div>
 
-                            <div class=" pb-4">
-                                <button @click="downloadTemplate" type="link" class="font-medium text-sm text-blue-600 hover:text-blue-500">Download template.csv</button>
+                            <div v-if="showTemplateDownload" class=" pb-4">
+                                <button @click="downloadTemplate" type="link" class="font-medium text-sm text-blue-600 hover:text-blue-500">{{ templateLabel }}</button>
                             </div>
 
                             <div v-if="localErrors && Object.keys(localErrors).length > 0"
@@ -93,7 +93,15 @@ const props = defineProps({
     errors: [Object, null],
     isSubmitting: {
         type: Boolean,
-        default: false, // Default value for loading
+        default: false,
+    },
+    showTemplateDownload: {
+        type: Boolean,
+        default: true,
+    },
+    templateLabel: {
+        type: String,
+        default: 'Download template.csv',
     },
 });
 

@@ -864,7 +864,7 @@
         </ldap>
         <xmlContact index="1">
             <Name>{if isset($fanvil_remote_phonebook_2_name)}{$fanvil_remote_phonebook_2_name}{else}Users{/if}</Name>
-            <Addr>https://{$domain_name}/app/provision/?address={$mac}&amp;file=directory.xml&amp;contacts=users</Addr>
+            <Addr>https://{$domain_name}/prov/directory.xml?contacts=users&amp;mac={$mac}</Addr>
             <UserName>{if isset($http_auth_username)}{$http_auth_username}{/if}</UserName>
             <PassWd>{if isset($http_auth_password)}{$http_auth_password}{/if}</PassWd>
             <Sipline>-1</Sipline>
@@ -873,7 +873,7 @@
         </xmlContact>
         <xmlContact index="2">
             <Name>{if isset($fanvil_remote_phonebook_2_name)}{$fanvil_remote_phonebook_2_name}{else}Groups{/if}</Name>
-            <Addr>https://{$domain_name}/app/provision/?address={$mac}&amp;file=directory.xml&amp;contacts=groups</Addr>
+            <Addr>https://{$domain_name}/prov/directory.xml?contacts=groups&amp;mac={$mac}</Addr>
             <UserName>{if isset($http_auth_username)}{$http_auth_username}{/if}</UserName>
             <PassWd>{if isset($http_auth_password)}{$http_auth_password}{/if}</PassWd>
             <Sipline>-1</Sipline>
@@ -882,7 +882,7 @@
         </xmlContact>
         <xmlContact index="3">
             <Name>{if isset($fanvil_remote_phonebook_3_name)}{$fanvil_remote_phonebook_3_name}{else}Extensions{/if}</Name>
-            <Addr>https://{$domain_name}/app/provision/?address={$mac}&amp;file=directory.xml&amp;contacts=extensions</Addr>
+            <Addr>https://{$domain_name}/prov/directory.xml?contacts=extensions&amp;mac={$mac}</Addr>
             <UserName>{if isset($http_auth_username)}{$http_auth_username}{/if}</UserName>
             <PassWd>{if isset($http_auth_password)}{$http_auth_password}{/if}</PassWd>
             <Sipline>-1</Sipline>

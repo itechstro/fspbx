@@ -10,10 +10,14 @@ use App\Models\DomainSettings;
 use Illuminate\Support\Carbon;
 use App\Models\DefaultSettings;
 use App\Models\ProvisioningTemplate;
+use App\Services\Provisioning\ProvisioningContactDirectoryService;
 use Illuminate\Support\Facades\Blade;
 
 class ProvisioningController extends Controller
 {
+    public function __construct(
+        private ProvisioningContactDirectoryService $contactDirectoryService,
+    ) {}
     /**
      * Catch-all entrypoint:
      * Route: /prov/{path}  (path can contain subfolders like "83/serial.xml")
@@ -67,14 +71,22 @@ class ProvisioningController extends Controller
             'content_type' => $contentType,
         ]);
 
+        $flv = $this->computeFlavor($request, $device, $id, (string) $ext);
+        $isContactDirectory = in_array($flv['flavor'], ['directory.xml', 'phonebook.xml'], true);
+
         // Load the device’s chosen template (DB-backed or legacy default)
         $tpl = $this->resolveTemplateForDevice($device);
-        if (!$tpl) {
+        if (! $tpl && $isContactDirectory) {
+            return $this->serveBuiltInContactDirectory($request, $device, $flv, $contentType);
+        }
+
+        if (! $tpl) {
             provisioning_debug('ProvisioningController: no provisioning template resolved', [
                 'device_uuid' => (string) $device->device_uuid,
                 'template' => $device->device_template,
                 'template_uuid' => $device->device_template_uuid,
             ]);
+
             return response('', 404);
         }
 
@@ -238,6 +250,103 @@ class ProvisioningController extends Controller
         return strtolower((string) $ext) === 'xml' ? 'application/xml' : 'text/plain';
     }
 
+    private function shouldRenderDedicatedContactTemplate(ProvisioningTemplate $tpl, string $flavor): bool
+    {
+        return ! str_contains((string) $tpl->content, "@case('{$flavor}')");
+    }
+
+    private function renderDedicatedContactTemplate(Devices $device, array $vars): string
+    {
+        $vendor = strtolower((string) ($device->device_vendor ?? ''));
+        $flavor = (string) ($vars['flavor'] ?? '');
+
+        if ($flavor === 'phonebook.xml') {
+            return view('provisioning.phonebook.grandstream', $vars)->render();
+        }
+
+        $view = match (true) {
+            in_array($vendor, ['snom'], true) => 'provisioning.directory.snom',
+            in_array($vendor, ['fanvil'], true) => 'provisioning.directory.fanvil',
+            default => 'provisioning.directory.yealink',
+        };
+
+        return view($view, $vars)->render();
+    }
+
+    private function serveBuiltInContactDirectory(
+        Request $request,
+        Devices $device,
+        array $flv,
+        string $contentType
+    ) {
+        provisioning_debug('ProvisioningController: serving built-in contact directory without device template', [
+            'device_uuid' => (string) $device->device_uuid,
+            'flavor' => $flv['flavor'] ?? null,
+        ]);
+
+        if ($request->isMethod('HEAD')) {
+            return response('', 200, [
+                'Content-Type' => $contentType,
+                'Cache-Control' => 'private, max-age=0, must-revalidate',
+                'X-Prov-Template' => 'builtin-contact-directory',
+                'X-Prov-Type' => 'builtin',
+            ]);
+        }
+
+        $body = $this->renderBuiltInContactDirectory($request, $device, $flv);
+        $etag = '"' . hash('sha256', $body) . '"';
+        $ifNoneMatch = $request->headers->get('If-None-Match');
+
+        if ($ifNoneMatch && trim($ifNoneMatch) === $etag) {
+            return response('', 304, [
+                'ETag' => $etag,
+                'Content-Type' => $contentType,
+                'Cache-Control' => 'private, max-age=0, must-revalidate',
+                'X-Prov-Template' => 'builtin-contact-directory',
+                'X-Prov-Type' => 'builtin',
+            ]);
+        }
+
+        try {
+            $device->fill([
+                'device_provisioned_date' => Carbon::now('UTC'),
+                'device_provisioned_method' => strtolower($request->getScheme()),
+                'device_provisioned_ip' => $request->ip(),
+                'device_provisioned_agent' => (string) $request->userAgent(),
+            ])->save();
+        } catch (\Throwable $e) {
+            provisioning_debug('ProvisioningController: failed updating device provisioning metadata for built-in directory', [
+                'device_uuid' => (string) $device->device_uuid,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return response($body, 200, [
+            'ETag' => $etag,
+            'Content-Type' => $contentType,
+            'Cache-Control' => 'private, max-age=0, must-revalidate',
+            'X-Prov-Template' => 'builtin-contact-directory',
+            'X-Prov-Type' => 'builtin',
+        ]);
+    }
+
+    private function renderBuiltInContactDirectory(Request $request, Devices $device, array $flv): string
+    {
+        $vars = $this->buildTemplateVars($device);
+        $vars += [
+            'flavor' => $flv['flavor'],
+            'contacts_filter' => strtolower((string) $request->query('contacts', 'all')),
+            'contacts' => $this->contactDirectoryService->buildForDevice(
+                $device,
+                $vars['lines'] ?? []
+            ),
+        ];
+
+        $body = $this->renderDedicatedContactTemplate($device, $vars);
+
+        return $this->maybePrettyPrintXml($body) ?: $body;
+    }
+
     private function renderProvisioningTemplate(
         Request $request,
         Devices $device,
@@ -287,6 +396,34 @@ class ProvisioningController extends Controller
             'flavor' => $flv['flavor'],
             'requested_ext' => strtolower((string) ($ext ?: $this->extensionFromFlavor($flv['flavor']))),
         ];
+
+        if (in_array($vars['flavor'], ['directory.xml', 'phonebook.xml'], true)) {
+            $vars['contacts_filter'] = strtolower((string) $request->query('contacts', 'all'));
+            $vars['contacts'] = $this->contactDirectoryService->buildForDevice(
+                $device,
+                $vars['lines'] ?? []
+            );
+
+            provisioning_debug('ProvisioningController: built provisioning contact directory', [
+                'device_uuid' => (string) $device->device_uuid,
+                'contacts_filter' => $vars['contacts_filter'],
+                'contact_count' => count($vars['contacts']),
+            ]);
+
+            if ($this->shouldRenderDedicatedContactTemplate($tpl, $vars['flavor'])) {
+                $body = $this->renderDedicatedContactTemplate($device, $vars);
+
+                if ($pretty = $this->maybePrettyPrintXml($body)) {
+                    $body = $pretty;
+                }
+
+                return [
+                    'body' => $body,
+                    'flavor' => $flv['flavor'],
+                    'mime' => $flv['mime'],
+                ];
+            }
+        }
 
         try {
             provisioning_debug('ProvisioningController: rendering provisioning template', [
@@ -736,6 +873,29 @@ class ProvisioningController extends Controller
             'ext' => $extLower,
             'raw_path' => $raw,
         ]);
+
+        if ($extLower === 'xml' && in_array($idLower, ['directory', 'phonebook'], true)) {
+            provisioning_debug('ProvisioningController: matched contact directory flavor', [
+                'device_uuid' => (string) $device->device_uuid,
+                'flavor' => "{$idLower}.xml",
+            ]);
+
+            return [
+                'flavor' => "{$idLower}.xml",
+                'mime' => 'application/xml',
+            ];
+        }
+
+        if ($extLower === 'xml' && str_ends_with($idLower, '-directory')) {
+            provisioning_debug('ProvisioningController: matched MAC-directory flavor', [
+                'device_uuid' => (string) $device->device_uuid,
+            ]);
+
+            return [
+                'flavor' => 'directory.xml',
+                'mime' => 'application/xml',
+            ];
+        }
 
         // Detect Dinstar serial index: "{productId}/{serial}.xml"
         if ($vendor === 'dinstar' && $extLower === 'xml' && preg_match('#^(?<pid>\d{2})/[A-Za-z0-9-]+\.xml$#', $raw, $m)) {

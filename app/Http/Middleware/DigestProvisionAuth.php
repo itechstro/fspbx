@@ -6,6 +6,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
+use App\Services\Provisioning\ProvisionDeviceResolver;
 use App\Services\Provisioning\VendorRouter;
 
 class DigestProvisionAuth
@@ -32,7 +33,10 @@ class DigestProvisionAuth
         }
 
         $token = VendorRouter::tokenFromId($id);
-        if (!$token) {
+        if (! $token && ProvisionDeviceResolver::isContactDirectoryId($id)) {
+            $token = ProvisionDeviceResolver::tokenFromRequest($request);
+        }
+        if (! $token) {
             $this->dbg($debug, 'early-404.no-token', ['id' => $id]);
             return response('', 404);
         }

@@ -23,6 +23,11 @@ class VendorRouter
         $base = strtolower(basename($id));
         $stem = preg_replace('/\.[^.]+$/', '', $base); // remove last extension, if any
 
+        // FusionPBX MAC-directory / MAC-phonebook filenames (e.g. 0004f2abcdef-directory)
+        if (preg_match('/^([0-9a-f]{12})-(?:directory|phonebook)$/', $stem, $m)) {
+            return $m[1];
+        }
+
         // 2) Polycom model-MAC (e.g., vvx600-0004f27a9446, spip321-<mac>, ssip7000-<mac>, ssduo-<mac>)
         if (preg_match('/^(?:spip|vvx|ssip|edgee)\d{3,4}-([0-9a-f]{12})$/', $stem, $m) || preg_match('/^ssduo-([0-9a-f]{12})$/', $stem, $m)) {
             return $m[1];

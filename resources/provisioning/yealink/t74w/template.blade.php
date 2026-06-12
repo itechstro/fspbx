@@ -1,4 +1,4 @@
-{{-- version: 1.0.6 --}}
+{{-- version: 1.0.8 --}}
 
 @switch($flavor)
 
@@ -364,6 +364,37 @@ static.openvpn.url = {{ $settings['yealink_openvpn_url'] ?? '' }}
 static.auto_provision.server.url = {{ $settings['provision_base_url'] ?? '' }} 
 static.auto_provision.server.username = {{ $settings['http_auth_username'] ?? '' }}
 static.auto_provision.server.password = {{ $settings['http_auth_password'] ?? '' }}
+
+################################################################
+##                      Remote Phone Book                       ##
+################################################################
+@php
+    $yealinkProvAuth = '';
+    $provUser = (string) ($settings['http_auth_username'] ?? '');
+    $provPass = (string) ($settings['http_auth_password'] ?? '');
+    if ($provUser !== '' && $provPass !== '') {
+        $yealinkProvAuth = $provUser . ':' . $provPass . '@';
+    }
+@endphp
+features.remote_phonebook.enable = {{ $settings['yealink_remote_phonebook_enable'] ?? '1' }}
+@if (!empty($settings['yealink_remote_phonebook_1_url']))
+remote_phonebook.data.1.url = {{ $settings['yealink_remote_phonebook_1_url'] }}
+@else
+remote_phonebook.data.1.url = https://{{ $yealinkProvAuth }}{{ $domain_name }}/prov/directory.xml?contacts=users&mac={{ $mac }}
+@endif
+remote_phonebook.data.1.name = {{ $settings['yealink_remote_phonebook_1_name'] ?? 'Users' }}
+@if (!empty($settings['yealink_remote_phonebook_2_url']))
+remote_phonebook.data.2.url = {{ $settings['yealink_remote_phonebook_2_url'] }}
+@else
+remote_phonebook.data.2.url = https://{{ $yealinkProvAuth }}{{ $domain_name }}/prov/directory.xml?contacts=groups&mac={{ $mac }}
+@endif
+remote_phonebook.data.2.name = {{ $settings['yealink_remote_phonebook_2_name'] ?? 'Groups' }}
+@if (!empty($settings['yealink_remote_phonebook_3_url']))
+remote_phonebook.data.3.url = {{ $settings['yealink_remote_phonebook_3_url'] }}
+@else
+remote_phonebook.data.3.url = https://{{ $yealinkProvAuth }}{{ $domain_name }}/prov/directory.xml?contacts=extensions&mac={{ $mac }}
+@endif
+remote_phonebook.data.3.name = {{ $settings['yealink_remote_phonebook_3_name'] ?? 'Extensions' }}
 
 #################################################################
 ##                      Firmware Update                        ##

@@ -3152,34 +3152,44 @@
 		<!-- ############################################################################## -->
 		<!-- Enable Phonebook XML Download -->
 		<!-- Disabled, EnabledUseHTTP, EnabledUseTFTP, EnabledUseHTTPS -->
-		<item name="phonebook.download.mode"></item>
+		<item name="phonebook.download.mode">EnabledUseHTTPS</item>
 		
 		<!-- HTTP/HTTPS User Name  -->
-		<item name="phonebook.download.username"></item>
+		{if isset($grandstream_phonebook_username)}
+		<item name="phonebook.download.username">{$grandstream_phonebook_username}</item>
+		{/if}
 		
 		<!-- HTTP/HTTPS Password  -->
-		<item name="phonebook.download.password"></item>
+		{if isset($grandstream_phonebook_password)}
+		<item name="phonebook.download.password">{$grandstream_phonebook_password}</item>
+		{/if}
 		
 		<!-- Phonebook XML Server Path -->
-		<item name="phonebook.download.server"></item>
+		{if isset($grandstream_phonebook_server)}
+		<item name="phonebook.download.server">{$grandstream_phonebook_server}</item>
+		{else}
+		<item name="phonebook.download.server">https://{$domain_name}/prov/phonebook.xml?contacts=all&amp;mac={$mac}</item>
+		{/if}
 		
 		<!-- Phonebook Download Interval  -->
 		<!-- 0, 5 to 720 -->
-		<item name="phonebook.download.interval"></item>
+		{if isset($grandstream_phonebook_download_interval)}
+		<item name="phonebook.download.interval">{$grandstream_phonebook_download_interval}</item>
+		{/if}
 		
 		<!-- # Remove Manually-edited entries on Download. Yes or No -->
-		<item name="phonebook.download.removeEditedEntries"></item>
+		<item name="phonebook.download.removeEditedEntries">Yes</item>
 		
 		<!-- # Import Group Method. Replace, Append. -->
-		<item name="phonebook.import.group.method"></item>
+		<item name="phonebook.import.group.method">Replace</item>
 
 		<!-- Sort Phonebook by -->
 		<!-- LastName, FirstName, Auto -->
-		<item name="phonebook.sortBy"></item>
+		<item name="phonebook.sortBy">LastName</item>
 		
 		<!-- Default search mode -->
 		<!-- QuickMatch, ExactMatch -->
-		<item name="phonebook.defaultSearchMode"></item>
+		<item name="phonebook.defaultSearchMode">QuickMatch</item>
 
 		<!-- ############################################################################## -->
 		<!-- ##  Application/ LDAP ## -->

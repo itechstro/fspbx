@@ -79,6 +79,7 @@
                                                     'account_groups',
                                                     'accounts',
                                                     'extension_uuid',
+                                                    'contact_uuid',
                                                     'container_3',
                                                     'reset',
                                                     'submit',
@@ -127,6 +128,17 @@
                                                     :search="true" :native="false" label="Assigned extension"
                                                     input-type="search" autocomplete="off" :floating="false"
                                                     placeholder="Select extension" :columns="{
+                                                        sm: {
+                                                            wrapper: 6,
+                                                        },
+                                                    }" />
+
+                                                <SelectElement name="contact_uuid" :items="options.phonebook_contacts"
+                                                    :search="true" :native="false" label="Phonebook contact"
+                                                    input-type="search" autocomplete="off" :floating="false"
+                                                    :strict="false" allow-absent placeholder="Select contact"
+                                                    description="Links this user to a phonebook contact. CloudPLAY uses the contact mobile number for enterprise directory sync."
+                                                    :columns="{
                                                         sm: {
                                                             wrapper: 6,
                                                         },

@@ -22,6 +22,7 @@ use App\Http\Controllers\ConferenceControlController;
 use App\Http\Controllers\ConferenceProfileController;
 use App\Http\Controllers\ConferenceRoomController;
 use App\Http\Controllers\ContactController;
+use App\Http\Controllers\ContactsController;
 use App\Http\Controllers\CustomerNotesController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeviceCloudProvisioningController;
@@ -622,17 +623,28 @@ Route::group(['middleware' => ['auth:sanctum', 'api.cookie.auth']], function () 
     Route::post('domains/{domain}/settings/copy', [DomainSettingsController::class, 'copy'])->name('domains.settings.copy');
     Route::post('domains/{domain}/settings/reload', [DomainSettingsController::class, 'reload'])->name('domains.settings.reload');
 
-    // Contacts
+    // Messages CRM contacts (separate contacts table)
     Route::post('contacts', [ContactController::class, 'store'])->name('contacts.store');
     Route::get('contacts/{phoneNumber}', [ContactController::class, 'show'])->name('contacts.show');
     Route::delete('/contacts/{contact}', [ContactController::class, 'destroy'])->name('contacts.destroy');
 
-    // Route::post('/contacts/item-options', [ContactsController::class, 'getItemOptions'])->name('contacts.item.options');
-    // Route::post('/contacts/bulk-delete', [ContactsController::class, 'bulkDelete'])->name('contacts.bulk.delete');
-    // Route::post('/contacts/select-all', [ContactsController::class, 'selectAll'])->name('contacts.select.all');
-    // Route::post('/contacts/import', [ContactsController::class, 'import'])->name('contacts.import');
-    // Route::get('/contacts/template/download', [ContactsController::class, 'downloadTemplate'])->name('contacts.download.template');
-    // Route::get('/contacts-export', [ContactsController::class, 'export'])->name('contacts.export');
+    // Phonebook contacts (v_contacts)
+    Route::get('phonebook-contacts/data', [ContactsController::class, 'getData'])->name('phonebook-contacts.data');
+    Route::post('phonebook-contacts', [ContactsController::class, 'store'])->name('phonebook-contacts.store');
+    Route::put('phonebook-contacts/{v_contact}', [ContactsController::class, 'update'])->name('phonebook-contacts.update');
+    Route::delete('phonebook-contacts/{v_contact}', [ContactsController::class, 'destroy'])->name('phonebook-contacts.destroy');
+    Route::post('phonebook-contacts/item-options', [ContactsController::class, 'getItemOptions'])->name('phonebook-contacts.item.options');
+    Route::post('phonebook-contacts/select-all', [ContactsController::class, 'selectAll'])->name('phonebook-contacts.select.all');
+    Route::post('phonebook-contacts/bulk-delete', [ContactsController::class, 'bulkDelete'])->name('phonebook-contacts.bulk.delete');
+    Route::post('phonebook-contacts/import/csv', [ContactsController::class, 'importCsv'])->name('phonebook-contacts.import.csv');
+    Route::post('phonebook-contacts/import/vcard', [ContactsController::class, 'importVcard'])->name('phonebook-contacts.import.vcard');
+    Route::get('phonebook-contacts/export/csv', [ContactsController::class, 'exportCsv'])->name('phonebook-contacts.export.csv');
+    Route::get('phonebook-contacts/export/vcard', [ContactsController::class, 'exportVcard'])->name('phonebook-contacts.export.vcard');
+    Route::get('phonebook-contacts/export/csv-template', [ContactsController::class, 'downloadCsvTemplate'])->name('phonebook-contacts.export.csv-template');
+    Route::get('phonebook-contacts/{v_contact}/export/vcard', [ContactsController::class, 'exportContactVcard'])->name('phonebook-contacts.export.contact-vcard');
+    Route::post('phonebook-contacts/{v_contact}/attachments', [ContactsController::class, 'storeAttachment'])->name('phonebook-contacts.attachments.store');
+    Route::delete('phonebook-contacts/{v_contact}/attachments/{attachment}', [ContactsController::class, 'destroyAttachment'])->name('phonebook-contacts.attachments.destroy');
+    Route::get('phonebook-contacts/{v_contact}/attachments/{attachment}/download', [ContactsController::class, 'downloadAttachment'])->name('phonebook-contacts.attachments.download');
 
     // Email Queue
     Route::get('/emailqueue/data', [EmailQueueController::class, 'getData'])->name('emailqueue.data');

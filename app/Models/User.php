@@ -40,6 +40,7 @@ class User extends Authenticatable
         'add_user',
         'api_key',
         'extension_uuid',
+        'contact_uuid',
     ];
 
     /**
@@ -58,7 +59,6 @@ class User extends Authenticatable
         'update_user',
         'add_date',
         'add_user',
-        'contact_uuid',
         'user_totp_secret',
         'user_type',
         'user_adv_fields',
@@ -178,6 +178,11 @@ class User extends Authenticatable
     public function contact()
     {
         return $this->belongsTo(Contact::class, 'contact_uuid', 'contact_uuid');
+    }
+
+    public function phonebookContact()
+    {
+        return $this->belongsTo(VContact::class, 'contact_uuid', 'contact_uuid');
     }
 
     /**

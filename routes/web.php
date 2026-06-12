@@ -22,6 +22,7 @@ use App\Http\Controllers\ConferenceController;
 use App\Http\Controllers\ConferenceControlController;
 use App\Http\Controllers\ConferenceProfileController;
 use App\Http\Controllers\ConferenceRoomController;
+use App\Http\Controllers\ContactsController;
 use App\Http\Controllers\CsrfTokenController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeviceCloudProvisioningController;
@@ -371,6 +372,9 @@ Route::group(['middleware' => 'auth'], function () {
     Route::post('/apps/user/reset-password', [AppsController::class, 'resetPassword'])->name('apps.user.reset');
     Route::post('/apps/users/{extension}/status', [AppsController::class, 'SetStatus'])->name('appsSetStatus');
     Route::get('/apps/email', [AppsController::class, 'emailUser'])->name('emailUser');
+
+    // Contacts
+    Route::get('contacts', [ContactsController::class, 'index'])->name('contacts.index');
 
     // Speed Dial
     Route::get('speed-dial', [SpeedDialController::class, 'index'])->name('speed-dial.index');
