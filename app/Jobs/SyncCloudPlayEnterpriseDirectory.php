@@ -3,7 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Extensions;
-use App\Services\CloudPlayEnterpriseDirectorySync;
+use App\Services\Contacts\ContactUserLinkService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -19,7 +19,7 @@ class SyncCloudPlayEnterpriseDirectory implements ShouldQueue
         public ?bool $active = null,
     ) {}
 
-    public function handle(CloudPlayEnterpriseDirectorySync $sync): void
+    public function handle(ContactUserLinkService $contactUserLinkService): void
     {
         $extension = Extensions::query()
             ->where('extension_uuid', $this->extensionUuid)
@@ -29,6 +29,6 @@ class SyncCloudPlayEnterpriseDirectory implements ShouldQueue
             return;
         }
 
-        $sync->syncForExtension($extension, $this->active);
+        $contactUserLinkService->syncCloudPlayForExtension($extension);
     }
 }

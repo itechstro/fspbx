@@ -22,6 +22,7 @@ class UserData extends Data
         public ?string $time_zone,
         public ?string $extension_uuid,
         public ?string $contact_uuid = null,
+        public ?string $phonebook_contact_uuid = null,
 
         public ?bool $can_manage_target = false,
         public ?bool $can_delete_target = false,

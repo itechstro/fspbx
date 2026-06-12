@@ -79,7 +79,7 @@
                                                     'account_groups',
                                                     'accounts',
                                                     'extension_uuid',
-                                                    'contact_uuid',
+                                                    'phonebook_contact_uuid',
                                                     'container_3',
                                                     'reset',
                                                     'submit',
@@ -133,7 +133,7 @@
                                                         },
                                                     }" />
 
-                                                <SelectElement name="contact_uuid" :items="options.phonebook_contacts"
+                                                <SelectElement name="phonebook_contact_uuid" :items="options.phonebook_contacts"
                                                     :search="true" :native="false" label="Phonebook contact"
                                                     input-type="search" autocomplete="off" :floating="false"
                                                     :strict="false" allow-absent placeholder="Select contact"

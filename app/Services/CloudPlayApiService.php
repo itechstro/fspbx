@@ -916,13 +916,13 @@ class CloudPlayApiService implements MobileAppProviderInterface
     public function resolveExtensionMobileNumber(Extensions $extension): string
     {
         return app(\App\Services\Contacts\ContactUserLinkService::class)
-            ->resolveMobileNumberForExtension($extension);
+            ->resolveMobileNumberForExtensionDirect($extension);
     }
 
     public function resolveExtensionBusinessPhoneNumber(Extensions $extension): string
     {
         return app(\App\Services\Contacts\ContactUserLinkService::class)
-            ->resolveWorkNumberForExtension($extension);
+            ->resolveWorkNumberForExtensionDirect($extension);
     }
 
     protected function normalizePhoneDigits(?string $number): string

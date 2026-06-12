@@ -59,6 +59,13 @@ class UpdateExtensionRequest extends FormRequest
             'user_context' => ['sometimes', 'required', 'string'],
             'accountcode' => ['sometimes', 'nullable', 'string'],
             'exclude_from_ringotel_stale_users' => ['nullable', 'boolean'],
+            'phonebook_contact_uuid' => [
+                'nullable',
+                'uuid',
+                Rule::exists('v_contacts', 'contact_uuid')->where(function ($query) {
+                    $query->where('domain_uuid', session('domain_uuid'));
+                }),
+            ],
             'auth_acl' => ['nullable', 'string'],
             'outbound_caller_id_number' => ['nullable', 'string'],
             'emergency_caller_id_number' => ['nullable', 'string'],

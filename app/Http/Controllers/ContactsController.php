@@ -7,6 +7,7 @@ use App\Exports\ContactCsvTemplate;
 use App\Http\Requests\StoreVContactRequest;
 use App\Http\Requests\UpdateVContactRequest;
 use App\Imports\ContactCsvImport;
+use App\Models\Extensions;
 use App\Models\Groups;
 use App\Models\User;
 use App\Models\VContact;
@@ -193,19 +194,33 @@ class ContactsController extends Controller
         }
 
         $userOptions = $this->userOptions();
+        $extensionOptions = $this->extensionOptions();
+        $phonebookExtensionUuid = $itemUuid
+            ? Extensions::query()
+                ->where('domain_uuid', session('domain_uuid'))
+                ->where('phonebook_contact_uuid', $item->contact_uuid)
+                ->value('extension_uuid')
+            : null;
+
         $itemPayload = $itemUuid
             ? array_merge($item->toArray(), [
                 'contact_users' => app(ContactUserLinkService::class)->formatContactUserAssignmentsForForm(
                     $item->contactUsers,
                     $userOptions,
                 ),
+                'phonebook_extension_uuid' => $phonebookExtensionUuid,
             ])
             : $item;
 
         return response()->json([
             'item' => $itemPayload,
-            'visibility' => $this->visibilityProps(),
+            'visibility' => array_merge($this->visibilityProps(), [
+                'linked_extensions' => $itemUuid
+                    ? app(ContactUserLinkService::class)->formatLinkedExtensionsForContact($item)
+                    : [],
+            ]),
             'user_options' => $userOptions,
+            'extension_options' => $extensionOptions,
             'group_options' => $this->groupOptions(),
             'contact_types' => $this->contactTypes(),
             'timezones' => getGroupedTimezones(),
@@ -694,6 +709,40 @@ class ContactsController extends Controller
         $this->contactVisibilityService->applyPortalListScope($query);
 
         return $query->exists();
+    }
+
+    private function extensionOptions(): array
+    {
+        return Extensions::query()
+            ->where('domain_uuid', session('domain_uuid'))
+            ->orderBy('extension')
+            ->get([
+                'extension_uuid',
+                'extension',
+                'directory_first_name',
+                'directory_last_name',
+                'effective_caller_id_name',
+            ])
+            ->map(function (Extensions $extension) {
+                $label = trim((string) $extension->effective_caller_id_name);
+
+                if ($label === '') {
+                    $label = trim(trim((string) $extension->directory_first_name) . ' ' . trim((string) $extension->directory_last_name));
+                }
+
+                if ($label === '') {
+                    $label = (string) $extension->extension;
+                } else {
+                    $label = "{$label} ({$extension->extension})";
+                }
+
+                return [
+                    'value' => $extension->extension_uuid,
+                    'label' => $label,
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     private function visibilityProps(): array

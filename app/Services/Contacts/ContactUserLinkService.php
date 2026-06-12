@@ -16,10 +16,10 @@ class ContactUserLinkService
 {
     public function resolvePhonebookContactForUser(User $user): ?VContact
     {
-        if (! empty($user->contact_uuid)) {
+        if (! empty($user->phonebook_contact_uuid)) {
             $contact = VContact::query()
                 ->where('domain_uuid', $user->domain_uuid)
-                ->whereKey($user->contact_uuid)
+                ->whereKey($user->phonebook_contact_uuid)
                 ->with('phones')
                 ->first();
 
@@ -130,8 +130,68 @@ class ContactUserLinkService
             ->values();
     }
 
+    public function resolvePhonebookContactForExtension(Extensions $extension): ?VContact
+    {
+        $direct = $this->resolvePhonebookContactForExtensionDirect($extension);
+
+        if ($direct) {
+            return $direct;
+        }
+
+        foreach ($this->usersForExtension($extension) as $user) {
+            $contact = $this->resolvePhonebookContactForUser($user);
+
+            if ($contact) {
+                return $contact;
+            }
+        }
+
+        return null;
+    }
+
+    public function resolvePhonebookContactForExtensionDirect(Extensions $extension): ?VContact
+    {
+        $extension->loadMissing('phonebookContact');
+
+        if ($extension->phonebook_contact_uuid && $extension->phonebookContact) {
+            $extension->phonebookContact->loadMissing('phones');
+
+            return $extension->phonebookContact;
+        }
+
+        return null;
+    }
+
+    public function resolveMobileNumberForExtensionDirect(Extensions $extension): string
+    {
+        $contact = $this->resolvePhonebookContactForExtensionDirect($extension);
+
+        return $contact ? $this->resolveMobileNumberForContact($contact) : '';
+    }
+
+    public function resolveWorkNumberForExtensionDirect(Extensions $extension): string
+    {
+        $contact = $this->resolvePhonebookContactForExtensionDirect($extension);
+
+        return $contact ? $this->resolveWorkNumberForContact($contact) : '';
+    }
+
+    public function extensionHasDirectLinkedContactPhones(Extensions $extension): bool
+    {
+        return $this->resolveMobileNumberForExtensionDirect($extension) !== ''
+            || $this->resolveWorkNumberForExtensionDirect($extension) !== '';
+    }
+
     private function resolvePhoneNumberForExtension(Extensions $extension, string $userResolver): string
     {
+        $contact = $this->resolvePhonebookContactForExtension($extension);
+
+        if ($contact) {
+            return $userResolver === 'resolveMobileNumberForUser'
+                ? $this->resolveMobileNumberForContact($contact)
+                : $this->resolveWorkNumberForContact($contact);
+        }
+
         foreach ($this->usersForExtension($extension) as $user) {
             $number = $this->{$userResolver}($user);
 
@@ -152,7 +212,7 @@ class ContactUserLinkService
         app(CloudPlayApiService::class)->clearEnterpriseDirectoryCache();
 
         $sync = app(CloudPlayEnterpriseDirectorySync::class);
-        $extensions = $this->extensionsForContact($contact);
+        $extensions = $this->directExtensionsForContact($contact);
 
         if ($extensions->isNotEmpty()) {
             $extensions->each(fn (Extensions $extension) => $this->syncCloudPlayForExtension($extension));
@@ -174,7 +234,14 @@ class ContactUserLinkService
     {
         if (User::query()
             ->where('domain_uuid', $contact->domain_uuid)
-            ->where('contact_uuid', $contact->contact_uuid)
+            ->where('phonebook_contact_uuid', $contact->contact_uuid)
+            ->exists()) {
+            return true;
+        }
+
+        if (Extensions::query()
+            ->where('domain_uuid', $contact->domain_uuid)
+            ->where('phonebook_contact_uuid', $contact->contact_uuid)
             ->exists()) {
             return true;
         }
@@ -339,7 +406,7 @@ class ContactUserLinkService
             return;
         }
 
-        if (! $this->extensionHasLinkedContactPhones($extension)) {
+        if (! $this->extensionHasDirectLinkedContactPhones($extension)) {
             $sync->removePhonebookOnlyEnterpriseEntry($extension);
 
             return;
@@ -351,11 +418,24 @@ class ContactUserLinkService
     /**
      * @return Collection<int, Extensions>
      */
+    public function directExtensionsForContact(VContact $contact): Collection
+    {
+        return Extensions::query()
+            ->where('domain_uuid', $contact->domain_uuid)
+            ->where('phonebook_contact_uuid', $contact->contact_uuid)
+            ->get();
+    }
+
+    /**
+     * @return Collection<int, Extensions>
+     */
     public function extensionsForContact(VContact $contact): Collection
     {
+        $directExtensions = $this->directExtensionsForContact($contact);
+
         $userUuids = User::query()
             ->where('domain_uuid', $contact->domain_uuid)
-            ->where('contact_uuid', $contact->contact_uuid)
+            ->where('phonebook_contact_uuid', $contact->contact_uuid)
             ->pluck('user_uuid');
 
         $assignedUserUuids = SpeedDialUser::query()
@@ -366,7 +446,7 @@ class ContactUserLinkService
         $userUuids = $userUuids->merge($assignedUserUuids)->unique()->values();
 
         if ($userUuids->isEmpty()) {
-            return collect();
+            return $directExtensions->values();
         }
 
         $extensionUuids = ExtensionUser::query()
@@ -381,13 +461,18 @@ class ContactUserLinkService
         $extensionUuids = $extensionUuids->merge($directExtensionUuids)->unique()->values();
 
         if ($extensionUuids->isEmpty()) {
-            return collect();
+            return $directExtensions->values();
         }
 
-        return Extensions::query()
-            ->where('domain_uuid', $contact->domain_uuid)
-            ->whereIn('extension_uuid', $extensionUuids)
-            ->get();
+        return $directExtensions
+            ->merge(
+                Extensions::query()
+                    ->where('domain_uuid', $contact->domain_uuid)
+                    ->whereIn('extension_uuid', $extensionUuids)
+                    ->get()
+            )
+            ->unique('extension_uuid')
+            ->values();
     }
 
     /**
@@ -465,7 +550,7 @@ class ContactUserLinkService
             ->where('user_uuid', $user->user_uuid)
             ->delete();
 
-        if (empty($user->contact_uuid)) {
+        if (empty($user->phonebook_contact_uuid)) {
             return;
         }
 
@@ -473,11 +558,159 @@ class ContactUserLinkService
         $assignment->contact_user_uuid = (string) Str::uuid();
         $assignment->forceFill([
             'domain_uuid' => $user->domain_uuid,
-            'contact_uuid' => $user->contact_uuid,
+            'contact_uuid' => $user->phonebook_contact_uuid,
             'user_uuid' => $user->user_uuid,
             'insert_date' => now(),
             'insert_user' => session('user_uuid'),
         ])->save();
+    }
+
+    /**
+     * @return array{
+     *     contact_uuid: string,
+     *     name: string,
+     *     mobile: string,
+     *     work: string,
+     *     user_labels: array<int, string>
+     * }|null
+     */
+    public function formatLinkedContactForExtension(Extensions $extension): ?array
+    {
+        $extension->loadMissing('phonebookContact');
+        $contact = null;
+        $userLabels = [];
+        $linkType = 'user';
+
+        if ($extension->phonebook_contact_uuid && $extension->phonebookContact) {
+            $contact = $extension->phonebookContact->loadMissing('phones');
+            $linkType = 'extension';
+        } else {
+            foreach ($this->usersForExtension($extension) as $user) {
+                $resolved = $this->resolvePhonebookContactForUser($user);
+
+                if (! $resolved) {
+                    continue;
+                }
+
+                $contact ??= $resolved;
+                $userLabels[] = $user->name_formatted ?: $user->username;
+            }
+        }
+
+        if (! $contact) {
+            return null;
+        }
+
+        return [
+            'contact_uuid' => (string) $contact->contact_uuid,
+            'name' => (string) $contact->display_name,
+            'mobile' => $this->resolveMobileNumberForExtension($extension),
+            'work' => $this->resolveWorkNumberForExtension($extension),
+            'user_labels' => array_values(array_unique($userLabels)),
+            'link_type' => $linkType,
+        ];
+    }
+
+    /**
+     * @return array<int, array{extension_uuid: string, extension: string, label: string, user_labels: array<int, string>}>
+     */
+    public function formatLinkedExtensionsForContact(VContact $contact): array
+    {
+        $contact->loadMissing('contactUsers.user');
+
+        $usersByUuid = User::query()
+            ->where('domain_uuid', $contact->domain_uuid)
+            ->where('phonebook_contact_uuid', $contact->contact_uuid)
+            ->get(['user_uuid', 'username'])
+            ->keyBy('user_uuid');
+
+        foreach ($contact->contactUsers as $assignment) {
+            if ($assignment->user) {
+                $usersByUuid->put(
+                    $assignment->user_uuid,
+                    $assignment->user,
+                );
+            }
+        }
+
+        $extensions = $this->extensionsForContact($contact);
+        $rows = [];
+
+        foreach ($extensions as $extension) {
+            $userLabels = [];
+            $isDirectLink = (string) $extension->phonebook_contact_uuid === (string) $contact->contact_uuid;
+
+            if ($isDirectLink) {
+                $userLabels[] = 'direct extension link';
+            }
+
+            foreach ($usersByUuid as $user) {
+                $matches = $this->extensionsForUser($user)
+                    ->contains(fn (Extensions $candidate) => $candidate->extension_uuid === $extension->extension_uuid);
+
+                if ($matches) {
+                    $userLabels[] = $user->name_formatted ?: $user->username;
+                }
+            }
+
+            $label = trim((string) $extension->effective_caller_id_name);
+
+            if ($label === '') {
+                $label = trim(trim((string) $extension->directory_first_name) . ' ' . trim((string) $extension->directory_last_name));
+            }
+
+            if ($label === '') {
+                $label = (string) $extension->extension;
+            }
+
+            $rows[] = [
+                'extension_uuid' => (string) $extension->extension_uuid,
+                'extension' => (string) $extension->extension,
+                'label' => $label,
+                'user_labels' => array_values(array_unique($userLabels)),
+                'direct_link' => $isDirectLink,
+            ];
+        }
+
+        usort($rows, fn (array $left, array $right) => strcmp($left['extension'], $right['extension']));
+
+        return $rows;
+    }
+
+    public function cleanupBeforeContactDelete(VContact $contact): void
+    {
+        $extensions = $this->extensionsForContact($contact);
+
+        // Break all linkage before CloudPLAY sync so contact phones stop resolving.
+        User::query()
+            ->where('domain_uuid', $contact->domain_uuid)
+            ->where('phonebook_contact_uuid', $contact->contact_uuid)
+            ->update(['phonebook_contact_uuid' => null]);
+
+        Extensions::query()
+            ->where('domain_uuid', $contact->domain_uuid)
+            ->where('phonebook_contact_uuid', $contact->contact_uuid)
+            ->update(['phonebook_contact_uuid' => null]);
+
+        SpeedDialUser::query()
+            ->where('domain_uuid', $contact->domain_uuid)
+            ->where('contact_uuid', $contact->contact_uuid)
+            ->delete();
+
+        if (get_mobile_app_provider() !== 'cloudplay') {
+            return;
+        }
+
+        app(CloudPlayApiService::class)->clearEnterpriseDirectoryCache();
+
+        $sync = app(CloudPlayEnterpriseDirectorySync::class);
+        $sync->removePhonebookOnlyContactEntry($contact);
+
+        foreach ($extensions as $extension) {
+            $this->releaseExtensionContactPhones($extension);
+        }
+
+        $sync->removeDuplicateEnterpriseEntries($contact->domain_uuid);
     }
 
     public function syncUserContactUuidAssignments(VContact $contact, array $userUuids): void
@@ -489,9 +722,9 @@ class ContactUserLinkService
 
         User::query()
             ->where('domain_uuid', $contact->domain_uuid)
-            ->where('contact_uuid', $contact->contact_uuid)
+            ->where('phonebook_contact_uuid', $contact->contact_uuid)
             ->whereNotIn('user_uuid', $userUuids)
-            ->update(['contact_uuid' => null]);
+            ->update(['phonebook_contact_uuid' => null]);
 
         if ($userUuids->isEmpty()) {
             return;
@@ -500,6 +733,117 @@ class ContactUserLinkService
         User::query()
             ->where('domain_uuid', $contact->domain_uuid)
             ->whereIn('user_uuid', $userUuids)
-            ->update(['contact_uuid' => $contact->contact_uuid]);
+            ->update(['phonebook_contact_uuid' => $contact->contact_uuid]);
+    }
+
+    public function syncExtensionPhonebookContactAssignment(VContact $contact, ?string $extensionUuid): void
+    {
+        $domainUuid = $contact->domain_uuid;
+
+        $previouslyLinkedExtensionUuids = Extensions::query()
+            ->where('domain_uuid', $domainUuid)
+            ->where('phonebook_contact_uuid', $contact->contact_uuid)
+            ->pluck('extension_uuid');
+
+        $previousContactForTargetExtension = null;
+
+        if ($extensionUuid) {
+            $previousContactForTargetExtension = Extensions::query()
+                ->where('domain_uuid', $domainUuid)
+                ->whereKey($extensionUuid)
+                ->value('phonebook_contact_uuid');
+        }
+
+        Extensions::query()
+            ->where('domain_uuid', $domainUuid)
+            ->where('phonebook_contact_uuid', $contact->contact_uuid)
+            ->when($extensionUuid, fn ($query) => $query->where('extension_uuid', '!=', $extensionUuid))
+            ->update(['phonebook_contact_uuid' => null]);
+
+        if ($extensionUuid) {
+            Extensions::query()
+                ->where('domain_uuid', $domainUuid)
+                ->whereKey($extensionUuid)
+                ->update(['phonebook_contact_uuid' => $contact->contact_uuid]);
+        }
+
+        $this->syncCloudPlayAfterPhonebookLinkChange(
+            $domainUuid,
+            collect([$contact->contact_uuid, $previousContactForTargetExtension])->filter()->unique()->values(),
+            $previouslyLinkedExtensionUuids
+                ->merge($extensionUuid ? [$extensionUuid] : [])
+                ->unique()
+                ->values(),
+        );
+    }
+
+    public function syncPhonebookContactAssignmentForExtension(
+        Extensions $extension,
+        ?string $previousContactUuid,
+        ?string $newContactUuid,
+    ): void {
+        $domainUuid = $extension->domain_uuid;
+
+        $displacedExtensionUuids = collect();
+
+        if ($newContactUuid) {
+            $displacedExtensionUuids = Extensions::query()
+                ->where('domain_uuid', $domainUuid)
+                ->where('phonebook_contact_uuid', $newContactUuid)
+                ->where('extension_uuid', '!=', $extension->extension_uuid)
+                ->pluck('extension_uuid');
+
+            Extensions::query()
+                ->where('domain_uuid', $domainUuid)
+                ->where('phonebook_contact_uuid', $newContactUuid)
+                ->where('extension_uuid', '!=', $extension->extension_uuid)
+                ->update(['phonebook_contact_uuid' => null]);
+        }
+
+        $this->syncCloudPlayAfterPhonebookLinkChange(
+            $domainUuid,
+            collect([$previousContactUuid, $newContactUuid])->filter()->unique()->values(),
+            collect([$extension->extension_uuid])->merge($displacedExtensionUuids)->unique()->values(),
+        );
+    }
+
+    /**
+     * @param  Collection<int, string>|array<int, string>  $contactUuids
+     * @param  Collection<int, string>|array<int, string>  $extensionUuids
+     */
+    public function syncCloudPlayAfterPhonebookLinkChange(
+        string $domainUuid,
+        Collection|array $contactUuids,
+        Collection|array $extensionUuids,
+    ): void {
+        if (get_mobile_app_provider() !== 'cloudplay') {
+            return;
+        }
+
+        app(CloudPlayApiService::class)->clearEnterpriseDirectoryCache();
+
+        foreach (collect($extensionUuids)->unique()->filter() as $extensionUuid) {
+            $extension = Extensions::query()
+                ->where('domain_uuid', $domainUuid)
+                ->whereKey($extensionUuid)
+                ->first();
+
+            if ($extension) {
+                $this->syncCloudPlayForExtension($extension);
+            }
+        }
+
+        foreach (collect($contactUuids)->unique()->filter() as $contactUuid) {
+            $contact = VContact::query()
+                ->where('domain_uuid', $domainUuid)
+                ->whereKey($contactUuid)
+                ->first();
+
+            if ($contact) {
+                $this->syncCloudPlayForContact($contact);
+            }
+        }
+
+        app(CloudPlayEnterpriseDirectorySync::class)->removeDuplicateEnterpriseEntries($domainUuid);
     }
 }

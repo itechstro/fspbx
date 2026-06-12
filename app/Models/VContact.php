@@ -37,6 +37,7 @@ class VContact extends Model
         'contact_time_zone',
         'contact_note',
         'cloudplay_ed_id',
+        'messages_crm_contact_uuid',
         'last_mod_date',
         'last_mod_user',
         'insert_date',

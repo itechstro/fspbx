@@ -82,6 +82,7 @@ class Extensions extends Model
         'enabled',
         'description',
         'cloudplay_ed_id',
+        'phonebook_contact_uuid',
         'absolute_codec_string',
         'force_ping',
         'insert_date',
@@ -196,6 +197,11 @@ class Extensions extends Model
     public function mobile_app()
     {
         return $this->hasOne(MobileAppUsers::class, 'extension_uuid', 'extension_uuid');
+    }
+
+    public function phonebookContact()
+    {
+        return $this->belongsTo(VContact::class, 'phonebook_contact_uuid', 'contact_uuid');
     }
 
     /**

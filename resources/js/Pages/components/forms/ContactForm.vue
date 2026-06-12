@@ -348,6 +348,35 @@
                                                     </div>
                                                 </StaticElement>
 
+                                                <SelectElement name="phonebook_extension_uuid"
+                                                    :items="extensionOptions" :search="true" :native="false"
+                                                    label="Linked extension" input-type="search" autocomplete="off"
+                                                    :floating="false" :strict="false" allow-absent
+                                                    placeholder="Select extension"
+                                                    description="Directly link this contact to an extension for CloudPLAY mobile and work numbers."
+                                                    :disabled="[() => !permissions.user_edit]" />
+
+                                                <StaticElement name="visibility_linked_extensions_note"
+                                                    :conditions="[() => visibility.linked_extensions?.length > 0]">
+                                                    <div class="mb-4 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800">
+                                                        <p class="font-medium text-gray-900">Linked extensions</p>
+                                                        <ul class="mt-2 space-y-1">
+                                                            <li v-for="row in visibility.linked_extensions" :key="row.extension_uuid">
+                                                                Ext {{ row.extension }} — {{ row.label }}
+                                                                <span v-if="row.direct_link" class="text-gray-500">
+                                                                    (direct link)
+                                                                </span>
+                                                                <span v-else-if="row.user_labels?.length" class="text-gray-500">
+                                                                    (via {{ row.user_labels.join(', ') }})
+                                                                </span>
+                                                            </li>
+                                                        </ul>
+                                                        <p class="mt-2 text-gray-600">
+                                                            CloudPLAY mobile and work numbers for these extensions come from this contact.
+                                                        </p>
+                                                    </div>
+                                                </StaticElement>
+
                                                 <TagsElement v-if="permissions.user_view" name="contact_users"
                                                     :search="true" :items="userOptions" label="Assigned Users"
                                                     input-type="search" autocomplete="off"
@@ -495,7 +524,7 @@ const urlsTabElements = ["urls_header", "urls", "urls_button_container", "urls_s
 const timesTabElements = ["times_header", "times", "times_button_container", "times_submit"];
 const relationsTabElements = ["relations_header", "relations", "relations_button_container", "relations_submit"];
 const visibilityTabElements = [
-    "visibility_header", "visibility_extensions_note", "contact_users", "contact_groups",
+    "visibility_header", "visibility_extensions_note", "phonebook_extension_uuid", "visibility_linked_extensions_note", "contact_users", "contact_groups",
     "visibility_button_container", "visibility_submit",
 ];
 const attachmentsTabElements = [
@@ -505,6 +534,8 @@ const attachmentsTabElements = [
 
 const flagValue = (value) => (value ? "1" : "0");
 
+const extensionOptions = computed(() => props.options?.extension_options ?? []);
+
 const mapPhones = (rows = []) => rows.map((row) => ({
     contact_phone_uuid: row.contact_phone_uuid ?? null,
     phone_label: row.phone_label ?? null,
@@ -512,7 +543,9 @@ const mapPhones = (rows = []) => rows.map((row) => ({
     phone_extension: row.phone_extension ?? null,
     phone_speed_dial: row.phone_speed_dial ?? null,
     phone_primary: flagValue(row.phone_primary),
-    phone_type_voice: flagValue(row.phone_type_voice),
+    phone_type_voice: row.phone_type_voice === undefined || row.phone_type_voice === null
+        ? (row.phone_number ? "1" : "0")
+        : flagValue(row.phone_type_voice),
     phone_type_fax: flagValue(row.phone_type_fax),
     phone_type_text: flagValue(row.phone_type_text),
     phone_description: row.phone_description ?? null,
@@ -625,6 +658,7 @@ const defaultValues = computed(() => ({
     attachments: mapAttachments(props.options?.item?.attachments ?? []),
     contact_users: mapAssignedUsers(props.options?.item?.contact_users ?? [], props.options?.user_options ?? []),
     contact_groups: mapAssignedGroups(props.options?.item?.contact_groups ?? []),
+    phonebook_extension_uuid: props.options?.item?.phonebook_extension_uuid ?? null,
 }));
 
 const attachmentFilename = (index) => {
@@ -695,6 +729,7 @@ const contactSubmitFields = [
     "attachments",
     "contact_users",
     "contact_groups",
+    "phonebook_extension_uuid",
 ];
 
 const includeVisibilityFields = () => showVisibilityTab.value;
@@ -705,7 +740,7 @@ const buildRequestData = (form$) => {
     return Object.fromEntries(
         contactSubmitFields
             .filter((field) => {
-                if (field === "contact_users" || field === "contact_groups") {
+                if (field === "contact_users" || field === "contact_groups" || field === "phonebook_extension_uuid") {
                     return includeVisibilityFields();
                 }
 

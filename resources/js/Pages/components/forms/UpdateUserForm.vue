@@ -56,7 +56,7 @@
                                     user_enabled: options?.item?.user_enabled ?? true,
                                     language: options?.item?.language ?? null,
                                     extension_uuid: options?.item?.extension_uuid ?? null,
-                                    contact_uuid: options?.item?.contact_uuid ?? null,
+                                    phonebook_contact_uuid: options?.item?.phonebook_contact_uuid ?? null,
                                     groups: options.item.user_groups
                                         ? options.item.user_groups.map(ug => ug.group_uuid)
                                         : [],
@@ -95,7 +95,7 @@
                                                     'account_groups',
                                                     'accounts',
                                                     'extension_uuid',
-                                                    'contact_uuid',
+                                                    'phonebook_contact_uuid',
                                                     'container_3',
                                                     'reset',
                                                     'submit',
@@ -193,7 +193,7 @@
                                                         },
                                                     }" />
 
-                                                <SelectElement name="contact_uuid" :items="options.phonebook_contacts"
+                                                <SelectElement name="phonebook_contact_uuid" :items="options.phonebook_contacts"
                                                     :search="true" :native="false" label="Phonebook contact"
                                                     input-type="search" autocomplete="off" :floating="false"
                                                     :strict="false" allow-absent placeholder="Select contact"

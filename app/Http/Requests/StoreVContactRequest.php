@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class StoreVContactRequest extends FormRequest
@@ -126,6 +127,14 @@ class StoreVContactRequest extends FormRequest
             'contact_groups.*' => ['nullable'],
             'contact_groups.*.group_uuid' => ['nullable', 'uuid'],
             'contact_groups.*.value' => ['nullable', 'uuid'],
+
+            'phonebook_extension_uuid' => [
+                'nullable',
+                'uuid',
+                Rule::exists('v_extensions', 'extension_uuid')->where(function ($query) {
+                    $query->where('domain_uuid', session('domain_uuid'));
+                }),
+            ],
         ];
     }
 

@@ -70,6 +70,13 @@ class ContactService
                 $this->syncContactGroups($contact, $validated['contact_groups'] ?? []);
             }
 
+            if (array_key_exists('phonebook_extension_uuid', $validated)) {
+                $this->contactUserLinkService->syncExtensionPhonebookContactAssignment(
+                    $contact,
+                    $validated['phonebook_extension_uuid'] ?: null,
+                );
+            }
+
             $fresh = $contact->fresh([
                 'phones',
                 'emails',
@@ -92,6 +99,8 @@ class ContactService
     public function delete(VContact $contact): void
     {
         DB::transaction(function () use ($contact) {
+            $this->contactUserLinkService->cleanupBeforeContactDelete($contact);
+
             $uuid = $contact->contact_uuid;
 
             foreach ([
@@ -129,7 +138,9 @@ class ContactService
                 'phone_extension' => $this->blankToNull($row['phone_extension'] ?? null),
                 'phone_speed_dial' => $this->blankToNull($row['phone_speed_dial'] ?? null),
                 'phone_primary' => $this->toFlag($row['phone_primary'] ?? null),
-                'phone_type_voice' => $this->toFlag($row['phone_type_voice'] ?? null),
+                'phone_type_voice' => $this->toFlag($row['phone_type_voice'] ?? (
+                    trim((string) ($row['phone_number'] ?? '')) !== '' ? '1' : null
+                )),
                 'phone_type_fax' => $this->toFlag($row['phone_type_fax'] ?? null),
                 'phone_type_video' => $this->toFlag($row['phone_type_video'] ?? null),
                 'phone_type_text' => $this->toFlag($row['phone_type_text'] ?? null),

@@ -33,10 +33,17 @@ class UpdateUserRequest extends FormRequest
             'account_groups'       => 'sometimes|array',
             'account_groups.*'     => 'uuid|exists:domain_groups,domain_group_uuid',
             'extension_uuid' => 'nullable|uuid',
-            'contact_uuid' => [
+            'phonebook_contact_uuid' => [
                 'nullable',
                 'uuid',
                 Rule::exists('v_contacts', 'contact_uuid')->where(function ($query) use ($user) {
+                    $query->where('domain_uuid', $user->domain_uuid);
+                }),
+            ],
+            'contact_uuid' => [
+                'nullable',
+                'uuid',
+                Rule::exists('contacts', 'contact_uuid')->where(function ($query) use ($user) {
                     $query->where('domain_uuid', $user->domain_uuid);
                 }),
             ],

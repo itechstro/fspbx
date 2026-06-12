@@ -104,7 +104,7 @@ class CloudPlayEnterpriseDirectorySync
             return false;
         }
 
-        if (! app(ContactUserLinkService::class)->extensionHasLinkedContactPhones($extension)) {
+        if (! app(ContactUserLinkService::class)->extensionHasDirectLinkedContactPhones($extension)) {
             $this->removePhonebookOnlyEnterpriseEntry($extension);
 
             return false;
@@ -313,6 +313,9 @@ class CloudPlayEnterpriseDirectorySync
             return;
         }
 
+        $contact->loadMissing('phones');
+        $mobile = app(ContactUserLinkService::class)->resolveMobileNumberForContact($contact);
+
         $edIds = [];
 
         if ((int) ($contact->cloudplay_ed_id ?? 0) > 0) {
@@ -321,7 +324,7 @@ class CloudPlayEnterpriseDirectorySync
 
         $edIds = array_values(array_unique(array_filter($edIds)));
 
-        if ($edIds === []) {
+        if ($edIds === [] && $mobile === '') {
             if (! empty($contact->cloudplay_ed_id)) {
                 $contact->cloudplay_ed_id = null;
                 $contact->save();
@@ -345,6 +348,10 @@ class CloudPlayEnterpriseDirectorySync
             } catch (\Throwable $e) {
                 logger('CloudPLAY enterprise phonebook contact deactivate failed: ' . $e->getMessage());
             }
+        }
+
+        if ($mobile !== '') {
+            $this->deactivateOrphanContactEnterpriseEntries($contact, 0, $mobile);
         }
 
         $contact->cloudplay_ed_id = null;

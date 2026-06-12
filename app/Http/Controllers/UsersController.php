@@ -147,6 +147,10 @@ class UsersController extends Controller
             $select[] = 'extension_uuid';
         }
 
+        if (Schema::hasColumn('v_users', 'phonebook_contact_uuid')) {
+            $select[] = 'phonebook_contact_uuid';
+        }
+
         if (Schema::hasColumn('v_users', 'contact_uuid')) {
             $select[] = 'contact_uuid';
         }
@@ -208,7 +212,10 @@ class UsersController extends Controller
 
             $this->ensureCanManageTarget($user);
 
-            if (Schema::hasColumn('v_users', 'contact_uuid') && empty($user->contact_uuid)) {
+            if (
+                Schema::hasColumn('v_users', 'phonebook_contact_uuid')
+                && empty($user->phonebook_contact_uuid)
+            ) {
                 $assignedContactUuid = SpeedDialUser::query()
                     ->where('domain_uuid', $domain_uuid)
                     ->where('user_uuid', $user->user_uuid)
@@ -216,11 +223,11 @@ class UsersController extends Controller
                     ->value('contact_uuid');
 
                 if ($assignedContactUuid) {
-                    $user->contact_uuid = $assignedContactUuid;
+                    $user->phonebook_contact_uuid = $assignedContactUuid;
                 }
             }
 
-            $user->makeVisible(['contact_uuid']);
+            $user->makeVisible(['phonebook_contact_uuid', 'contact_uuid']);
 
             $userDto = UserData::from($user);
             $updateRoute = route('users.update', ['user' => $itemUuid]);
@@ -252,6 +259,7 @@ class UsersController extends Controller
                 domain_uuid: $domain_uuid,
                 extension_uuid: null,
                 contact_uuid: null,
+                phonebook_contact_uuid: null,
             );
             $updateRoute = null;
         }
@@ -389,6 +397,10 @@ class UsersController extends Controller
                 $userAttributes['extension_uuid'] = $data['extension_uuid'] ?? null;
             }
 
+            if (Schema::hasColumn('v_users', 'phonebook_contact_uuid')) {
+                $userAttributes['phonebook_contact_uuid'] = $data['phonebook_contact_uuid'] ?? null;
+            }
+
             if (Schema::hasColumn('v_users', 'contact_uuid')) {
                 $userAttributes['contact_uuid'] = $data['contact_uuid'] ?? null;
             }
@@ -509,8 +521,11 @@ class UsersController extends Controller
                 $userUpdate['extension_uuid'] = $validated['extension_uuid'] ?: null;
             }
 
-            if (Schema::hasColumn('v_users', 'contact_uuid') && array_key_exists('contact_uuid', $validated)) {
-                $contactUuid = $validated['contact_uuid'] ?: null;
+            if (
+                Schema::hasColumn('v_users', 'phonebook_contact_uuid')
+                && array_key_exists('phonebook_contact_uuid', $validated)
+            ) {
+                $contactUuid = $validated['phonebook_contact_uuid'] ?: null;
 
                 if ($contactUuid === null) {
                     $contactUuid = SpeedDialUser::query()
@@ -520,7 +535,11 @@ class UsersController extends Controller
                         ->value('contact_uuid');
                 }
 
-                $userUpdate['contact_uuid'] = $contactUuid;
+                $userUpdate['phonebook_contact_uuid'] = $contactUuid;
+            }
+
+            if (Schema::hasColumn('v_users', 'contact_uuid') && array_key_exists('contact_uuid', $validated)) {
+                $userUpdate['contact_uuid'] = $validated['contact_uuid'] ?: null;
             }
 
             $user->update($userUpdate);

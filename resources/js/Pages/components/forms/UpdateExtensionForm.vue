@@ -50,7 +50,7 @@
                             </div>
 
 
-                            <Vueform v-if="!loading" ref="form$" :endpoint="submitForm" @success="handleSuccess"
+                            <Vueform v-if="!loading" :key="options.item?.extension_uuid" ref="form$" :endpoint="submitForm" @success="handleSuccess"
                                 @error="handleError" @response="handleResponse" :display-errors="false" :default="{
                                     extension_uuid: options.item.extension_uuid ?? '',
                                     directory_first_name: options.item.directory_first_name ?? '',
@@ -87,6 +87,7 @@
                                     force_ping: options.item.force_ping ?? 'false',
                                     user_context: options.item.user_context ?? '',
                                     accountcode: options.item.accountcode ?? '',
+                                    phonebook_contact_uuid: options.item.phonebook_contact_uuid ?? null,
                                     exclude_from_ringotel_stale_users: options.item?.mobile_app?.exclude_from_stale_report ?? false,
                                     recording: !!options.item.user_record,
                                     user_record: options.item.user_record ?? null,
@@ -346,6 +347,8 @@
 
                                                 <FormTab name="advanced" label="Advanced Settings" :elements="[
                                                     'advanced_title',
+                                                    'phonebook_contact_uuid',
+                                                    'linked_phonebook_contact_user_note',
                                                     'directory_visible',
                                                     'directory_exten_visible',
                                                     'call_screen_enabled',
@@ -1631,6 +1634,28 @@
                                                 <StaticElement name="advanced_title" tag="h4"
                                                     content="Advanced Settings" description="" />
 
+                                                <SelectElement name="phonebook_contact_uuid"
+                                                    :items="options.phonebook_contacts ?? []"
+                                                    :search="true" :native="false" label="Phonebook contact"
+                                                    input-type="search" autocomplete="off" :floating="false"
+                                                    :strict="false" allow-absent placeholder="Select contact"
+                                                    description="Direct extension link for CloudPLAY and provisioning. Takes priority over a phonebook contact linked on the portal user."
+                                                    :conditions="[() => options.permissions?.extension_update]" />
+
+                                                <StaticElement name="linked_phonebook_contact_user_note"
+                                                    :conditions="[() => linkedPhonebookContact && linkedPhonebookContact.link_type === 'user']">
+                                                    <div class="mb-4 rounded-md border border-amber-100 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                                                        <p class="font-medium">Contact also linked via portal user</p>
+                                                        <p class="mt-1">
+                                                            {{ linkedPhonebookContact.name }}
+                                                            (via {{ linkedPhonebookContact.user_labels.join(', ') }})
+                                                        </p>
+                                                        <p class="mt-2">
+                                                            Choose a contact above to link this extension directly. A direct link overrides the user link for CloudPLAY and directory sync.
+                                                        </p>
+                                                    </div>
+                                                </StaticElement>
+
                                                 <ToggleElement name="directory_visible"
                                                     text="Show in company dial-by-name directory"
                                                     description="Controls whether this extension appears in the company’s dial-by-name directory. Hide extensions for devices (door phones, intercoms) or private users (e.g., executives)."
@@ -1911,6 +1936,8 @@ const props = defineProps({
     header: String,
     loading: Boolean,
 });
+
+const linkedPhonebookContact = computed(() => props.options?.linked_phonebook_contact ?? null);
 
 const voicemailFileOptions = [
     { value: 'attach', label: 'Attach recording' },

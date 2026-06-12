@@ -26,6 +26,8 @@ use App\Models\MobileAppUsers;
 use App\Data\ExtensionListData;
 use App\Jobs\UpdateAppSettings;
 use App\Jobs\SyncCloudPlayEnterpriseDirectory;
+use App\Models\VContact;
+use App\Services\Contacts\ContactUserLinkService;
 use App\Data\ExtensionDetailData;
 use App\Imports\ExtensionsImport;
 use Illuminate\Support\Facades\DB;
@@ -454,6 +456,7 @@ class ExtensionsController extends Controller
                     'forward_user_not_registered_enabled',
                     'follow_me_uuid',
                     'follow_me_enabled',
+                    'phonebook_contact_uuid',
                 ])
                 ->with([
                     'voicemail' => function ($query) use ($currentDomain) {
@@ -823,6 +826,24 @@ class ExtensionsController extends Controller
 
         return response()->json([
             'item'        => $extensionDto,
+            'linked_phonebook_contact' => ($itemUuid ?? null) && isset($extension)
+                ? app(ContactUserLinkService::class)->formatLinkedContactForExtension($extension)
+                : null,
+            'phonebook_contacts' => VContact::query()
+                ->where('domain_uuid', $currentDomain)
+                ->orderBy('contact_organization')
+                ->orderBy('contact_name_given')
+                ->get(['contact_uuid', 'contact_organization', 'contact_name_given', 'contact_name_family'])
+                ->map(function (VContact $contact) {
+                    $name = trim("{$contact->contact_name_given} {$contact->contact_name_family}");
+
+                    return [
+                        'value' => $contact->contact_uuid,
+                        'label' => $name !== '' ? $name : ($contact->contact_organization ?: $contact->contact_uuid),
+                    ];
+                })
+                ->values()
+                ->all(),
             'voicemail' => $voicemailDto ?? null,
             'voicemail_copies' => $voicemailDestinations ?? [],
             'all_voicemails' => $allVoicemails ?? null,
@@ -1271,6 +1292,8 @@ public function store(StoreExtensionRequest $request)
                 ->where('domain_uuid', $currentDomain)
                 ->firstOrFail();
 
+            $previousPhonebookContactUuid = $extension->phonebook_contact_uuid;
+
             if ($selfService) {
                 $data['extension'] = $extension->extension;
                 $data['effective_caller_id_number'] = $extension->extension;
@@ -1387,9 +1410,28 @@ public function store(StoreExtensionRequest $request)
 
             DB::commit();
 
-            if ($extension->mobile_app && get_mobile_app_provider() === 'cloudplay') {
-                SyncCloudPlayEnterpriseDirectory::dispatch($extension->extension_uuid)
-                    ->onQueue('default');
+            $phonebookContactChanged = array_key_exists('phonebook_contact_uuid', $data)
+                && ($data['phonebook_contact_uuid'] ?: null) !== ($previousPhonebookContactUuid ?: null);
+
+            if (get_mobile_app_provider() === 'cloudplay') {
+                $extension->refresh();
+                $extension->loadMissing('mobile_app');
+                $contactUserLinkService = app(ContactUserLinkService::class);
+
+                if ($phonebookContactChanged) {
+                    $contactUserLinkService->syncPhonebookContactAssignmentForExtension(
+                        $extension,
+                        $previousPhonebookContactUuid,
+                        $extension->phonebook_contact_uuid,
+                    );
+                } elseif (
+                    $extension->mobile_app
+                    || ! empty($extension->cloudplay_ed_id)
+                    || $contactUserLinkService->extensionHasDirectLinkedContactPhones($extension)
+                ) {
+                    SyncCloudPlayEnterpriseDirectory::dispatch($extension->extension_uuid)
+                        ->onQueue('default');
+                }
             }
 
             //clear fusionpbx cache
