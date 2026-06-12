@@ -13,7 +13,9 @@ use App\Models\VContactRelation;
 use App\Models\VContactTime;
 use App\Models\VContactUrl;
 use App\Models\SpeedDialUser;
+use App\Services\Contacts\ContactCallingCardService;
 use App\Services\Contacts\ContactUserLinkService;
+use App\Models\VContactSetting;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -21,6 +23,7 @@ class ContactService
 {
     public function __construct(
         private ContactUserLinkService $contactUserLinkService,
+        private ContactCallingCardService $contactCallingCardService,
     ) {}
     private const CORE_FIELDS = [
         'contact_type',
@@ -77,6 +80,10 @@ class ContactService
                 );
             }
 
+            if ($this->shouldSyncCallingCard($validated)) {
+                $this->contactCallingCardService->sync($contact, $validated);
+            }
+
             $fresh = $contact->fresh([
                 'phones',
                 'emails',
@@ -118,6 +125,7 @@ class ContactService
 
             SpeedDialUser::query()->where('contact_uuid', $uuid)->delete();
             VContactGroup::query()->where('contact_uuid', $uuid)->delete();
+            VContactSetting::query()->where('contact_uuid', $uuid)->delete();
             $contact->delete();
         });
     }
@@ -461,5 +469,22 @@ class ContactService
     private function isPrimary(mixed $value): bool
     {
         return in_array($value, [1, '1', true, 'true'], true);
+    }
+
+    private function shouldSyncCallingCard(array $validated): bool
+    {
+        foreach ([
+            'calling_card_enabled',
+            'calling_card_mode',
+            'calling_card_username',
+            'calling_card_password',
+            'calling_card_pinless_number',
+        ] as $field) {
+            if (array_key_exists($field, $validated)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

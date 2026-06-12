@@ -119,6 +119,13 @@ class VContact extends Model
         return $this->hasMany(VContactGroup::class, 'contact_uuid', 'contact_uuid');
     }
 
+    public function hasCallingCardSettings()
+    {
+        return $this->hasOne(VContactSetting::class, 'contact_uuid', 'contact_uuid')
+            ->where('contact_setting_category', 'calling card')
+            ->where('contact_setting_enabled', 'true');
+    }
+
     public function getDisplayNameAttribute(): string
     {
         $name = trim("{$this->contact_name_given} {$this->contact_name_family}");

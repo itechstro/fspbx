@@ -222,10 +222,14 @@
                             <div class="flex items-center">
                                 <input v-model="selectedItems" type="checkbox" name="action_box[]"
                                     :value="row.contact_uuid" class="h-4 w-4 rounded border-gray-300 text-indigo-600">
-                                <div class="ml-4"
+                                <div class="ml-4 flex items-center gap-2"
                                     :class="{ 'cursor-pointer hover:text-gray-900': permissions.update }"
                                     @click="permissions.update && handleEditButtonClick(row.contact_uuid)">
-                                    {{ displayName(row) }}
+                                    <span>{{ displayName(row) }}</span>
+                                    <Badge v-if="row.has_calling_card" text="Calling Card"
+                                        backgroundColor="bg-amber-100" textColor="text-amber-800"
+                                        ringColor="ring-amber-400/30"
+                                        class="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide" />
                                 </div>
                             </div>
                         </TableField>

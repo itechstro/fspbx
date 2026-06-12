@@ -17,6 +17,7 @@ use App\Models\VContact;
 use App\Models\VContactAttachment;
 use App\Services\ContactService;
 use App\Services\ContactVisibilityService;
+use App\Services\Contacts\ContactCallingCardService;
 use App\Services\Contacts\ContactUserLinkService;
 use App\Services\Contacts\ContactImportService;
 use App\Services\Contacts\ContactVcardService;
@@ -42,6 +43,7 @@ class ContactsController extends Controller
         private ContactVisibilityService $contactVisibilityService,
         private ContactImportService $contactImportService,
         private ContactVcardService $contactVcardService,
+        private ContactCallingCardService $contactCallingCardService,
     ) {}
 
     public function index(Request $request)
@@ -229,8 +231,8 @@ class ContactsController extends Controller
                     $userOptions,
                 ),
                 'phonebook_extension_uuid' => $phonebookExtensionUuid,
-            ])
-            : $item;
+            ], $this->contactCallingCardService->formatForForm($item->contact_uuid))
+            : array_merge($item->toArray(), $this->contactCallingCardService->formatForForm(null));
 
         return response()->json([
             'item' => $itemPayload,
@@ -397,7 +399,8 @@ class ContactsController extends Controller
                     'phone_number',
                     'phone_speed_dial'
                 );
-            }]);
+            }])
+            ->withExists('hasCallingCardSettings as has_calling_card');
 
         if ($request->boolean('filter.speedDial')) {
             $query->with(['contactUsers' => function ($query) {
@@ -902,6 +905,8 @@ class ContactsController extends Controller
             'attachment_delete' => userCheckPermission('contact_attachment_delete') || userCheckPermission('contact_edit'),
             'sync_connect' => userCheckPermission('contact_sync_connect'),
             'sync_run' => userCheckPermission('contact_sync_run'),
+            'setting_view' => userCheckPermission('contact_setting_view') || userCheckPermission('contact_edit'),
+            'setting_edit' => userCheckPermission('contact_setting_edit') || userCheckPermission('contact_edit'),
         ];
     }
 }

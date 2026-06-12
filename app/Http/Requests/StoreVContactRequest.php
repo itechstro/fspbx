@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Services\Contacts\ContactCallingCardService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -31,6 +32,8 @@ class StoreVContactRequest extends FormRequest
                     'Enter an organization or a contact name.'
                 );
             }
+
+            $this->validateCallingCard($validator);
         });
     }
 
@@ -135,6 +138,12 @@ class StoreVContactRequest extends FormRequest
                     $query->where('domain_uuid', session('domain_uuid'));
                 }),
             ],
+
+            'calling_card_enabled' => ['nullable'],
+            'calling_card_mode' => ['nullable', 'string', Rule::in(['pin_auth', 'pinless'])],
+            'calling_card_username' => ['nullable', 'string', 'max:32', 'regex:/^\d+$/'],
+            'calling_card_password' => ['nullable', 'string', 'max:32', 'regex:/^\d+$/'],
+            'calling_card_pinless_number' => ['nullable', 'string', 'max:32', 'regex:/^\d+$/'],
         ];
     }
 
@@ -168,5 +177,69 @@ class StoreVContactRequest extends FormRequest
         }
 
         return $sanitized;
+    }
+
+    private function validateCallingCard(Validator $validator): void
+    {
+        if (! $this->hasCallingCardPayload()) {
+            return;
+        }
+
+        $enabled = in_array($this->input('calling_card_enabled'), [true, 1, '1', 'true'], true);
+
+        if (! $enabled) {
+            return;
+        }
+
+        $mode = $this->input('calling_card_mode', 'pin_auth') === 'pinless' ? 'pinless' : 'pin_auth';
+        $domainUuid = session('domain_uuid');
+        $contactUuid = $this->route('v_contact')?->contact_uuid;
+        $service = app(ContactCallingCardService::class);
+
+        if ($mode === 'pinless') {
+            $pinlessNumber = preg_replace('/\D+/', '', (string) $this->input('calling_card_pinless_number', '')) ?? '';
+
+            if ($pinlessNumber === '') {
+                $validator->errors()->add('calling_card_pinless_number', 'Enter the caller ID number for pinless access.');
+
+                return;
+            }
+
+            if ($service->isPinlessNumberTaken($domainUuid, $pinlessNumber, $contactUuid)) {
+                $validator->errors()->add('calling_card_pinless_number', 'This caller ID number is already assigned to another calling card.');
+            }
+
+            return;
+        }
+
+        $username = preg_replace('/\D+/', '', (string) $this->input('calling_card_username', '')) ?? '';
+        $password = preg_replace('/\D+/', '', (string) $this->input('calling_card_password', '')) ?? '';
+
+        if ($username === '') {
+            $validator->errors()->add('calling_card_username', 'Enter a reference number.');
+        } elseif ($service->isReferenceNumberTaken($domainUuid, $username, $contactUuid)) {
+            $validator->errors()->add('calling_card_username', 'This reference number is already assigned to another calling card.');
+        }
+
+        if ($password === '') {
+            $validator->errors()->add('calling_card_password', 'Enter a PIN.');
+        }
+    }
+
+    private function hasCallingCardPayload(): bool
+    {
+        foreach ([
+            'calling_card_enabled',
+            'calling_card_mode',
+            'calling_card_username',
+            'calling_card_password',
+            'calling_card_pinless_number',
+        ] as $field) {
+            if ($this->has($field)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

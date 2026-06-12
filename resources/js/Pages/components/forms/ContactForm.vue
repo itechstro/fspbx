@@ -58,6 +58,8 @@
                                                 <FormTab name="relations" label="Relations" :elements="relationsTabElements" />
                                                 <FormTab v-if="showVisibilityTab" name="visibility" label="Visibility"
                                                     :elements="visibilityTabElements" />
+                                                <FormTab v-if="showCallingCardTab" name="calling_card" label="Calling Card"
+                                                    :elements="callingCardTabElements" />
                                                 <FormTab v-if="mode === 'update'" name="attachments" label="Attachments"
                                                     :elements="attachmentsTabElements" />
                                             </FormTabs>
@@ -398,6 +400,44 @@
                                                 <ButtonElement name="visibility_submit" button-label="Save" :submits="true"
                                                     align="right" />
 
+                                                <!-- Calling Card -->
+                                                <StaticElement name="calling_card_header" tag="h4" content="Calling Card"
+                                                    description="Configure DISA calling card authentication for this contact. Used by disa.plus.lua when the dialplan enables pinless access or reference number + PIN lookup." />
+
+                                                <ToggleElement name="calling_card_enabled" text="Enable calling card"
+                                                    true-value="1" false-value="0"
+                                                    :labels="{ on: 'Yes', off: 'No' }"
+                                                    :disabled="[() => !permissions.setting_edit]" />
+
+                                                <RadiogroupElement name="calling_card_mode" label="Authentication"
+                                                    view="tabs"
+                                                    :items="{ pin_auth: 'Reference + PIN', pinless: 'Pinless (caller ID)' }"
+                                                    :conditions="[['calling_card_enabled', '==', '1']]"
+                                                    :disabled="[() => !permissions.setting_edit]" />
+
+                                                <TextElement name="calling_card_username" label="Reference Number"
+                                                    placeholder="Digits entered before PIN at DISA prompt"
+                                                    input-type="tel" :floating="false"
+                                                    :conditions="[['calling_card_enabled', '==', '1'], ['calling_card_mode', '==', 'pin_auth']]"
+                                                    :disabled="[() => !permissions.setting_edit]" />
+
+                                                <TextElement name="calling_card_password" label="PIN"
+                                                    placeholder="Numeric PIN"
+                                                    input-type="password" :floating="false"
+                                                    :conditions="[['calling_card_enabled', '==', '1'], ['calling_card_mode', '==', 'pin_auth']]"
+                                                    :disabled="[() => !permissions.setting_edit]" />
+
+                                                <TextElement name="calling_card_pinless_number" label="Caller ID Number"
+                                                    placeholder="ANI that identifies this calling card"
+                                                    input-type="tel" :floating="false"
+                                                    :conditions="[['calling_card_enabled', '==', '1'], ['calling_card_mode', '==', 'pinless']]"
+                                                    :disabled="[() => !permissions.setting_edit]"
+                                                    description="Must match the inbound caller ID on calls to your DISA entry point." />
+
+                                                <GroupElement name="calling_card_button_container" />
+                                                <ButtonElement name="calling_card_submit" button-label="Save" :submits="true"
+                                                    align="right" />
+
                                                 <!-- Attachments -->
                                                 <StaticElement name="attachments_header" tag="h4" content="Attachments"
                                                     description="Upload files linked to this contact. Save the contact before uploading on create." />
@@ -510,6 +550,7 @@ const userOptions = computed(() => props.options?.user_options ?? []);
 const groupOptions = computed(() => props.options?.group_options ?? []);
 const showVisibilityTab = computed(() => visibility.value.permissions_enabled
     && (permissions.value.user_view || permissions.value.group_view));
+const showCallingCardTab = computed(() => permissions.value.setting_view);
 const timezones = computed(() => props.options?.timezones ?? []);
 const phoneLabels = computed(() => props.options?.phone_labels ?? []);
 const emailLabels = computed(() => props.options?.email_labels ?? []);
@@ -547,6 +588,11 @@ const visibilityTabElements = [
 const attachmentsTabElements = [
     "attachments_header", "attachments", "attachment_upload_panel",
     "attachments_button_container", "attachments_submit",
+];
+const callingCardTabElements = [
+    "calling_card_header", "calling_card_enabled", "calling_card_mode",
+    "calling_card_username", "calling_card_password", "calling_card_pinless_number",
+    "calling_card_button_container", "calling_card_submit",
 ];
 
 const flagValue = (value) => (value ? "1" : "0");
@@ -676,6 +722,11 @@ const defaultValues = computed(() => ({
     contact_users: mapAssignedUsers(props.options?.item?.contact_users ?? [], props.options?.user_options ?? []),
     contact_groups: mapAssignedGroups(props.options?.item?.contact_groups ?? []),
     phonebook_extension_uuid: props.options?.item?.phonebook_extension_uuid ?? null,
+    calling_card_enabled: flagValue(props.options?.item?.calling_card_enabled),
+    calling_card_mode: props.options?.item?.calling_card_mode ?? "pin_auth",
+    calling_card_username: props.options?.item?.calling_card_username ?? null,
+    calling_card_password: props.options?.item?.calling_card_password ?? null,
+    calling_card_pinless_number: props.options?.item?.calling_card_pinless_number ?? null,
 }));
 
 const attachmentFilename = (index) => {
@@ -747,9 +798,15 @@ const contactSubmitFields = [
     "contact_users",
     "contact_groups",
     "phonebook_extension_uuid",
+    "calling_card_enabled",
+    "calling_card_mode",
+    "calling_card_username",
+    "calling_card_password",
+    "calling_card_pinless_number",
 ];
 
 const includeVisibilityFields = () => showVisibilityTab.value;
+const includeCallingCardFields = () => showCallingCardTab.value && permissions.value.setting_edit;
 
 const buildRequestData = (form$) => {
     const data = form$.data;
@@ -759,6 +816,10 @@ const buildRequestData = (form$) => {
             .filter((field) => {
                 if (field === "contact_users" || field === "contact_groups" || field === "phonebook_extension_uuid") {
                     return includeVisibilityFields();
+                }
+
+                if (field.startsWith("calling_card_")) {
+                    return includeCallingCardFields();
                 }
 
                 return field in data;
