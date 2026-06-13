@@ -185,19 +185,31 @@
             <TalkingSoftkey>{{ $talkingSoftkey }}</TalkingSoftkey>
             <RingingSoftkey>{{ $ringingSoftkey }}</RingingSoftkey>
             <AlertingSoftkey>{{ $resolve('softkey_alertingsoftkey', 'dialpad;xfer;cancel;') }}</AlertingSoftkey>
+            <XAlertingSoftkey>{{ $resolve('softkey_xalertingsoftkey', 'dialpad;xfer;cancel;') }}</XAlertingSoftkey>
             <ConferenceSoftkey>{{ $resolve('softkey_conferencesoftkey', 'conf;dialpad;end;split;hold;mute;exit;') }}</ConferenceSoftkey>
+            <WaitingSoftkey>{{ $resolve('softkey_waitingsoftkey', 'hold;xfer;conf;end;') }}</WaitingSoftkey>
+            <EndingSoftkey>{{ $resolve('softkey_endingsoftkey', 'complete;autoRedial;end;redial;') }}</EndingSoftkey>
             <DialerPreSoftkey>{{ $resolve('softkey_dialerpresoftkey', 'audio;video;redial;') }}</DialerPreSoftkey>
             <DialerCallSoftkey>{{ $resolve('softkey_dialercallsoftkey', 'audio;video;redial;') }}</DialerCallSoftkey>
             <DialerXferSoftkey>{{ $resolve('softkey_dialerxfersoftkey', 'audio;video;xfer;contact;history;cancel;') }}</DialerXferSoftkey>
             <DialerCfwdSoftkey>{{ $resolve('softkey_dialercfwdsoftkey', 'contact;history;forward;cancel;') }}</DialerCfwdSoftkey>
             <DesktopClick>{{ $resolve('softkey_desktopclick', 'none;none;none;none;none;') }}</DesktopClick>
+            <DailerClick>{{ $resolve('softkey_dailerclick', 'pline;nline;none;none;none;') }}</DailerClick>
+            <RingingClick>{{ $resolve('softkey_ringingclick', 'none;none;none;none;none;') }}</RingingClick>
+            <CallClick>{{ $resolve('softkey_callclick', 'pcall;ncall;voldown;volup;none;') }}</CallClick>
+            <DesktopLongPress>{{ $resolve('softkey_desktoplongpress', 'status;none;none;mwi;none;') }}</DesktopLongPress>
+            <DialerConfSoftkey>{{ $resolve('softkey_dialerconfsoftkey', 'audio;video;cancel;contact;history;redial;') }}</DialerConfSoftkey>
         </softKeyConfig>
 @else
         <softkey>
             <SoftkeyMode>{{ $resolve('softkey_mode', '0') }}</SoftkeyMode>
-            <SoftKeyExitStyle>{{ $resolve('softkey_exit', '2') }}</SoftKeyExitStyle>
+            <SoftKeyExitStyle>{{ $resolve('softkey_exit', $profile === 'standard' ? '1' : '2') }}</SoftKeyExitStyle>
             <DesktopSoftkey>{{ $resolve('softkey_desktopsoftkey', 'history;contact;dnd;menu;') }}</DesktopSoftkey>
+@if ($profile === 'entry')
             <TalkingSoftkey>{{ $talkingSoftkey }}</TalkingSoftkey>
+@elseif ($profile === 'advanced')
+            <TalkingAudioSoftkey>{{ $talkingSoftkey }}</TalkingAudioSoftkey>
+@endif
 @if ($profile === 'entry')
             <RingingSoftkey>{{ $ringingSoftkey }}</RingingSoftkey>
             <AlertingSoftkey>{{ $resolve('softkey_alertingsoftkey', 'end;none;none;none;') }}</AlertingSoftkey>
@@ -211,6 +223,44 @@
             <DialerCfwdSoftkey>{{ $resolve('softkey_dialercfwdsoftkey', 'send;2aB;delete;exit;') }}</DialerCfwdSoftkey>
             <DesktopClick>{{ $resolve('softkey_desktopclick', 'history;status;none;none;none;') }}</DesktopClick>
             <DailerClick>{{ $resolve('softkey_dailerclick', 'pline;nline;none;none;none;') }}</DailerClick>
+            <RingingClick>{{ $resolve('softkey_ringingclick', 'none;none;none;none;none;') }}</RingingClick>
+            <CallClick>{{ $resolve('softkey_callclick', 'none;none;none;none;none;') }}</CallClick>
+            <DesktopLongPress>{{ $resolve('softkey_desktoplongpress', 'status;none;none;none;reset;') }}</DesktopLongPress>
+            <DialerConfSoftkey>{{ $resolve('softkey_dialerconfsoftkey', 'contact;clogs;redial;video;cancel;') }}</DialerConfSoftkey>
+@elseif ($profile === 'standard')
+            <TalkingSoftkey>{{ $talkingSoftkey }}</TalkingSoftkey>
+            <RingingSoftkey>{{ $ringingSoftkey }}</RingingSoftkey>
+            <AlertingSoftkey>{{ $resolve('softkey_alertingsoftkey', 'end;none;none;none;') }}</AlertingSoftkey>
+            <XAlertingSoftkey>{{ $resolve('softkey_xalertingsoftkey', 'end;none;none;none;') }}</XAlertingSoftkey>
+            <ConferenceSoftkey>{{ $resolve('softkey_conferencesoftkey', 'hold;none;split;end;') }}</ConferenceSoftkey>
+            <WaitingSoftkey>{{ $resolve('softkey_waitingsoftkey', 'hold;xfer;conf;end;') }}</WaitingSoftkey>
+            <EndingSoftkey>{{ $resolve('softkey_endingsoftkey', 'repeat;none;none;end;') }}</EndingSoftkey>
+            <DialerPreSoftkey>{{ $resolve('softkey_dialerpresoftkey', 'send;2aB;delete;exit;') }}</DialerPreSoftkey>
+            <DialerCallSoftkey>{{ $resolve('softkey_dialercallsoftkey', 'repeat;2aB;delete;exit;') }}</DialerCallSoftkey>
+            <DialerXferSoftkey>{{ $resolve('softkey_dialerxfersoftkey', 'repeat;2aB;delete;exit;') }}</DialerXferSoftkey>
+            <DialerCfwdSoftkey>{{ $resolve('softkey_dialercfwdsoftkey', 'repeat;2aB;delete;exit;') }}</DialerCfwdSoftkey>
+            <DesktopClick>{{ $resolve('softkey_desktopclick', 'history;status;none;none;none;') }}</DesktopClick>
+            <DailerClick>{{ $resolve('softkey_dailerclick', 'none;none;none;none;none;') }}</DailerClick>
+            <CallClick>{{ $resolve('softkey_callclick', 'none;none;voldown;volup;none;') }}</CallClick>
+            <DesktopLongPress>{{ $resolve('softkey_desktoplongpress', 'status;none;none;none;reset;') }}</DesktopLongPress>
+            <DialerConfSoftkey>{{ $resolve('softkey_dialerconfsoftkey', 'contact;clogs;redial;video;cancel;') }}</DialerConfSoftkey>
+@elseif ($profile === 'advanced')
+            <TalkingVideoSoftkey>{{ $resolve('softkey_talkingvideosoftkey', 'hold;xfer;switch;end;') }}</TalkingVideoSoftkey>
+            <RingingSoftkey>{{ $ringingSoftkey }}</RingingSoftkey>
+            <AlertingSoftkey>{{ $resolve('softkey_alertingsoftkey', 'end;none;none;none;') }}</AlertingSoftkey>
+            <XAlertingSoftkey>{{ $resolve('softkey_xalertingsoftkey', 'end;none;none;xfer;') }}</XAlertingSoftkey>
+            <ConferenceSoftkey>{{ $resolve('softkey_conferencesoftkey', 'hold;manage;conf;split;end;') }}</ConferenceSoftkey>
+            <WaitingSoftkey>{{ $resolve('softkey_waitingsoftkey', 'xfer;accept;reject;end;') }}</WaitingSoftkey>
+            <EndingSoftkey>{{ $resolve('softkey_endingsoftkey', 'redial;none;none;end;') }}</EndingSoftkey>
+            <DialerPreSoftkey>{{ $resolve('softkey_dialerpresoftkey', 'audio;video;save;exit;') }}</DialerPreSoftkey>
+            <DialerCallSoftkey>{{ $resolve('softkey_dialercallsoftkey', 'send;2aB;delete;exit;') }}</DialerCallSoftkey>
+            <DialerXferSoftkey>{{ $resolve('softkey_dialerxfersoftkey', 'delete;xfer;send;exit;') }}</DialerXferSoftkey>
+            <DialerCfwdSoftkey>{{ $resolve('softkey_dialercfwdsoftkey', 'send;2aB;delete;exit;') }}</DialerCfwdSoftkey>
+            <CallLogSoftkey>{{ $resolve('softkey_calllogsoftkey', 'exit;option;delete;dial;') }}</CallLogSoftkey>
+            <DesktopClick>{{ $resolve('softkey_desktopclick', 'history;status;none;none;none;') }}</DesktopClick>
+            <DailerClick>{{ $resolve('softkey_dailerclick', 'pline;nline;none;none;none;') }}</DailerClick>
+            <RingingClick>{{ $resolve('softkey_ringingclick', 'none;none;none;none;none;') }}</RingingClick>
+            <CallClick>{{ $resolve('softkey_callclick', 'none;none;voldown;volup;none;') }}</CallClick>
             <DesktopLongPress>{{ $resolve('softkey_desktoplongpress', 'status;none;none;none;reset;') }}</DesktopLongPress>
             <DialerConfSoftkey>{{ $resolve('softkey_dialerconfsoftkey', 'contact;clogs;redial;video;cancel;') }}</DialerConfSoftkey>
 @else

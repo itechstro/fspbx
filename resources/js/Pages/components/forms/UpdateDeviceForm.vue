@@ -371,8 +371,7 @@
                                                                     },
                                                                 }" placeholder="Display Name" :floating="false" />
 
-                                                            <TextElement name="password" label="SIP Password"
-                                                                placeholder="Enter SIP password" :floating="false"
+                                                            <DeviceLinePasswordElement placeholder="Enter SIP password"
                                                                 :columns="{
                                                                     sm: {
                                                                         container: 4,
@@ -426,10 +425,9 @@
                                                                             () => isExternalLine(index) || isManualAuthId(index),
                                                                         ]" />
 
-                                                                    <TextElement name="password" label="SIP Password"
+                                                                    <DeviceLinePasswordElement
                                                                         placeholder="Enter sip password"
-                                                                        :floating="false"
-                                                                        :default="options.default_line_options?.password"
+                                                                        :default-value="options.default_line_options?.password"
                                                                         :conditions="[
                                                                             () => options?.permissions?.manage_device_line_password,
                                                                             () => isExternalLine(index) || isManualAuthId(index),
@@ -1339,6 +1337,7 @@ import { ref, reactive, computed } from "vue";
 import { Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot } from '@headlessui/vue'
 import { XMarkIcon } from "@heroicons/vue/24/solid";
 import FormChildModal from "../FormChildModal.vue"
+import DeviceLinePasswordElement from "./DeviceLinePasswordElement.vue"
 import { Cog8ToothIcon, DocumentDuplicateIcon } from "@heroicons/vue/24/outline";
 import Badge from "@generalComponents/Badge.vue";
 import { XCircleIcon } from '@heroicons/vue/20/solid'

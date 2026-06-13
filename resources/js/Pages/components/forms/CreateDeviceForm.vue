@@ -272,8 +272,7 @@
                                                                     },
                                                                 }" placeholder="Display Name" :floating="false" />
 
-                                                            <TextElement name="password" label="SIP Password"
-                                                                placeholder="Enter SIP password" :floating="false"
+                                                            <DeviceLinePasswordElement placeholder="Enter SIP password"
                                                                 :columns="{
                                                                     sm: {
                                                                         container: 4,
@@ -330,11 +329,9 @@
                                                                             () => isExternalLine(index) || isManualAuthId(index),
                                                                         ]" />
 
-                                                                    <TextElement name="password"
-                                                                        label="SIP Password"
+                                                                    <DeviceLinePasswordElement
                                                                         placeholder="Enter sip password"
-                                                                        :floating="false"
-                                                                        :default="options.default_line_options?.password"
+                                                                        :default-value="options.default_line_options?.password"
                                                                         :conditions="[
                                                                             () => options?.permissions?.manage_device_line_password,
                                                                             () => isExternalLine(index) || isManualAuthId(index),
@@ -550,6 +547,7 @@ import { Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot } fro
 import { XMarkIcon } from "@heroicons/vue/24/solid";
 import { Cog8ToothIcon } from "@heroicons/vue/24/outline";
 import FormChildModal from "../FormChildModal.vue"
+import DeviceLinePasswordElement from "./DeviceLinePasswordElement.vue"
 
 
 const props = defineProps({
