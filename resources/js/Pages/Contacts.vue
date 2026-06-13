@@ -762,11 +762,22 @@ const hideNotification = () => {
 };
 
 const handleErrorResponse = (error) => {
-    const messages = error?.response?.data?.messages;
+    const data = error?.response?.data;
+    const messages = data?.messages;
 
     if (messages) {
         const type = messages.error ? "error" : "success";
         showNotification(type, messages);
+        return;
+    }
+
+    if (data?.errors) {
+        showNotification("error", data.errors);
+        return;
+    }
+
+    if (data?.message) {
+        showNotification("error", { error: [data.message] });
         return;
     }
 

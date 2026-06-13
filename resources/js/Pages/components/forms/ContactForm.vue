@@ -883,6 +883,10 @@ const handleError = (error, details, form$) => {
     form$.messageBag.clear();
 
     if (details.type === "submit") {
+        if (error?.response) {
+            handleResponse(error.response, form$);
+        }
+
         emit("error", error);
         return;
     }
