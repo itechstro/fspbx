@@ -76,6 +76,7 @@ class IbratroProvisionSettings
             self::text('ibratro_video_bit_rate', '2000000', 'Video bit rate in bps'),
             self::text('ibratro_video_resolution', '6', 'Video resolution index'),
             self::text('ibratro_video_negotiate_dir', '2', 'Video negotiate direction'),
+            self::text('ibratro_h264_packet_mode', '', 'H264 packet mode. Leave blank to omit from config', false),
         ];
     }
 
@@ -142,6 +143,7 @@ class IbratroProvisionSettings
             self::text('ibratro_enable_intercom', '1', 'Enable intercom'),
             self::text('ibratro_default_ext_line', '1', 'Default external line index'),
             self::text('ibratro_enable_sel_line', '1', 'Enable line selection'),
+            self::text('ibratro_enable_def_line', '0', 'Enable default line selection', false),
             self::text('ibratro_default_answer_mode', '2', 'Default answer mode for calls'),
             self::text('ibratro_default_dial_mode', '2', 'Default dial mode for calls'),
             self::text('ibratro_auto_onhook', '1', 'Auto on-hook after remote hangup', false),
@@ -190,6 +192,16 @@ class IbratroProvisionSettings
             self::text('ibratro_softkey_talkingsoftkey', 'hold;xfer;conf;end;', 'In-call softkeys'),
             self::text('ibratro_softkey_ringingsoftkey', 'accept;none;forward;reject;', 'Ringing softkeys'),
             self::text('ibratro_softkey_desktopclick', 'history;status;none;none;none;', 'Desktop click actions'),
+            self::text('ibratro_softkey_mode', '0', 'Softkey mode', false),
+            self::text('ibratro_softkey_talkingvideosoftkey', 'hold;xfer;switch;end;', 'In-call video softkeys', false),
+            self::text('ibratro_softkey_dialerpresoftkey', 'audio;video;save;exit;', 'Dialer pre-call softkeys', false),
+            self::text('ibratro_softkey_dialercallsoftkey', 'send;2aB;delete;exit;', 'Dialer call softkeys', false),
+            self::text('ibratro_softkey_alertingsoftkey', 'dialpad;xfer;cancel;', 'Alerting softkeys', false),
+            self::text('ibratro_softkey_conferencesoftkey', 'conf;dialpad;end;split;hold;mute;exit;', 'Conference softkeys', false),
+            self::text('ibratro_softkey_dialerxfersoftkey', 'audio;video;xfer;contact;history;cancel;', 'Dialer transfer softkeys', false),
+            self::text('ibratro_softkey_dialercfwdsoftkey', 'contact;history;forward;cancel;', 'Dialer call forward softkeys', false),
+            self::text('ibratro_video_display_mode', '3', 'Video display mode on calls', false),
+            self::text('ibratro_auto_handle_video', '1', 'Auto-handle incoming video calls', false),
             self::text('ibratro_firmware_config', '', 'Firmware config file name', false),
             self::text('ibratro_enable_auto_upgrade', '0', 'Enable automatic firmware upgrade', false),
             self::text('ibratro_firmware_upgrade_server_1', '', 'Firmware upgrade server 1', false),
@@ -274,6 +286,7 @@ class IbratroProvisionSettings
             self::text('ibratro_memory_key_to_bxfer', '3', 'Memory key blind transfer mode'),
             self::text('ibratro_dss_home_page', '0', 'DSS home page index'),
             self::text('ibratro_dss_long_press_action', '1', 'DSS long-press action'),
+            self::text('ibratro_auto_blf_list', '0', 'Auto BLF list on DSS keys', false),
             self::text('ibratro_dss_timeout_to_home', '90', 'Seconds before DSS returns to home page', false),
             self::text('ibratro_side_key_pages', '1', 'Number of programmable side key pages', false),
         ];

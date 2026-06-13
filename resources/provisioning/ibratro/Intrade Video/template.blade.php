@@ -1,4 +1,4 @@
-{{-- version: 2.1.0 --}}
+{{-- version: 2.3.0 --}}
 
 @switch($flavor)
 
@@ -9,7 +9,7 @@
     'maxLines' => 20,
     'videoEnabled' => true,
     'includeLineVideoCodec' => false,
-    'keyLayout' => 'advanced',
+    'keyLayout' => 'video',
     'funcKeyPages' => 4,
     'keysPerPage' => 29,
 ])

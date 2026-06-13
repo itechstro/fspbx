@@ -269,14 +269,16 @@
                                                                 }" />
 
                                                             <SelectElement name="auth_id" label="Ext/Number"
-                                                                :items="options.extensions" label-prop="name"
-                                                                :search="true" :native="false" input-type="search"
+                                                                :items="options.extensions" value-prop="value"
+                                                                label-prop="name" :search="true" :native="false"
+                                                                :strict="false" :create="true" input-type="search"
                                                                 autocomplete="off" :columns="{
 
                                                                     sm: {
                                                                         container: 4,
                                                                     },
-                                                                }" placeholder="Choose Ext/Number" :floating="false"
+                                                                }" placeholder="Choose or enter Ext/Number"
+                                                                :floating="false"
                                                                 @change="(newValue, oldValue, el$) => {
 
                                                                     el$.form$.el$('device_keys').children$[index].children$['display_name'].update(newValue);

@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\Domain;
 use App\Models\DeviceKey;
 use App\Models\Devices;
 use App\Models\Extensions;
@@ -23,7 +22,6 @@ class DeviceService
             $this->normalizeKeyTemplateValue($inputs);
 
             $domainUuid = (string) ($inputs['domain_uuid'] ?? '');
-            $domainName = $this->resolveDomainName($domainUuid);
 
             $device = new Devices();
             $device->fill($inputs);
@@ -31,9 +29,7 @@ class DeviceService
 
             $deviceLines = $inputs['device_lines'] ?? null;
             if (is_array($deviceLines) && ! empty($deviceLines)) {
-                foreach ($deviceLines as $line) {
-                    $this->createDeviceLine($device, $line, $domainUuid, $domainName);
-                }
+                $this->syncDeviceLines($device, $deviceLines, $domainUuid);
             }
 
             return $device->fresh();
@@ -118,17 +114,6 @@ class DeviceService
         });
     }
 
-    private function resolveDomainName(string $domainUuid): ?string
-    {
-        if ($domainUuid === '') {
-            return session('domain_name');
-        }
-
-        return Domain::query()
-            ->where('domain_uuid', $domainUuid)
-            ->value('domain_name') ?? session('domain_name');
-    }
-
     private function normalizeKeyTemplateValue(array &$inputs): void
     {
         if (array_key_exists('device_key_template_uuid', $inputs) && $inputs['device_key_template_uuid'] === 'NULL') {
@@ -171,43 +156,6 @@ class DeviceService
         return (string) $value;
     }
 
-    private function createDeviceLine(Devices $device, array $line, string $domainUuid, ?string $domainName): void
-    {
-        $extension = Extensions::where('extension', $line['auth_id'])
-            ->where('domain_uuid', $domainUuid)
-            ->first();
-
-        if (! $extension) {
-            return;
-        }
-
-        $deviceLine = new DeviceLines();
-        $deviceLine->fill([
-            'device_uuid' => $device->device_uuid,
-            'line_number' => $line['line_number'],
-            'line_type_id' => $line['line_type_id'] ?? 'line',
-            'server_address' => $domainName,
-            'server_address_primary' => $line['server_address_primary'] ?? get_domain_setting('server_address_primary', $domainUuid),
-            'server_address_secondary' => $line['server_address_secondary'] ?? get_domain_setting('server_address_secondary', $domainUuid),
-            'outbound_proxy_primary' => $line['outbound_proxy_primary'] ?? get_domain_setting('outbound_proxy_primary', $domainUuid),
-            'outbound_proxy_secondary' => $line['outbound_proxy_secondary'] ?? get_domain_setting('outbound_proxy_secondary', $domainUuid),
-            'display_name' => $line['display_name'] ?? null,
-            'user_id' => $extension->extension,
-            'auth_id' => $extension->extension,
-            'label' => $line['display_name'] ?? null,
-            'password' => $extension->password,
-            'sip_port' => $line['sip_port'] ?? get_domain_setting('line_sip_port', $domainUuid),
-            'sip_transport' => $line['sip_transport'] ?? get_domain_setting('line_sip_transport', $domainUuid),
-            'register_expires' => $line['register_expires'] ?? get_domain_setting('register_expires', $domainUuid),
-            'shared_line' => ($line['line_type_id'] ?? null) === 'sharedline' ? '1' : ($line['shared_line'] ?? null),
-            'device_line_uuid' => (string) Str::uuid(),
-            'domain_uuid' => $device->domain_uuid,
-            'enabled' => 'true',
-        ]);
-
-        $deviceLine->save();
-    }
-
     private function syncDeviceLines(Devices $device, mixed $deviceLines, string $domainUuid): void
     {
         if (empty($deviceLines) || ! is_array($deviceLines)) {
@@ -218,14 +166,16 @@ class DeviceService
         $device->lines()->delete();
 
         foreach ($deviceLines as $line) {
-            $isExternalLine = ($line['line_type_id'] ?? null) === 'externalline';
+            $isExternalLineType = ($line['line_type_id'] ?? null) === 'externalline';
 
             $extension = null;
-            if (! $isExternalLine && ! empty($line['auth_id'])) {
+            if (! empty($line['auth_id'])) {
                 $extension = Extensions::where('extension', $line['auth_id'])
                     ->where('domain_uuid', $domainUuid)
                     ->first();
             }
+
+            $usesManualCredentials = $isExternalLineType || ($extension === null && ! empty($line['auth_id']));
 
             $deviceLineData = [
                 'device_uuid' => $device->device_uuid,
@@ -236,13 +186,11 @@ class DeviceService
                 'outbound_proxy_primary' => $line['outbound_proxy_primary'] ?? null,
                 'outbound_proxy_secondary' => $line['outbound_proxy_secondary'] ?? null,
                 'display_name' => $line['display_name'] ?? null,
-                'user_id' => $isExternalLine
-                    ? ($line['user_id'] ?? null)
+                'user_id' => $usesManualCredentials
+                    ? ($line['user_id'] ?? $line['auth_id'] ?? null)
                     : ($extension->extension ?? ($line['user_id'] ?? null)),
-                'auth_id' => $isExternalLine
-                    ? ($line['auth_id'] ?? null)
-                    : ($extension->extension ?? ($line['auth_id'] ?? null)),
-                'password' => $isExternalLine
+                'auth_id' => $line['auth_id'] ?? null,
+                'password' => $usesManualCredentials
                     ? ($line['password'] ?? null)
                     : ($extension->password ?? null),
                 'label' => $line['display_name'] ?? null,
@@ -250,8 +198,8 @@ class DeviceService
                 'sip_transport' => $line['sip_transport'] ?? null,
                 'register_expires' => $line['register_expires'] ?? null,
                 'shared_line' => ($line['line_type_id'] ?? null) === 'sharedline' ? '1' : '',
-                'external_line' => $isExternalLine,
-                'device_line_uuid' => $line['device_line_uuid'] ?? null,
+                'external_line' => $usesManualCredentials,
+                'device_line_uuid' => $line['device_line_uuid'] ?? (string) Str::uuid(),
                 'domain_uuid' => $device->domain_uuid,
                 'enabled' => 'true',
             ];

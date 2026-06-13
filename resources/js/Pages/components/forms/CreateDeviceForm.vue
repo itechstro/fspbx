@@ -238,35 +238,28 @@
                                                                 }" />
 
                                                             <SelectElement v-if="!isExternalLine(index)" name="auth_id" label="Ext/Number"
-                                                                :items="options.extensions" label-prop="name"
-                                                                :search="true" :native="false" input-type="search"
+                                                                :items="options.extensions" value-prop="value"
+                                                                label-prop="name" :search="true" :native="false"
+                                                                :strict="false" :create="true" input-type="search"
                                                                 autocomplete="off" :columns="{
 
                                                                     sm: {
                                                                         container: 4,
                                                                     },
-                                                                }" placeholder="Choose Ext/Number" :floating="false"
-                                                                @change="(newValue, oldValue, el$) => {
+                                                                }" placeholder="Choose or enter Ext/Number"
+                                                                :floating="false"
+                                                                description="Pick a tenant extension or type an extension from another PBX."
+                                                                @change="(newValue, oldValue, el$) => handleAuthIdChange(index, newValue, el$)" />
 
-                                                                    el$.form$.el$('device_lines').children$[index].children$['display_name'].update(newValue);
-                                                                    el$.form$.el$('device_lines').children$[index].children$['user_id'].update(newValue);
-
-
-                                                                }" />
-
-                                                            <StaticElement v-else name="external_auth_hint"
-                                                                label="Ext/Number"
+                                                            <TextElement v-else name="auth_id" label="Ext/Number"
+                                                                placeholder="Enter Ext/Number" :floating="false"
                                                                 :columns="{
 
                                                                     sm: {
                                                                         container: 4,
                                                                     },
-                                                                }">
-                                                                <div
-                                                                    class="flex h-9 items-center rounded-md bg-gray-100 px-3 text-sm text-gray-900 ring-1 ring-inset ring-gray-300">
-                                                                    Edit in Advanced Settings
-                                                                </div>
-                                                            </StaticElement>
+                                                                }"
+                                                                @change="(newValue, oldValue, el$) => handleAuthIdChange(index, newValue, el$)" />
 
                                                             <TextElement name="display_name" label="Display Name"
                                                                 :columns="{
@@ -278,6 +271,18 @@
                                                                         container: 3,
                                                                     },
                                                                 }" placeholder="Display Name" :floating="false" />
+
+                                                            <TextElement name="password" label="SIP Password"
+                                                                placeholder="Enter SIP password" :floating="false"
+                                                                :columns="{
+                                                                    sm: {
+                                                                        container: 4,
+                                                                    },
+                                                                }"
+                                                                :conditions="[
+                                                                    () => options?.permissions?.manage_device_line_password,
+                                                                    () => isExternalLine(index) || isManualAuthId(index),
+                                                                ]" />
 
                                                             <StaticElement label="&nbsp;" name="key_advanced" :columns="{
 
@@ -312,7 +317,7 @@
                                                                         :default="options.default_line_options?.user_id"
                                                                         :conditions="[
                                                                             () => options?.permissions?.manage_device_line_user_id,
-                                                                            () => form$.el$(`device_lines.${index}.line_type_id`)?.value === 'externalline'
+                                                                            () => isExternalLine(index) || isManualAuthId(index),
                                                                         ]" />
 
                                                                     <TextElement name="auth_id"
@@ -322,7 +327,7 @@
                                                                         :default="options.default_line_options?.auth_id"
                                                                         :conditions="[
                                                                             () => options?.permissions?.manage_device_line_auth_id,
-                                                                            () => form$.el$(`device_lines.${index}.line_type_id`)?.value === 'externalline'
+                                                                            () => isExternalLine(index) || isManualAuthId(index),
                                                                         ]" />
 
                                                                     <TextElement name="password"
@@ -332,7 +337,7 @@
                                                                         :default="options.default_line_options?.password"
                                                                         :conditions="[
                                                                             () => options?.permissions?.manage_device_line_password,
-                                                                            () => form$.el$(`device_lines.${index}.line_type_id`)?.value === 'externalline'
+                                                                            () => isExternalLine(index) || isManualAuthId(index),
                                                                         ]" />
 
                                                                     <TextElement name="server_address_primary"
@@ -595,6 +600,26 @@ function closeAdvSettings() {
 
 function isExternalLine(index) {
     return form$?.value?.el$(`device_lines.${index}.line_type_id`)?.value === 'externalline'
+}
+
+function isManualAuthId(index) {
+    if (isExternalLine(index)) {
+        return false
+    }
+
+    const authId = String(form$?.value?.el$(`device_lines.${index}.auth_id`)?.value ?? '').trim()
+    if (authId === '') {
+        return false
+    }
+
+    const extensions = props.options?.extensions ?? []
+    return !extensions.some((extension) => String(extension.value) === authId)
+}
+
+function handleAuthIdChange(index, newValue, el$) {
+    const line = el$.form$.el$('device_lines').children$[index]
+    line.children$['display_name'].update(newValue)
+    line.children$['user_id'].update(newValue)
 }
 
 const handleTabSelected = (activeTab, previousTab) => {

@@ -15,7 +15,7 @@
     $resolvedRtpInitialPort = $rtpInitialPort ?? $resolve('rtp_initial_port', '10000');
     $resolvedRtpPortQuantity = $rtpPortQuantity ?? $resolve('rtp_port_quantity', '1000');
     $resolvedVideoResolution = $videoResolution ?? $resolve('video_resolution', '6');
-    $resolvedDssLongPress = $resolve('dss_long_press_action', ($keyLayout ?? 'advanced') === 'advanced' ? '1' : '3');
+    $resolvedDssLongPress = $resolve('dss_long_press_action', '3');
     $talkingSoftkey = $resolve('softkey_talkingsoftkey', 'hold;xfer;conf;end;');
     $ringingSoftkey = $resolve('softkey_ringingsoftkey', 'accept;none;forward;reject;');
 @endphp
@@ -47,6 +47,9 @@
         <RTPPortQuantity>{{ $resolvedRtpPortQuantity }}</RTPPortQuantity>
         <RTPKeepAlive>{{ $resolve('rtp_keep_alive', '1') }}</RTPKeepAlive>
         <SelectYourTone>{{ $resolve('country_toneset', '13') }}</SelectYourTone>
+@if (!empty($videoEnabled) && $resolve('h264_packet_mode', '') !== '')
+        <H264PacketMode>{{ $resolve('h264_packet_mode') }}</H264PacketMode>
+@endif
         <capability>
             <AudioCodecSets>{{ $resolvedAudioCodecMap }}</AudioCodecSets>
 @if (!empty($videoEnabled))
@@ -60,8 +63,13 @@
     </mm>
     <sip>
         <SIPPort>{{ $sip_port ?? '5060' }}</SIPPort>
+@if ($resolve('enable_stun', '1') === '0')
+        <STUNServer></STUNServer>
+        <STUNPort>{{ $resolve('stun_port', '3478') }}</STUNPort>
+@else
         <STUNServer>{{ $resolve('stun_server', 'stun.l.google.com') }}</STUNServer>
         <STUNPort>{{ $resolve('stun_port', '19302') }}</STUNPort>
+@endif
         <STUNRefreshTime>{{ $resolve('stun_refresh_time', '50') }}</STUNRefreshTime>
         <SIPWaitStunTime>{{ $resolve('sip_wait_stun_time', '800') }}</SIPWaitStunTime>
         <EnableRFC4475>{{ $resolve('enable_rfc4475', '1') }}</EnableRFC4475>
@@ -83,7 +91,7 @@
 @endfor
     </sip>
     <call>
-        <port>
+        <port index="1">
             <EnableMultiLine>{{ $resolve('enable_multiline', '1') }}</EnableMultiLine>
             <CallWaiting>{{ $resolve('call_waiting', '1') }}</CallWaiting>
             <CallTransfer>{{ $resolve('call_transfer', '1') }}</CallTransfer>
@@ -93,6 +101,18 @@
             <EnableSelLine>{{ $resolve('enable_sel_line', '1') }}</EnableSelLine>
             <DefaultAnsMode>{{ $resolve('default_answer_mode', '2') }}</DefaultAnsMode>
             <DefaultDialMode>{{ $resolve('default_dial_mode', '2') }}</DefaultDialMode>
+@if ($profile === 'entry' || $profile === 'video')
+            <EnableDefLine>{{ $resolve('enable_def_line', '1') }}</EnableDefLine>
+@endif
+@if (!empty($videoEnabled))
+@if ($profile === 'video')
+            <AutoHandleVideo>{{ $resolve('auto_handle_video', '0') }}</AutoHandleVideo>
+            <EnableDefLine>{{ $resolve('enable_def_line', '1') }}</EnableDefLine>
+@else
+            <VideoDisplayMode>{{ $resolve('video_display_mode', '3') }}</VideoDisplayMode>
+            <AutoHandleVideo>{{ $resolve('auto_handle_video', '1') }}</AutoHandleVideo>
+@endif
+@endif
 @if ($resolve('auto_onhook', '') !== '')
             <AutoOnhook>{{ $resolve('auto_onhook') }}</AutoOnhook>
             <AutoOnhookTime>{{ $resolve('auto_onhook_time', '3') }}</AutoOnhookTime>
@@ -106,64 +126,104 @@
         </port>
     </call>
     <phone>
-        <MenuPassword>{{ $resolve('menu_password', '123') }}</MenuPassword>
+        <MenuPassword>{{ $resolve('menu_password', '') }}</MenuPassword>
         <LineDisplayFormat>{{ $resolve('line_display_format', '$name@$protocol$instance') }}</LineDisplayFormat>
         <EnableCallHistory>{{ $resolve('enable_call_history', '1') }}</EnableCallHistory>
         <SIPNotifyXML>{{ $resolve('sip_notify_xml', '1') }}</SIPNotifyXML>
         <XMLUpdateInterval>{{ $resolve('xml_update_interval', '30') }}</XMLUpdateInterval>
+@if ($profile === 'video')
+        <CallerDisplayT>{{ $resolve('caller_display_type', '6') }}</CallerDisplayT>
+        <EnableMWITone>{{ $resolve('enable_mwi_tone', '0') }}</EnableMWITone>
+@else
+        <CallerDisplayType>{{ $resolve('caller_display_type', '5') }}</CallerDisplayType>
+@if ($profile === 'entry')
+        <EnableMWITone>{{ $resolve('enable_mwi_tone', '0') }}</EnableMWITone>
+@endif
+@endif
         <display>
             <LCDTitle>{{ $resolve('greeting', 'InTrade') }}</LCDTitle>
+@if ($profile !== 'video' && $profile !== 'entry')
             <PhoneModel>{{ $modelLabel }}</PhoneModel>
+@endif
+            <LCDConstrast>{{ $resolve('lcd_contrast', '5') }}</LCDConstrast>
             <LCDLuminanceLevel>{{ $resolve('display_brightness_active', '12') }}</LCDLuminanceLevel>
-            <InactiveLuminanceLevel>{{ $resolve('display_brightness_inactive', '4') }}</InactiveLuminanceLevel>
+            <EnableEnergysaving>{{ $resolve('enable_energy_saving', '1') }}</EnableEnergysaving>
             <BacklightOffTime>{{ $resolve('display_inactivity_time', '45') }}</BacklightOffTime>
             <DefaultLanguage>{{ $resolve('default_language', 'en') }}</DefaultLanguage>
-@if ($resolve('lcd_contrast', '') !== '')
-            <LCDContrast>{{ $resolve('lcd_contrast') }}</LCDContrast>
-@endif
-@if ($resolve('caller_display_type', '') !== '')
-            <CallerDisplayType>{{ $resolve('caller_display_type') }}</CallerDisplayType>
-@endif
 @if ($resolve('display_call_duration', '') !== '')
             <DisplayCallDuration>{{ $resolve('display_call_duration') }}</DisplayCallDuration>
 @endif
-@if ($resolve('enable_energy_saving', '') !== '')
-            <EnableEnergysaving>{{ $resolve('enable_energy_saving') }}</EnableEnergysaving>
-@endif
         </display>
-        <voice>
+        <volume>
             <RingType>{{ $resolve('default_ringtone', 'Type 2') }}</RingType>
-@if ($resolve('default_ringtone_ext', '') !== '')
-            <RingTypeExt>{{ $resolve('default_ringtone_ext') }}</RingTypeExt>
-@endif
-@if ($resolve('default_ringtone_ext2', '') !== '')
-            <RingTypeExt2>{{ $resolve('default_ringtone_ext2') }}</RingTypeExt2>
-@endif
-@if ($resolve('enable_mwi_tone', '') !== '')
+@if ($profile !== 'video' && $profile !== 'entry' && $resolve('enable_mwi_tone', '') !== '')
             <EnableMWITone>{{ $resolve('enable_mwi_tone') }}</EnableMWITone>
 @endif
-        </voice>
+        </volume>
         <date>
             <EnableSNTP>{{ $resolve('enable_sntp', '1') }}</EnableSNTP>
             <SNTPServer>{{ $settings['ntp_server_primary'] ?? '0.pool.ntp.org' }}</SNTPServer>
-            <SecondSNTP>{{ $settings['ntp_server_secondary'] ?? 'time.nist.gov' }}</SecondSNTP>
+            <SecondSNTPServer>{{ $settings['ntp_server_secondary'] ?? 'time.nist.gov' }}</SecondSNTPServer>
             <TimeZone>{{ $resolve('time_zone', '32') }}</TimeZone>
             <TimeZoneName>{{ $resolve('time_zone_name', 'UTC+8') }}</TimeZoneName>
-            <Enable_DST>{{ $resolve('enable_dst', '0') }}</Enable_DST>
-            <DSTFixedType>{{ $resolve('dst_fixed_type', '0') }}</DSTFixedType>
-            <Location>{{ $resolve('location', '4') }}</Location>
-            <MinuteOffset>{{ $resolve('dst_minute_offset', '60') }}</MinuteOffset>
+            <DSTType>{{ $resolve('enable_dst', '0') }}</DSTType>
+            <DSTLocation>{{ $resolve('location', '0') }}</DSTLocation>
+            <DSTRuleMode>{{ $resolve('dst_fixed_type', '0') }}</DSTRuleMode>
+            <DSTMinOffset>{{ $resolve('dst_minute_offset', '60') }}</DSTMinOffset>
+        </date>
+        <timeDisplay>
+            <EnableTimeDisplay>0</EnableTimeDisplay>
             <TimeDisplayStyle>{{ $resolve('time_display', '0') }}</TimeDisplayStyle>
             <DateDisplayStyle>{{ $resolve('date_display', '6') }}</DateDisplayStyle>
             <DateSeparator>{{ $resolve('date_separator', '0') }}</DateSeparator>
-        </date>
-        <softkey>
+        </timeDisplay>
+@if ($profile === 'video')
+        <softKeyConfig>
+            <SoftkeyMode>{{ $resolve('softkey_mode', '0') }}</SoftkeyMode>
             <SoftKeyExitStyle>{{ $resolve('softkey_exit', '2') }}</SoftKeyExitStyle>
             <DesktopSoftkey>{{ $resolve('softkey_desktopsoftkey', 'history;contact;dnd;menu;') }}</DesktopSoftkey>
             <TalkingSoftkey>{{ $talkingSoftkey }}</TalkingSoftkey>
             <RingingSoftkey>{{ $ringingSoftkey }}</RingingSoftkey>
+            <AlertingSoftkey>{{ $resolve('softkey_alertingsoftkey', 'dialpad;xfer;cancel;') }}</AlertingSoftkey>
+            <ConferenceSoftkey>{{ $resolve('softkey_conferencesoftkey', 'conf;dialpad;end;split;hold;mute;exit;') }}</ConferenceSoftkey>
+            <DialerPreSoftkey>{{ $resolve('softkey_dialerpresoftkey', 'audio;video;redial;') }}</DialerPreSoftkey>
+            <DialerCallSoftkey>{{ $resolve('softkey_dialercallsoftkey', 'audio;video;redial;') }}</DialerCallSoftkey>
+            <DialerXferSoftkey>{{ $resolve('softkey_dialerxfersoftkey', 'audio;video;xfer;contact;history;cancel;') }}</DialerXferSoftkey>
+            <DialerCfwdSoftkey>{{ $resolve('softkey_dialercfwdsoftkey', 'contact;history;forward;cancel;') }}</DialerCfwdSoftkey>
+            <DesktopClick>{{ $resolve('softkey_desktopclick', 'none;none;none;none;none;') }}</DesktopClick>
+        </softKeyConfig>
+@else
+        <softkey>
+            <SoftkeyMode>{{ $resolve('softkey_mode', '0') }}</SoftkeyMode>
+            <SoftKeyExitStyle>{{ $resolve('softkey_exit', '2') }}</SoftKeyExitStyle>
+            <DesktopSoftkey>{{ $resolve('softkey_desktopsoftkey', 'history;contact;dnd;menu;') }}</DesktopSoftkey>
+            <TalkingSoftkey>{{ $talkingSoftkey }}</TalkingSoftkey>
+@if ($profile === 'entry')
+            <RingingSoftkey>{{ $ringingSoftkey }}</RingingSoftkey>
+            <AlertingSoftkey>{{ $resolve('softkey_alertingsoftkey', 'end;none;none;none;') }}</AlertingSoftkey>
+            <XAlertingSoftkey>{{ $resolve('softkey_xalertingsoftkey', 'end;none;none;xfer;') }}</XAlertingSoftkey>
+            <ConferenceSoftkey>{{ $resolve('softkey_conferencesoftkey', 'hold;none;split;end;') }}</ConferenceSoftkey>
+            <WaitingSoftkey>{{ $resolve('softkey_waitingsoftkey', 'xfer;accept;reject;end;') }}</WaitingSoftkey>
+            <EndingSoftkey>{{ $resolve('softkey_endingsoftkey', 'repeat;none;none;end;') }}</EndingSoftkey>
+            <DialerPreSoftkey>{{ $resolve('softkey_dialerpresoftkey', 'send;2aB;delete;exit;') }}</DialerPreSoftkey>
+            <DialerCallSoftkey>{{ $resolve('softkey_dialercallsoftkey', 'send;2aB;delete;exit;') }}</DialerCallSoftkey>
+            <DialerXferSoftkey>{{ $resolve('softkey_dialerxfersoftkey', 'delete;xfer;send;exit;') }}</DialerXferSoftkey>
+            <DialerCfwdSoftkey>{{ $resolve('softkey_dialercfwdsoftkey', 'send;2aB;delete;exit;') }}</DialerCfwdSoftkey>
             <DesktopClick>{{ $resolve('softkey_desktopclick', 'history;status;none;none;none;') }}</DesktopClick>
+            <DailerClick>{{ $resolve('softkey_dailerclick', 'pline;nline;none;none;none;') }}</DailerClick>
+            <DesktopLongPress>{{ $resolve('softkey_desktoplongpress', 'status;none;none;none;reset;') }}</DesktopLongPress>
+            <DialerConfSoftkey>{{ $resolve('softkey_dialerconfsoftkey', 'contact;clogs;redial;video;cancel;') }}</DialerConfSoftkey>
+@else
+@if (!empty($videoEnabled))
+            <TalkingVideoSoftkey>{{ $resolve('softkey_talkingvideosoftkey', 'hold;xfer;switch;end;') }}</TalkingVideoSoftkey>
+            <DialerPreSoftkey>{{ $resolve('softkey_dialerpresoftkey', 'audio;video;save;exit;') }}</DialerPreSoftkey>
+            <DialerCallSoftkey>{{ $resolve('softkey_dialercallsoftkey', 'send;2aB;delete;exit;') }}</DialerCallSoftkey>
+@endif
+            <RingingSoftkey>{{ $ringingSoftkey }}</RingingSoftkey>
+            <DesktopClick>{{ $resolve('softkey_desktopclick', 'history;status;none;none;none;') }}</DesktopClick>
+@endif
         </softkey>
+@endif
 @include('provisioning.ibratro.partials.xml-contacts', [
     'settings' => $settings,
     'domain_name' => $domain_name ?? '',
@@ -231,28 +291,52 @@
         <DSCPRTPVideo>{{ $resolve('dscp_rtp_video', '34') }}</DSCPRTPVideo>
     </qos>
 @if ($resolve('syslog_enable', '0') === '1')
-    <syslog>
-        <Enable>1</Enable>
-        <Server>{{ $resolve('syslog_server', '0.0.0.0') }}</Server>
-        <Port>{{ $resolve('syslog_server_port', '514') }}</Port>
-    </syslog>
+    <log>
+        <EnableSyslog>1</EnableSyslog>
+        <SyslogServer>{{ $resolve('syslog_server', '0.0.0.0') }}</SyslogServer>
+        <SyslogServerPort>{{ $resolve('syslog_server_port', '514') }}</SyslogServerPort>
+    </log>
 @endif
-    <ui>
+@if ($profile === 'video')
+    <uiMainTainConfig>
+        <TimeoutToScreensaver>{{ $resolve('timeout_to_screensaver', '7200') }}</TimeoutToScreensaver>
+        <MissedCallPopup>0</MissedCallPopup>
+        <MWIPopup>0</MWIPopup>
+        <DeviceConnectPopup>0</DeviceConnectPopup>
+        <SMSPopup>0</SMSPopup>
+        <OtherPopup>1</OtherPopup>
+        <DisplayProvisionprompt>0</DisplayProvisionprompt>
+    </uiMainTainConfig>
+@elseif ($profile === 'entry')
+    <UIconfig>
+        <DisplayLanguage>{{ $resolve('display_language', 'en;cn;tc;ru;it;fr;de;he;es;cat;eus;gal;tr;hr;slo;cz;nl;ko;ua;pt;pl;ar;jp;kr;') }}</DisplayLanguage>
+        <Currentmaterialversion>0x01000000</Currentmaterialversion>
+    </UIconfig>
+    <background>
+        <TimeoutToScreensaver>{{ $resolve('timeout_to_screensaver', '0') }}</TimeoutToScreensaver>
+        <MissedCallPopup>1</MissedCallPopup>
+        <MWIPopup>1</MWIPopup>
+        <DeviceConnectPopup>1</DeviceConnectPopup>
+        <SMSPopup>1</SMSPopup>
+        <OtherPopup>1</OtherPopup>
+        <DisplayProvisionprompt>0</DisplayProvisionprompt>
+        <PowerSaving>1</PowerSaving>
+        <TimeoutToPowerSaving>{{ $resolve('timeout_to_power_saving', '360') }}</TimeoutToPowerSaving>
+    </background>
+@else
+    <UIconfig>
         <BluetoothEnabled>{{ $resolve('bluetooth_enabled', '1') }}</BluetoothEnabled>
         <BluetoothAdapterName>{{ $modelLabel }}</BluetoothAdapterName>
-@if ($resolve('bluetooth_ring_mode', '') !== '')
-        <BluetoothRingMode>{{ $resolve('bluetooth_ring_mode') }}</BluetoothRingMode>
-@endif
-@if ($resolve('power_saving', '') !== '')
-        <PowerSaving>{{ $resolve('power_saving') }}</PowerSaving>
-@endif
-@if ($resolve('screensaver_type', '') !== '')
-        <ScreensaverType>{{ $resolve('screensaver_type') }}</ScreensaverType>
+        <BluetoothRingMode>{{ $resolve('bluetooth_ring_mode', '1') }}</BluetoothRingMode>
+    </UIconfig>
+    <background>
         <TimeoutToScreensaver>{{ $resolve('timeout_to_screensaver', '7200') }}</TimeoutToScreensaver>
+        <PowerSaving>{{ $resolve('power_saving', '1') }}</PowerSaving>
         <TimeoutToPowerSaving>{{ $resolve('timeout_to_power_saving', '7200') }}</TimeoutToPowerSaving>
-@endif
+        <ScreensaverType>{{ $resolve('screensaver_type', '1') }}</ScreensaverType>
 @if ($resolve('app_icon_display', '') !== '')
         <AppIconDisplay>{{ $resolve('app_icon_display') }}</AppIconDisplay>
 @endif
-    </ui>
+    </background>
+@endif
 </sysConf>
