@@ -39,7 +39,10 @@ class StoreVContactRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        $this->merge($this->sanitizedCoreFields());
+        $this->merge(array_merge(
+            $this->sanitizedCoreFields(),
+            $this->sanitizedCallingCardFields(),
+        ));
     }
 
     protected function coreRules(): array
@@ -174,6 +177,26 @@ class StoreVContactRequest extends FormRequest
 
         if ($this->has('contact_note')) {
             $sanitized['contact_note'] = trim((string) $this->input('contact_note')) ?: null;
+        }
+
+        return $sanitized;
+    }
+
+    private function sanitizedCallingCardFields(): array
+    {
+        $sanitized = [];
+
+        foreach ([
+            'calling_card_username',
+            'calling_card_password',
+            'calling_card_pinless_number',
+        ] as $field) {
+            if (! $this->has($field)) {
+                continue;
+            }
+
+            $value = preg_replace('/\D+/', '', (string) $this->input($field, '')) ?? '';
+            $sanitized[$field] = $value === '' ? null : $value;
         }
 
         return $sanitized;

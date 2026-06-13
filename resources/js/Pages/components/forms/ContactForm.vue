@@ -808,6 +808,12 @@ const contactSubmitFields = [
 const includeVisibilityFields = () => showVisibilityTab.value;
 const includeCallingCardFields = () => showCallingCardTab.value && permissions.value.setting_edit;
 
+const callingCardEnabled = (data) => {
+    const value = data?.calling_card_enabled;
+
+    return value === true || value === 1 || value === "1" || value === "true";
+};
+
 const buildRequestData = (form$) => {
     const data = form$.data;
 
@@ -819,7 +825,19 @@ const buildRequestData = (form$) => {
                 }
 
                 if (field.startsWith("calling_card_")) {
-                    return includeCallingCardFields();
+                    if (!includeCallingCardFields()) {
+                        return false;
+                    }
+
+                    if (
+                        field !== "calling_card_enabled"
+                        && field !== "calling_card_mode"
+                        && !callingCardEnabled(data)
+                    ) {
+                        return false;
+                    }
+
+                    return true;
                 }
 
                 return field in data;
