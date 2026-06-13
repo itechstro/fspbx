@@ -1037,6 +1037,47 @@ if (!function_exists('formatPhoneNumber')) {
     }
 }
 
+if (!function_exists('formatContactPhoneE164')) {
+    /**
+     * Normalize a contact phone value to E.164 (+country + national number) for CloudPLAY sync.
+     */
+    function formatContactPhoneE164(?string $phoneNumber, ?string $domainUuid = null): string
+    {
+        $phoneNumber = trim((string) $phoneNumber);
+
+        if ($phoneNumber === '') {
+            return '';
+        }
+
+        $region = 'US';
+
+        if ($domainUuid) {
+            $region = strtoupper((string) (get_domain_setting('country', $domainUuid) ?: 'US'));
+        }
+
+        $phoneNumberUtil = PhoneNumberUtil::getInstance();
+
+        try {
+            $phoneNumberObject = $phoneNumberUtil->parse($phoneNumber, $region);
+
+            if ($phoneNumberUtil->isValidNumber($phoneNumberObject)) {
+                return $phoneNumberUtil->format($phoneNumberObject, PhoneNumberFormat::E164);
+            }
+        } catch (NumberParseException $e) {
+            // fall through to digit-only fallback
+        }
+
+        return preg_replace('/\D+/', '', $phoneNumber) ?? '';
+    }
+}
+
+if (!function_exists('phoneNumberDigits')) {
+    function phoneNumberDigits(?string $phoneNumber): string
+    {
+        return preg_replace('/\D+/', '', (string) $phoneNumber) ?? '';
+    }
+}
+
 if (!function_exists('debugEloquentSqlWithBindings')) {
     function debugEloquentSqlWithBindings($query)
     {

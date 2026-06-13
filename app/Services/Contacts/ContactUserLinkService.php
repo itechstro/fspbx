@@ -84,6 +84,74 @@ class ContactUserLinkService
         return $this->resolvePhoneNumberForContactByLabel($contact, 'work');
     }
 
+    public function resolveEmailForContact(VContact $contact): string
+    {
+        $contact->loadMissing('emails');
+
+        foreach ($contact->emails as $email) {
+            if (! $this->isPrimaryFlag($email->email_primary)) {
+                continue;
+            }
+
+            $address = trim((string) $email->email_address);
+
+            if ($address !== '') {
+                return $address;
+            }
+        }
+
+        foreach ($contact->emails as $email) {
+            if (strtolower((string) $email->email_label) !== 'work') {
+                continue;
+            }
+
+            $address = trim((string) $email->email_address);
+
+            if ($address !== '') {
+                return $address;
+            }
+        }
+
+        foreach ($contact->emails as $email) {
+            $address = trim((string) $email->email_address);
+
+            if ($address !== '') {
+                return $address;
+            }
+        }
+
+        return '';
+    }
+
+    public function resolveEmailForUser(User $user): string
+    {
+        $contact = $this->resolvePhonebookContactForUser($user);
+
+        return $contact ? $this->resolveEmailForContact($contact) : '';
+    }
+
+    public function resolveEmailForExtension(Extensions $extension): string
+    {
+        $contact = $this->resolvePhonebookContactForExtension($extension);
+
+        if ($contact) {
+            $email = $this->resolveEmailForContact($contact);
+
+            if ($email !== '') {
+                return $email;
+            }
+        }
+
+        return trim((string) ($extension->email ?? ''));
+    }
+
+    public function resolveEmailForExtensionDirect(Extensions $extension): string
+    {
+        $contact = $this->resolvePhonebookContactForExtensionDirect($extension);
+
+        return $contact ? $this->resolveEmailForContact($contact) : '';
+    }
+
     public function resolvePhoneNumberForContactByLabel(VContact $contact, string $label): string
     {
         $contact->loadMissing('phones');
@@ -94,10 +162,10 @@ class ContactUserLinkService
                 continue;
             }
 
-            $digits = preg_replace('/\D+/', '', (string) $phone->phone_number);
+            $normalized = formatContactPhoneE164((string) $phone->phone_number, $contact->domain_uuid);
 
-            if ($digits !== '') {
-                return $digits;
+            if ($normalized !== '') {
+                return $normalized;
             }
         }
 
@@ -606,6 +674,7 @@ class ContactUserLinkService
             'name' => (string) $contact->display_name,
             'mobile' => $this->resolveMobileNumberForExtension($extension),
             'work' => $this->resolveWorkNumberForExtension($extension),
+            'email' => $this->resolveEmailForExtension($extension),
             'user_labels' => array_values(array_unique($userLabels)),
             'link_type' => $linkType,
         ];
@@ -845,5 +914,10 @@ class ContactUserLinkService
         }
 
         app(CloudPlayEnterpriseDirectorySync::class)->removeDuplicateEnterpriseEntries($domainUuid);
+    }
+
+    private function isPrimaryFlag(mixed $value): bool
+    {
+        return in_array($value, [1, '1', true, 'true'], true);
     }
 }

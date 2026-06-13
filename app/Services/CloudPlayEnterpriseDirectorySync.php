@@ -55,7 +55,7 @@ class CloudPlayEnterpriseDirectorySync
             $edId = $this->cloudPlay->syncEnterpriseDirectory($mobileApp->domain_uuid, [
                 'ed_id' => $resolvedEdId,
                 'name' => $extension->effective_caller_id_name,
-                'email' => $extension->email ?: '',
+                'email' => app(ContactUserLinkService::class)->resolveEmailForExtension($extension),
                 'extension' => $extension->extension,
                 'caller_id_number' => $extension->effective_caller_id_number,
                 'business_phone' => $this->cloudPlay->resolveExtensionBusinessPhoneNumber($extension),
@@ -124,7 +124,7 @@ class CloudPlayEnterpriseDirectorySync
         $edId = $this->cloudPlay->syncEnterpriseDirectory($extension->domain_uuid, [
             'ed_id' => $resolvedEdId,
             'name' => $extension->effective_caller_id_name,
-            'email' => $extension->email ?: '',
+            'email' => app(ContactUserLinkService::class)->resolveEmailForExtension($extension),
             'extension' => $extension->extension,
             'caller_id_number' => $extension->effective_caller_id_number,
             'business_phone' => $this->cloudPlay->resolveExtensionBusinessPhoneNumber($extension),
@@ -221,7 +221,7 @@ class CloudPlayEnterpriseDirectorySync
         $this->deactivateLegacyContactEnterpriseEntries($contact);
 
         $resolvedEdId = (int) ($contact->cloudplay_ed_id ?? 0);
-        $email = $contact->emails->first()?->email_address ?? '';
+        $email = $link->resolveEmailForContact($contact);
 
         try {
             $edId = $this->cloudPlay->syncEnterpriseDirectory($contact->domain_uuid, [
@@ -280,9 +280,9 @@ class CloudPlayEnterpriseDirectorySync
                 continue;
             }
 
-            $entryMobile = preg_replace('/\D+/', '', (string) ($entry['ed_mobile'] ?? ''));
+            $entryMobile = phoneNumberDigits((string) ($entry['ed_mobile'] ?? ''));
 
-            if ($entryMobile === '' || $entryMobile !== $mobile) {
+            if ($entryMobile === '' || $entryMobile !== phoneNumberDigits($mobile)) {
                 continue;
             }
 

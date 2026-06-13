@@ -871,7 +871,7 @@ class CloudPlayApiService implements MobileAppProviderInterface
         $extension = (string) ($params['extension'] ?? '');
         $profileId = $params['profile_id'] ?? $this->getProfileId($domainUuid);
         $callerId = preg_replace('/\D+/', '', (string) ($params['caller_id_number'] ?? ''));
-        $businessPhone = $this->normalizePhoneDigits($params['business_phone'] ?? '');
+        $businessPhone = $this->normalizePhoneForCloudPlay($params['business_phone'] ?? '', $domainUuid);
 
         if ($businessPhone === '' && ($params['active'] ?? true)) {
             $businessPhone = $callerId;
@@ -892,7 +892,7 @@ class CloudPlayApiService implements MobileAppProviderInterface
             'ed_other_number' => '',
             'ed_blf_prefix' => $extension,
             'ed_email_id' => (string) ($params['email'] ?? ''),
-            'ed_mobile' => $this->normalizePhoneDigits($params['mobile'] ?? ''),
+            'ed_mobile' => $this->normalizePhoneForCloudPlay($params['mobile'] ?? '', $domainUuid),
             'ed_landline' => '',
             'ed_extension' => $extension,
             'ed_profile_id' => $profileId ? (string) $profileId : '',
@@ -925,8 +925,8 @@ class CloudPlayApiService implements MobileAppProviderInterface
             ->resolveWorkNumberForExtensionDirect($extension);
     }
 
-    protected function normalizePhoneDigits(?string $number): string
+    protected function normalizePhoneForCloudPlay(?string $number, string $domainUuid): string
     {
-        return preg_replace('/\D+/', '', (string) $number);
+        return formatContactPhoneE164($number, $domainUuid);
     }
 }
