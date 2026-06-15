@@ -4,11 +4,9 @@ namespace Modules\ContactCenter\Http\Controllers;
 
 use App\Models\CDR;
 use Inertia\Inertia;
-use App\Models\Dialplans;
 use App\Models\Recordings;
 use App\Models\FusionCache;
 use App\Models\MusicOnHold;
-use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use App\Models\CallCenterAgents;
@@ -18,7 +16,7 @@ use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
 use App\Models\CallCenterQueueAgents;
 use Illuminate\Support\Facades\Cache;
-use App\Services\BasicQueueService;
+use App\Services\ContactCenterQueueService;
 use App\Services\FreeswitchEslService;
 use App\Services\CallRoutingOptionsService;
 use Illuminate\Support\Facades\Session;
@@ -1092,88 +1090,15 @@ class DashboardController extends Controller
      */
     public function create()
     {
-        $callCenterQueue = new CallCenterQueues();
-        $callCenterQueue->queue_name = 'New Contact Center';
-
-        // Retrieve the highest queue_extension number
-        $highestQueueExtension = CallCenterQueues::where('domain_uuid', Session::get('domain_uuid'))
-            ->max('queue_extension');
-
-        // Make new extention by icrementing previous highest
-        if ($highestQueueExtension) {
-            $callCenterQueue->queue_extension = $highestQueueExtension + 1;
-        } else {
-            $callCenterQueue->queue_extension = 9000;
+        try {
+            $callCenterQueue = app(ContactCenterQueueService::class)->createShellQueue();
+        } catch (\RuntimeException $exception) {
+            return redirect()
+                ->route('contactcenter.settings.list')
+                ->with('error', $exception->getMessage());
         }
-
-        // Generate Dialplan XML file
-        $xml = $this->generateDialPlanXML($callCenterQueue);
-
-        // Create new dialplan
-        $dialPlan = new Dialplans();
-        $dialPlan->app_uuid = '95788e50-9500-079e-2807-fd530b0ea370';
-        $dialPlan->domain_uuid = Session::get('domain_uuid');
-        $dialPlan->dialplan_name = $callCenterQueue->queue_name;
-        $dialPlan->dialplan_number = $callCenterQueue->queue_extension;
-        //$dialPlan->dialplan_destination = '';
-        $dialPlan->dialplan_context = Session::get('domain_name');
-        $dialPlan->dialplan_continue = 'false';
-        $dialPlan->dialplan_xml = $xml;
-        // $dialPlan->dialplan_xml = '';
-        $dialPlan->dialplan_order = 230;
-        $dialPlan->dialplan_enabled = 'true';
-        $dialPlan->dialplan_description = $callCenterQueue->queue_description;
-        $dialPlan->save();
-
-        $callCenterQueue->dialplan_uuid = $dialPlan->dialplan_uuid;
-
-        $callCenterQueue->save();
-
-        if (session_status() == PHP_SESSION_NONE || session_id() == '') {
-            session_start();
-            //clear the cache
-            FusionCache::clear('configuration:callcenter.conf*');
-        }
-
-        // Generate freeswitch xml file
-        // save_call_center_xml();
-
-        // Load Freeswitch config
-        $fp = event_socket_create(
-            config('eventsocket.ip'),
-            config('eventsocket.port'),
-            config('eventsocket.password')
-        );
-
-        // Start new queue
-        event_socket_request($fp, 'api reloadxml');
-        event_socket_request($fp, sprintf(
-            'api callcenter_config queue load %s@%s',
-            $callCenterQueue->queue_extension,
-            Session::get('domain_name')
-        ));
-        fclose($fp);
 
         return redirect()->route('contactcenter.settings.show', ['callCenterQueues' => $callCenterQueue]);
-    }
-
-    private function generateDialPlanXML(CallCenterQueues $callCenterQueue)
-    {
-        // Data to pass to the Blade template
-        $data = [
-            'queue' => $callCenterQueue,
-        ];
-
-        if ($callCenterQueue->queue_greeting != '') {
-            $path = Session::get('domain_name') . '/' . $callCenterQueue->queue_greeting;
-            if (Storage::disk('recordings')->exists($path)) {
-                $recording_path = Storage::disk('recordings')->path($path);
-                $data = array_merge($data, ['recording_path' => $recording_path]);
-            }
-        }
-
-        // Render the Blade template and get the XML content as a string
-        return view('contactcenter::layouts.xml.contact-center-dial-plan-template', $data)->render();
     }
 
     protected function getTimezone()
@@ -1225,208 +1150,17 @@ class DashboardController extends Controller
      */
     public function update(UpdateSettingsRequest $request, CallCenterQueues $callCenterQueues)
     {
-        /*$this->destinationTimeoutCategorySelected = false;
-
-        $settingsArray = [];
-        parse_str($settings, $settingsArray);
-
-        if(isset($settingsArray['queue_greeting']) && $settingsArray['queue_greeting'] == 'disabled') {
-            $settingsArray['queue_greeting'] = null;
-        }
-
-        if(isset($settingsArray['queue_announce_sound']) && $settingsArray['queue_announce_sound'] == 'null') {
-            $settingsArray['queue_announce_sound'] = null;
-        }
-
-        $validator = Validator::make(
-            $settingsArray,
-            $this->rules(),
-            $this->messages()
+        $queue = app(ContactCenterQueueService::class)->saveFromContactCenterSettings(
+            $request->validated(),
+            $callCenterQueues,
         );
-
-        if ($validator->fails()) {
-            $this->dispatch('savedError', $validator->errors());
-            return;
-        }*/
-
-        $attributes = $request->validated();
-
-        // if ($settingsArray['queue_time_base_score_sec'] != '') $callCenterQueues->queue_time_base_score = $settingsArray['queue_time_base_score'];
-        if ($callCenterQueues->dialplan_uuid == '') {
-            $callCenterQueues->dialplan_uuid = Str::uuid();
-        }
-
-        $callCenterQueues->queue_name = $attributes['queue_name'];
-        $callCenterQueues->queue_extension = $attributes['queue_extension'];
-        $callCenterQueues->queue_greeting = $attributes['queue_greeting'] ?? '';
-        $callCenterQueues->queue_description = $attributes['queue_description'] ?? '';
-        $callCenterQueues->queue_strategy = $attributes['queue_strategy'];
-
-        if (($attributes['queue_max_wait_time'] ?? '') !== '') {
-            $callCenterQueues->queue_max_wait_time = $attributes['queue_max_wait_time'];
-        }
-
-        if (($attributes['queue_max_wait_time_with_no_agent'] ?? '') !== '') {
-            $callCenterQueues->queue_max_wait_time_with_no_agent = $attributes['queue_max_wait_time_with_no_agent'];
-        }
-
-        $callCenterQueues->queue_cc_exit_keys = $attributes['queue_cc_exit_keys'] ?? '';
-        $callCenterQueues->queue_timeout_action = $attributes['queue_timeout_action'] ?? '';
-        $callCenterQueues->queue_time_base_score = $attributes['queue_time_base_score'];
-
-        if (($attributes['queue_time_base_score_sec'] ?? '') !== '') {
-            $callCenterQueues->queue_time_base_score_sec = $attributes['queue_time_base_score_sec'];
-        }
-
-        $callCenterQueues->queue_tier_rules_apply = $attributes['queue_tier_rules_apply'];
-
-        if (($attributes['queue_tier_rule_wait_second'] ?? '') !== '') {
-            $callCenterQueues->queue_tier_rule_wait_second = $attributes['queue_tier_rule_wait_second'];
-        }
-
-        $callCenterQueues->queue_tier_rule_wait_multiply_level = $attributes['queue_tier_rule_wait_multiply_level'];
-        $callCenterQueues->queue_tier_rule_no_agent_no_wait = $attributes['queue_tier_rule_no_agent_no_wait'];
-        $callCenterQueues->queue_email_address = $attributes['queue_email_address'] ?? '';
-
-        if (($attributes['queue_discard_abandoned_after'] ?? '') !== '') {
-            $callCenterQueues->queue_discard_abandoned_after = $attributes['queue_discard_abandoned_after'];
-        }
-
-        $callCenterQueues->queue_abandoned_resume_allowed = $attributes['queue_abandoned_resume_allowed'];
-        $callCenterQueues->queue_cid_prefix = $attributes['queue_cid_prefix'] ?? '';
-
-        if (isset($attributes['queue_moh_sound'])) {
-            $mohSound = $attributes['queue_moh_sound'];
-
-            if (str_starts_with((string) $mohSound, 'local_stream://') || $mohSound === '${us-ring}' || $mohSound === 'null') {
-                $callCenterQueues->queue_moh_sound = $mohSound === 'null' ? null : $mohSound;
-            } else {
-                $path = Session::get('domain_name') . '/' . $mohSound;
-                $callCenterQueues->queue_moh_sound = Storage::disk('recordings')->path($path);
-            }
-        } else {
-            $callCenterQueues->queue_moh_sound = '';
-        }
-
-        if (!empty($attributes['queue_announce_sound']) && $attributes['queue_announce_sound'] != 'null') {
-            $path = Session::get('domain_name') . '/' . $attributes['queue_announce_sound'];
-            $callCenterQueues->queue_announce_sound = Storage::disk('recordings')->path($path);
-        } else {
-            $callCenterQueues->queue_announce_sound = '';
-        }
-
-        if (($attributes['queue_announce_frequency'] ?? '') !== '') {
-            $callCenterQueues->queue_announce_frequency = $attributes['queue_announce_frequency'];
-        }
-
-        if (($attributes['queue_record_template'] ?? 'false') === 'true') {
-            $path = Session::get('domain_name') . '/archive/${strftime(%Y)}/${strftime(%b)}/${strftime(%d)}/${uuid}.${record_ext}';
-            $callCenterQueues->queue_record_template = Storage::disk('recordings')->path($path);
-        } else {
-            $callCenterQueues->queue_record_template = '';
-        }
-
-        $callCenterQueues->queue_timeout_action = $attributes['queue_timeout_action'] ?? '';
-        $callCenterQueues->queue_announce_position = $attributes['queue_announce_position'];
-        $callCenterQueues->queue_max_wait_time_with_no_agent_time_reached = $attributes['queue_max_wait_time_with_no_agent_time_reached'];
-        $callCenterQueues->update_date = date('Y-m-d H:i:s');
-        $callCenterQueues->update_user = Session::get('user_uuid');
-        $callCenterQueues->save();
-
-        if (isset($attributes['tiers']) && is_array($attributes['tiers'])) {
-            $tiers = $attributes['tiers'];
-            $firstTier = reset($tiers);
-
-            if (is_array($firstTier) && array_key_exists('call_center_agent_uuid', $firstTier)) {
-                app(BasicQueueService::class)->syncTiersForQueue($callCenterQueues, array_values($tiers));
-            } else {
-                foreach ($tiers as $agentUuid => $tier) {
-                    $queueAgent = CallCenterQueueAgents::where('call_center_agent_uuid', $agentUuid)
-                        ->where('call_center_queue_uuid', $callCenterQueues->call_center_queue_uuid)
-                        ->where('domain_uuid', Session::get('domain_uuid'))
-                        ->first();
-
-                    if (! $queueAgent) {
-                        continue;
-                    }
-
-                    $queueAgent->tier_level = (int) ($tier['level'] ?? $tier['tier_level'] ?? 0);
-                    $queueAgent->tier_position = (int) ($tier['position'] ?? $tier['tier_position'] ?? 0);
-                    $queueAgent->save();
-                }
-            }
-        }
-
-        // Generate Dialplan XML file
-        $xml = $this->generateDialPlanXML($callCenterQueues);
-        $dialPlan = Dialplans::where('dialplan_uuid', $callCenterQueues->dialplan_uuid)->first();
-
-        if (!$dialPlan) {
-            $dialPlan = new Dialplans();
-            $dialPlan->dialplan_uuid = $callCenterQueues->dialplan_uuid;
-            $dialPlan->app_uuid = '95788e50-9500-079e-2807-fd530b0ea370';
-            $dialPlan->domain_uuid = Session::get('domain_uuid');
-            $dialPlan->dialplan_name = $callCenterQueues->queue_name;
-            $dialPlan->dialplan_number = $callCenterQueues->queue_extension;
-            //$dialPlan->dialplan_destination = '';
-            $dialPlan->dialplan_context = Session::get('domain_name');
-            $dialPlan->dialplan_continue = 'false';
-            $dialPlan->dialplan_xml = $xml;
-            $dialPlan->dialplan_order = 230;
-            $dialPlan->dialplan_enabled = 'true';
-            $dialPlan->dialplan_description = $callCenterQueues->queue_description;
-        } else {
-            $dialPlan->dialplan_xml = $xml;
-            $dialPlan->dialplan_name = $callCenterQueues->queue_name;
-            $dialPlan->dialplan_number = $callCenterQueues->queue_extension;
-            $dialPlan->update_date = date('Y-m-d H:i:s');
-            $dialPlan->update_user = Session::get('user_uuid');
-        }
-
-        $dialPlan->save();
-
-        $this->reloadQueue($callCenterQueues->queue_extension);
-
-        unset($attributes, $dialPlan, $xml, $queueAgent);
 
         return response()->json([
             'status' => 'success',
-            'call_center_queue' => $callCenterQueues->call_center_queue_uuid,
+            'call_center_queue' => $queue->call_center_queue_uuid,
             'message' => 'ContactCenter has been saved',
             'messages' => ['success' => ['Contact center saved.']],
         ]);
-    }
-
-    public function reloadQueue($queue_extension)
-    {
-        // $this->destinationTimeoutCategorySelected = false;
-
-        // connect to Freeswitch
-        $fp = event_socket_create(
-            config('eventsocket.ip'),
-            config('eventsocket.port'),
-            config('eventsocket.password')
-        );
-
-        //clear fusionpbx cache
-        if (session_status() == PHP_SESSION_NONE || session_id() == '') {
-            session_start();
-            if (isset($_SESSION['destinations']['array'])) {
-                unset($_SESSION['destinations']['array']);
-            }
-        }
-
-        //clear fusionpbx cache
-        FusionCache::clear("dialplan:" . Session::get("domain_name"));
-        FusionCache::clear('configuration:callcenter.conf*');
-
-        event_socket_request($fp, 'api reloadxml');
-        event_socket_request($fp, sprintf(
-            'bgapi callcenter_config queue reload %s@%s',
-            $queue_extension,
-            Session::get('domain_name')
-        ));
-        fclose($fp);
     }
 
     /**
@@ -1436,55 +1170,15 @@ class DashboardController extends Controller
      */
     public function destroy(CallCenterQueues $callCenterQueues)
     {
-        // remove queue from freeswitch
-        $fp = event_socket_create(
-            config('eventsocket.ip'),
-            config('eventsocket.port'),
-            config('eventsocket.password')
-        );
+        app(ContactCenterQueueService::class)->deleteQueue($callCenterQueues);
 
-        // Unload current configuration
-        event_socket_request($fp, sprintf(
-            'api callcenter_config queue unload %s@%s',
-            $callCenterQueues->queue_extension,
-            Session::get('domain_name')
-        ));
-
-        // Delete dialplan associated with this queue
-        if ($callCenterQueues->dialplan) {
-            $callCenterQueues->dialplan->delete();
-        }
-
-        //clear fusionpbx cache
-        if (session_status() == PHP_SESSION_NONE || session_id() == '') {
-            session_start();
-            if (isset($_SESSION['destinations']['array'])) {
-                unset($_SESSION['destinations']['array']);
-            }
-            //clear the cache
-            FusionCache::clear("dialplan:" . Session::get("domain_name"));
-            FusionCache::clear('configuration:callcenter.conf*');
-        }
-
-        // Delete contact center queue
-        $deleted = $callCenterQueues->delete();
-
-        if ($deleted) {
-            return response()->json([
-                'status' => 200,
-                'success' => [
-                    'message' => 'Contact Center has been deleted'
-                ],
-                'redirect_url' => route('contactcenter.settings.list'),
-            ]);
-        } else {
-            return response()->json([
-                'status' => 401,
-                'errors' => [
-                    'message' => "There was an error deleting this Contact Center",
-                ],
-            ]);
-        }
+        return response()->json([
+            'status' => 200,
+            'success' => [
+                'message' => 'Contact Center has been deleted',
+            ],
+            'redirect_url' => route('contactcenter.settings.list'),
+        ]);
     }
 
     public function assignAgent(CallCenterQueues $callCenterQueues, CallCenterAgents $callCenterAgents)

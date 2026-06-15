@@ -8,19 +8,7 @@
                                     <div class="lg:grid lg:grid-cols-12 lg:gap-x-5">
                                         <div class="px-2 py-6 sm:px-6 lg:col-span-3 lg:px-0 lg:py-0">
                                             <FormTabs view="vertical">
-                                                <FormTab name="settings" label="Settings" :elements="[
-                                                    'queue_name',
-                                                    'queue_extension',
-                                                    'queue_strategy',
-                                                    'queue_greeting',
-                                                    'placeholder',
-                                                    'placeholder2',
-                                                    'queue_greeting_action_buttons',
-                                                    'queue_moh_sound',
-                                                    'queue_tier_rules_apply',
-                                                    'queue_description',
-                                                    'settings_submit',
-                                                ]" />
+                                                <FormTab name="settings" label="Settings" :elements="settingsTabElements" />
                                                 <FormTab name="agents" label="Agents" :elements="[
                                                     'tiers_header',
                                                     'selected_agents',
@@ -37,23 +25,7 @@
                                                     'placeholder3',
                                                     'advanced_submit',
                                                 ]" />
-                                                <FormTab v-if="extendedFields" name="contact_center" label="Tier Rules & More" :elements="[
-                                                    'cc_header',
-                                                    'queue_tier_rule_wait_second',
-                                                    'queue_tier_rule_wait_multiply_level',
-                                                    'queue_tier_rule_no_agent_no_wait',
-                                                    'queue_cc_exit_keys',
-                                                    'queue_announce_sound',
-                                                    'queue_announce_frequency',
-                                                    'queue_announce_position',
-                                                    'queue_time_base_score',
-                                                    'queue_time_base_score_sec',
-                                                    'queue_discard_abandoned_after',
-                                                    'queue_email_address',
-                                                    'queue_abandoned_resume_allowed',
-                                                    'queue_record_template',
-                                                    'contact_center_submit',
-                                                ]" />
+                                                <FormTab v-if="extendedFields" name="contact_center" label="Tier Rules & More" :elements="contactCenterTabElements" />
                                             </FormTabs>
                                         </div>
 
@@ -142,7 +114,7 @@
 
                                                 <GroupElement name="placeholder2" />
 
-                                                <ToggleElement name="queue_tier_rules_apply" text="Tier Rules"
+                                                <ToggleElement v-if="!extendedFields" name="queue_tier_rules_apply" text="Tier Rules"
                                                     true-value="true" false-value="false"
                                                     :labels="{ on: 'On', off: 'Off' }" label="&nbsp;"
                                                     :columns="{ sm: { container: 6 } }" />
@@ -251,26 +223,37 @@
                                                 <ButtonElement name="advanced_submit" button-label="Save"
                                                     :submits="true" align="right" />
 
-                                                <StaticElement v-if="extendedFields" name="cc_header" tag="h4"
-                                                    content="Tier Rules, Announcements, and More" />
+                                                <StaticElement v-if="extendedFields" name="cc_tier_rules_header" tag="h4"
+                                                    content="Tier Rules"
+                                                    description="Control how callers progress through agent tiers." />
+
+                                                <ToggleElement v-if="extendedFields" name="queue_tier_rules_apply"
+                                                    text="Enable Tier Rules" true-value="true" false-value="false"
+                                                    :labels="{ on: 'On', off: 'Off' }"
+                                                    description="When enabled, callers wait between tier levels instead of reaching all tiers at once." />
 
                                                 <TextElement v-if="extendedFields" name="queue_tier_rule_wait_second"
-                                                    input-type="number" label="Tier Rule Wait (seconds)" :floating="false"
-                                                    :columns="{ sm: { container: 6 } }" />
+                                                    input-type="number" label="Delay Before Next Tier (seconds)"
+                                                    :floating="false" :columns="{ sm: { container: 6 } }"
+                                                    description="How long a caller waits before the next tier level opens." />
+
+                                                <GroupElement v-if="extendedFields" name="cc_tier_rules_spacer" />
 
                                                 <ToggleElement v-if="extendedFields" name="queue_tier_rule_wait_multiply_level"
                                                     text="Multiply Wait by Tier Level" true-value="true" false-value="false"
-                                                    :labels="{ on: 'On', off: 'Off' }" label="&nbsp;"
-                                                    :columns="{ sm: { container: 6 } }" />
+                                                    :labels="{ on: 'On', off: 'Off' }"
+                                                    description="When enabled, the delay above is multiplied by the tier level before advancing." />
 
                                                 <ToggleElement v-if="extendedFields" name="queue_tier_rule_no_agent_no_wait"
-                                                    text="No Agent No Wait" true-value="true" false-value="false"
-                                                    :labels="{ on: 'On', off: 'Off' }" label="&nbsp;"
-                                                    :columns="{ sm: { container: 6 } }" />
+                                                    text="Skip Tiers With No Agents" true-value="true" false-value="false"
+                                                    :labels="{ on: 'On', off: 'Off' }"
+                                                    description="When enabled, callers skip tiers that have no logged-in agents." />
 
-                                                <SelectElement v-if="extendedFields" name="queue_cc_exit_keys" label="Exit Key"
-                                                    :items="exitKeyOptions" :native="false" allow-absent :search="false"
-                                                    :columns="{ sm: { container: 6 } }" />
+                                                <StaticElement v-if="extendedFields" name="cc_divider_announce" tag="hr" />
+
+                                                <StaticElement v-if="extendedFields" name="cc_announce_header" tag="h4"
+                                                    content="Announcements"
+                                                    description="Optional periodic messages and position updates while callers wait." />
 
                                                 <SelectElement v-if="extendedFields" name="queue_announce_sound"
                                                     label="Periodic Announcement" :items="fetchAnnouncementSounds"
@@ -279,40 +262,68 @@
                                                     :columns="{ sm: { container: 6 } }" />
 
                                                 <TextElement v-if="extendedFields" name="queue_announce_frequency"
-                                                    input-type="number" label="Announcement Frequency (seconds)"
-                                                    :floating="false" :columns="{ sm: { container: 6 } }" />
+                                                    input-type="number" label="Frequency (seconds)" :floating="false"
+                                                    :columns="{ sm: { container: 6 } }"
+                                                    description="How often the announcement plays. Leave blank to disable." />
 
                                                 <ToggleElement v-if="extendedFields" name="queue_announce_position"
-                                                    text="Announce Position" true-value="true" false-value="false"
-                                                    :labels="{ on: 'On', off: 'Off' }" label="&nbsp;"
-                                                    :columns="{ sm: { container: 6 } }" />
+                                                    text="Announce Queue Position" true-value="true" false-value="false"
+                                                    :labels="{ on: 'On', off: 'Off' }" />
+
+                                                <StaticElement v-if="extendedFields" name="cc_divider_behavior" tag="hr" />
+
+                                                <StaticElement v-if="extendedFields" name="cc_behavior_header" tag="h4"
+                                                    content="Queue Behavior"
+                                                    description="Exit key and priority scoring for callers in this queue." />
+
+                                                <SelectElement v-if="extendedFields" name="queue_cc_exit_keys" label="Exit Key"
+                                                    :items="exitKeyOptions" :native="false" allow-absent :search="false"
+                                                    :columns="{ sm: { container: 6 } }"
+                                                    description="Digit callers can press to leave the queue. Disabled uses 0." />
+
+                                                <GroupElement v-if="extendedFields" name="cc_behavior_spacer" />
 
                                                 <SelectElement v-if="extendedFields" name="queue_time_base_score"
                                                     label="Time Base Score" :items="timeBaseScoreOptions" :native="false"
-                                                    :columns="{ sm: { container: 6 } }" />
+                                                    :columns="{ sm: { container: 6 } }"
+                                                    description="How queue priority is calculated for waiting callers." />
 
                                                 <TextElement v-if="extendedFields" name="queue_time_base_score_sec"
-                                                    input-type="number" label="Time Base Score Seconds" :floating="false"
+                                                    input-type="number" label="Score Seconds" :floating="false"
                                                     :columns="{ sm: { container: 6 } }"
-                                                    :conditions="[['queue_time_base_score', 'in', ['queue']]]" />
+                                                    :conditions="[['queue_time_base_score', 'in', ['queue']]]"
+                                                    description="Fixed priority value when Time Base Score is set to Queue." />
+
+                                                <StaticElement v-if="extendedFields" name="cc_divider_abandoned" tag="hr" />
+
+                                                <StaticElement v-if="extendedFields" name="cc_abandoned_header" tag="h4"
+                                                    content="Abandoned Calls"
+                                                    description="What happens when a caller leaves the queue before an agent answers." />
 
                                                 <TextElement v-if="extendedFields" name="queue_discard_abandoned_after"
-                                                    input-type="number" label="Discard Abandoned After (seconds)"
-                                                    :floating="false" :columns="{ sm: { container: 6 } }" />
+                                                    input-type="number" label="Remove After (seconds)" :floating="false"
+                                                    :columns="{ sm: { container: 6 } }"
+                                                    description="How long before an abandoned caller is removed from the queue." />
 
                                                 <TextElement v-if="extendedFields" name="queue_email_address"
-                                                    input-type="email" label="Email Address" :floating="false"
-                                                    :columns="{ sm: { container: 6 } }" />
+                                                    input-type="email" label="Notification Email" :floating="false"
+                                                    :columns="{ sm: { container: 6 } }"
+                                                    description="Send an email when a caller abandons before being answered." />
 
                                                 <ToggleElement v-if="extendedFields" name="queue_abandoned_resume_allowed"
-                                                    text="Abandoned Resume Allowed" true-value="true" false-value="false"
-                                                    :labels="{ on: 'On', off: 'Off' }" label="&nbsp;"
-                                                    :columns="{ sm: { container: 6 } }" />
+                                                    text="Allow Position Resume" true-value="true" false-value="false"
+                                                    :labels="{ on: 'On', off: 'Off' }"
+                                                    description="Let returning callers keep their place if they rejoin within the remove window." />
+
+                                                <StaticElement v-if="extendedFields" name="cc_divider_recording" tag="hr" />
+
+                                                <StaticElement v-if="extendedFields" name="cc_recording_header" tag="h4"
+                                                    content="Recording" />
 
                                                 <ToggleElement v-if="extendedFields" name="queue_record_template"
                                                     text="Record Calls" true-value="true" false-value="false"
-                                                    :labels="{ on: 'On', off: 'Off' }" label="&nbsp;"
-                                                    :columns="{ sm: { container: 6 } }" />
+                                                    :labels="{ on: 'On', off: 'Off' }"
+                                                    description="Record calls handled through this queue." />
 
                                                 <ButtonElement v-if="extendedFields" name="contact_center_submit"
                                                     button-label="Save" :submits="true" align="right" />
@@ -414,6 +425,56 @@ const tierOptions = Array.from({ length: 20 }, (_, i) => {
     const value = String(i + 1);
     return { value, label: value };
 });
+
+const settingsTabElements = computed(() => {
+    const elements = [
+        "queue_name",
+        "queue_extension",
+        "queue_strategy",
+        "queue_greeting",
+        "placeholder",
+        "placeholder2",
+        "queue_greeting_action_buttons",
+        "queue_moh_sound",
+    ];
+
+    if (!props.extendedFields) {
+        elements.push("queue_tier_rules_apply");
+    }
+
+    elements.push("queue_description", "settings_submit");
+
+    return elements;
+});
+
+const contactCenterTabElements = [
+    "cc_tier_rules_header",
+    "queue_tier_rules_apply",
+    "queue_tier_rule_wait_second",
+    "cc_tier_rules_spacer",
+    "queue_tier_rule_wait_multiply_level",
+    "queue_tier_rule_no_agent_no_wait",
+    "cc_divider_announce",
+    "cc_announce_header",
+    "queue_announce_sound",
+    "queue_announce_frequency",
+    "queue_announce_position",
+    "cc_divider_behavior",
+    "cc_behavior_header",
+    "queue_cc_exit_keys",
+    "cc_behavior_spacer",
+    "queue_time_base_score",
+    "queue_time_base_score_sec",
+    "cc_divider_abandoned",
+    "cc_abandoned_header",
+    "queue_discard_abandoned_after",
+    "queue_email_address",
+    "queue_abandoned_resume_allowed",
+    "cc_divider_recording",
+    "cc_recording_header",
+    "queue_record_template",
+    "contact_center_submit",
+];
 
 const defaultValues = computed(() => ({
     queue_name: props.options?.item?.queue_name ?? null,

@@ -35,19 +35,46 @@ class BasicQueueService
                 'queue_greeting' => $validated['queue_greeting'] ?? '',
                 'queue_strategy' => $validated['queue_strategy'],
                 'queue_moh_sound' => $validated['queue_moh_sound'] ?? 'local_stream://default',
-                'queue_record_template' => $queue->queue_record_template ?: 'true',
-                'queue_time_base_score' => $queue->queue_time_base_score ?: 'system',
+                'queue_record_template' => array_key_exists('queue_record_template', $validated)
+                    ? (string) ($validated['queue_record_template'] ?? '')
+                    : ($queue->queue_record_template ?: 'true'),
+                'queue_time_base_score' => $validated['queue_time_base_score'] ?? ($queue->queue_time_base_score ?: 'system'),
+                'queue_time_base_score_sec' => $validated['queue_time_base_score_sec'] ?? $queue->queue_time_base_score_sec,
                 'queue_max_wait_time' => (string) ($validated['queue_max_wait_time'] ?? 0),
                 'queue_max_wait_time_with_no_agent' => (string) ($validated['queue_max_wait_time_with_no_agent'] ?? 90),
-                'queue_max_wait_time_with_no_agent_time_reached' => $queue->queue_max_wait_time_with_no_agent_time_reached ?: '5',
+                'queue_max_wait_time_with_no_agent_time_reached' => (string) (
+                    $validated['queue_max_wait_time_with_no_agent_time_reached']
+                    ?? $queue->queue_max_wait_time_with_no_agent_time_reached
+                    ?: '5'
+                ),
                 'queue_tier_rules_apply' => $validated['queue_tier_rules_apply'] ?? 'false',
-                'queue_tier_rule_wait_second' => $queue->queue_tier_rule_wait_second ?: '30',
-                'queue_tier_rule_wait_multiply_level' => $queue->queue_tier_rule_wait_multiply_level ?: 'false',
-                'queue_tier_rule_no_agent_no_wait' => $queue->queue_tier_rule_no_agent_no_wait ?: 'false',
-                'queue_discard_abandoned_after' => $queue->queue_discard_abandoned_after ?: '900',
-                'queue_abandoned_resume_allowed' => $queue->queue_abandoned_resume_allowed ?: 'false',
+                'queue_tier_rule_wait_second' => (string) (
+                    $validated['queue_tier_rule_wait_second']
+                    ?? $queue->queue_tier_rule_wait_second
+                    ?: '30'
+                ),
+                'queue_tier_rule_wait_multiply_level' => $validated['queue_tier_rule_wait_multiply_level']
+                    ?? ($queue->queue_tier_rule_wait_multiply_level ?: 'false'),
+                'queue_tier_rule_no_agent_no_wait' => $validated['queue_tier_rule_no_agent_no_wait']
+                    ?? ($queue->queue_tier_rule_no_agent_no_wait ?: 'false'),
+                'queue_discard_abandoned_after' => (string) (
+                    $validated['queue_discard_abandoned_after']
+                    ?? $queue->queue_discard_abandoned_after
+                    ?: '900'
+                ),
+                'queue_abandoned_resume_allowed' => $validated['queue_abandoned_resume_allowed']
+                    ?? ($queue->queue_abandoned_resume_allowed ?: 'false'),
+                'queue_cc_exit_keys' => $validated['queue_cc_exit_keys'] ?? $queue->queue_cc_exit_keys,
+                'queue_announce_sound' => array_key_exists('queue_announce_sound', $validated)
+                    ? ($validated['queue_announce_sound'] ?? '')
+                    : $queue->queue_announce_sound,
+                'queue_announce_frequency' => $validated['queue_announce_frequency'] ?? $queue->queue_announce_frequency,
+                'queue_announce_position' => $validated['queue_announce_position']
+                    ?? ($queue->queue_announce_position ?: 'false'),
+                'queue_email_address' => $validated['queue_email_address'] ?? $queue->queue_email_address,
                 'queue_cid_prefix' => $this->blankToNull($validated['queue_cid_prefix'] ?? null),
-                'queue_timeout_action' => $this->buildQueueTimeoutAction($validated, session('domain_name')),
+                'queue_timeout_action' => $validated['queue_timeout_action']
+                    ?? $this->buildQueueTimeoutAction($validated, session('domain_name')),
                 'queue_description' => $this->blankToNull($validated['queue_description'] ?? null),
             ]);
 
@@ -356,9 +383,23 @@ class BasicQueueService
             "\t\t" . '<action application="answer" data=""/>',
             sprintf("\t\t" . '<action application="set" data="call_center_queue_uuid=%s"/>', $this->xml($queue->call_center_queue_uuid)),
             sprintf("\t\t" . '<action application="set" data="queue_extension=%s"/>', $this->xml($queue->queue_extension)),
-            "\t\t" . '<action application="set" data="cc_export_vars=${cc_export_vars},call_center_queue_uuid,sip_h_Alert-Info"/>',
+            "\t\t" . '<action application="set" data="cc_export_vars=${cc_export_vars},call_center_queue_uuid,sip_h_Alert-Info,absolute_codec_string"/>',
             "\t\t" . '<action application="set" data="hangup_after_bridge=true"/>',
         ];
+
+        if (filled($queue->queue_time_base_score_sec)) {
+            $lines[] = sprintf(
+                "\t\t" . '<action application="set" data="cc_base_score=%s"/>',
+                $this->xml($queue->queue_time_base_score_sec)
+            );
+        }
+
+        if (filled($queue->queue_cc_exit_keys)) {
+            $lines[] = sprintf(
+                "\t\t" . '<action application="set" data="cc_exit_keys=%s"/>',
+                $this->xml($queue->queue_cc_exit_keys)
+            );
+        }
 
         if ($queue->queue_cid_prefix) {
             $lines[] = sprintf(
