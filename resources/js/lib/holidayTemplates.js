@@ -178,6 +178,57 @@ const caHolidays = [
     },
 ];
 
+const ukHolidays = [
+    {
+        label: "New Year's Day (January 1)",
+        value: { mon: '1', wday: '', mday: '1', mweek: '' },
+    },
+    {
+        label: 'May Day (First Monday in May)',
+        value: { mon: '5', wday: '2', mday: '1-7', mweek: '' },
+    },
+    {
+        label: 'Spring Bank Holiday (Last Monday in May)',
+        value: { mon: '5', wday: '2', mday: '25-31', mweek: '' },
+    },
+    {
+        label: 'August Bank Holiday (Last Monday in August)',
+        value: { mon: '8', wday: '2', mday: '25-31', mweek: '' },
+    },
+    {
+        label: 'August Bank Holiday (First Monday in August; Scotland Only)',
+        value: { mon: '8', wday: '2', mday: '1-7', mweek: '' },
+    },
+    {
+        label: 'Christmas Day (December 25)',
+        value: { mon: '12', wday: '', mday: '25', mweek: '' },
+    },
+    {
+        label: 'Boxing Day (December 26)',
+        value: { mon: '12', wday: '', mday: '26', mweek: '' },
+    },
+    {
+        label: "St. Patrick's Day (March 17)",
+        value: { mon: '3', wday: '', mday: '17', mweek: '' },
+    },
+    {
+        label: "St. Andrew's Day (November 30)",
+        value: { mon: '11', wday: '', mday: '30', mweek: '' },
+    },
+    {
+        label: "Mother's Day (Second Sunday in May)",
+        value: { mon: '5', wday: '1', mday: '8-14', mweek: '' },
+    },
+    {
+        label: "Father's Day (Third Sunday in June)",
+        value: { mon: '6', wday: '1', mday: '15-21', mweek: '' },
+    },
+    {
+        label: 'Halloween (October 31)',
+        value: { mon: '10', wday: '', mday: '31', mweek: '' },
+    },
+];
+
 const sgHolidays = [
     {
         label: "New Year's Day (January 1)",
@@ -466,6 +517,7 @@ const krHolidays = [
 export const holidayTemplateCountries = [
     { value: 'us_holiday', label: 'US Holiday', fieldName: 'us_holiday', holidays: usHolidays },
     { value: 'ca_holiday', label: 'Canadian Holiday', fieldName: 'ca_holiday', holidays: caHolidays },
+    { value: 'uk_holiday', label: 'UK Holiday', fieldName: 'uk_holiday', holidays: ukHolidays },
     { value: 'sg_holiday', label: 'Singapore Holiday', fieldName: 'sg_holiday', holidays: sgHolidays },
     { value: 'my_holiday', label: 'Malaysia Holiday', fieldName: 'my_holiday', holidays: myHolidays },
     { value: 'id_holiday', label: 'Indonesia Holiday', fieldName: 'id_holiday', holidays: idHolidays },

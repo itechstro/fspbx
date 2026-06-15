@@ -209,6 +209,7 @@ $makeTimeRangeRegex = function ($start, $end) {
 
                     case 'us_holiday':
                     case 'ca_holiday':
+                    case 'uk_holiday':
                     case 'sg_holiday':
                     case 'my_holiday':
                     case 'id_holiday':
