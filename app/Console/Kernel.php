@@ -156,6 +156,8 @@ class Kernel extends ConsoleKernel
             )
                 ->daily();
         }
+
+        $schedule->command('recorder:send-analytics-reports')->hourly();
     }
 
     /**

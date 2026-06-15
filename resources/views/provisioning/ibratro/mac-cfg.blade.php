@@ -103,6 +103,10 @@
             <DefaultDialMode>{{ $resolve('default_dial_mode', '2') }}</DefaultDialMode>
 @if ($profile === 'entry' || $profile === 'video')
             <EnableDefLine>{{ $resolve('enable_def_line', '1') }}</EnableDefLine>
+@elseif ($profile === 'standard')
+            <EnableDefLine>{{ $resolve('enable_def_line', '0') }}</EnableDefLine>
+            <VideoDisplayMode>{{ $resolve('video_display_mode', '0') }}</VideoDisplayMode>
+            <AutoHandleVideo>{{ $resolve('auto_handle_video', '0') }}</AutoHandleVideo>
 @endif
 @if (!empty($videoEnabled))
 @if ($profile === 'video')
@@ -136,7 +140,7 @@
         <EnableMWITone>{{ $resolve('enable_mwi_tone', '0') }}</EnableMWITone>
 @else
         <CallerDisplayType>{{ $resolve('caller_display_type', '5') }}</CallerDisplayType>
-@if ($profile === 'entry')
+@if ($profile === 'entry' || $profile === 'standard')
         <EnableMWITone>{{ $resolve('enable_mwi_tone', '0') }}</EnableMWITone>
 @endif
 @endif
@@ -156,7 +160,7 @@
         </display>
         <volume>
             <RingType>{{ $resolve('default_ringtone', 'Type 2') }}</RingType>
-@if ($profile !== 'video' && $profile !== 'entry' && $resolve('enable_mwi_tone', '') !== '')
+@if ($profile === 'advanced' && $resolve('enable_mwi_tone', '') !== '')
             <EnableMWITone>{{ $resolve('enable_mwi_tone') }}</EnableMWITone>
 @endif
         </volume>
@@ -203,7 +207,7 @@
 @else
         <softkey>
             <SoftkeyMode>{{ $resolve('softkey_mode', '0') }}</SoftkeyMode>
-            <SoftKeyExitStyle>{{ $resolve('softkey_exit', $profile === 'standard' ? '1' : '2') }}</SoftKeyExitStyle>
+            <SoftKeyExitStyle>{{ $resolve('softkey_exit', '2') }}</SoftKeyExitStyle>
             <DesktopSoftkey>{{ $resolve('softkey_desktopsoftkey', 'history;contact;dnd;menu;') }}</DesktopSoftkey>
 @if ($profile === 'entry')
             <TalkingSoftkey>{{ $talkingSoftkey }}</TalkingSoftkey>
@@ -228,19 +232,21 @@
             <DesktopLongPress>{{ $resolve('softkey_desktoplongpress', 'status;none;none;none;reset;') }}</DesktopLongPress>
             <DialerConfSoftkey>{{ $resolve('softkey_dialerconfsoftkey', 'contact;clogs;redial;video;cancel;') }}</DialerConfSoftkey>
 @elseif ($profile === 'standard')
-            <TalkingSoftkey>{{ $talkingSoftkey }}</TalkingSoftkey>
+            <TalkingAudioSoftkey>{{ $talkingSoftkey }}</TalkingAudioSoftkey>
             <RingingSoftkey>{{ $ringingSoftkey }}</RingingSoftkey>
             <AlertingSoftkey>{{ $resolve('softkey_alertingsoftkey', 'end;none;none;none;') }}</AlertingSoftkey>
-            <XAlertingSoftkey>{{ $resolve('softkey_xalertingsoftkey', 'end;none;none;none;') }}</XAlertingSoftkey>
-            <ConferenceSoftkey>{{ $resolve('softkey_conferencesoftkey', 'hold;none;split;end;') }}</ConferenceSoftkey>
-            <WaitingSoftkey>{{ $resolve('softkey_waitingsoftkey', 'hold;xfer;conf;end;') }}</WaitingSoftkey>
-            <EndingSoftkey>{{ $resolve('softkey_endingsoftkey', 'repeat;none;none;end;') }}</EndingSoftkey>
-            <DialerPreSoftkey>{{ $resolve('softkey_dialerpresoftkey', 'send;2aB;delete;exit;') }}</DialerPreSoftkey>
-            <DialerCallSoftkey>{{ $resolve('softkey_dialercallsoftkey', 'repeat;2aB;delete;exit;') }}</DialerCallSoftkey>
-            <DialerXferSoftkey>{{ $resolve('softkey_dialerxfersoftkey', 'repeat;2aB;delete;exit;') }}</DialerXferSoftkey>
-            <DialerCfwdSoftkey>{{ $resolve('softkey_dialercfwdsoftkey', 'repeat;2aB;delete;exit;') }}</DialerCfwdSoftkey>
-            <DesktopClick>{{ $resolve('softkey_desktopclick', 'history;status;none;none;none;') }}</DesktopClick>
-            <DailerClick>{{ $resolve('softkey_dailerclick', 'none;none;none;none;none;') }}</DailerClick>
+            <XAlertingSoftkey>{{ $resolve('softkey_xalertingsoftkey', 'end;none;none;xfer;') }}</XAlertingSoftkey>
+            <ConferenceSoftkey>{{ $resolve('softkey_conferencesoftkey', 'hold;manage;conf;split;end;') }}</ConferenceSoftkey>
+            <WaitingSoftkey>{{ $resolve('softkey_waitingsoftkey', 'xfer;accept;reject;end;') }}</WaitingSoftkey>
+            <EndingSoftkey>{{ $resolve('softkey_endingsoftkey', 'redial;none;none;end;') }}</EndingSoftkey>
+            <DialerPreSoftkey>{{ $resolve('softkey_dialerpresoftkey', 'send;save;delete;end;') }}</DialerPreSoftkey>
+            <DialerCallSoftkey>{{ $resolve('softkey_dialercallsoftkey', 'send;2aB;delete;exit;') }}</DialerCallSoftkey>
+            <DialerXferSoftkey>{{ $resolve('softkey_dialerxfersoftkey', 'delete;xfer;send;exit;') }}</DialerXferSoftkey>
+            <DialerCfwdSoftkey>{{ $resolve('softkey_dialercfwdsoftkey', 'send;2aB;delete;exit;') }}</DialerCfwdSoftkey>
+            <CallLogSoftkey>{{ $resolve('softkey_calllogsoftkey', 'exit;option;delete;send;') }}</CallLogSoftkey>
+            <DesktopClick>{{ $resolve('softkey_desktopclick', 'history;status;none;none;menu;') }}</DesktopClick>
+            <DailerClick>{{ $resolve('softkey_dailerclick', 'pline;nline;none;none;none;') }}</DailerClick>
+            <RingingClick>{{ $resolve('softkey_ringingclick', 'none;none;none;none;none;') }}</RingingClick>
             <CallClick>{{ $resolve('softkey_callclick', 'none;none;voldown;volup;none;') }}</CallClick>
             <DesktopLongPress>{{ $resolve('softkey_desktoplongpress', 'status;none;none;none;reset;') }}</DesktopLongPress>
             <DialerConfSoftkey>{{ $resolve('softkey_dialerconfsoftkey', 'contact;clogs;redial;video;cancel;') }}</DialerConfSoftkey>
@@ -288,6 +294,8 @@
     'keysPerPage' => $keysPerPage ?? 29,
     'sideKeyPages' => $sideKeyPages ?? $resolve('side_key_pages', '1'),
     'dssLongPressAction' => $resolvedDssLongPress,
+    'ibratro_auto_blf_list' => $resolve('auto_blf_list', '1'),
+    'ibratro_dss_timeout_to_home' => $resolve('dss_timeout_to_home', ''),
 ])
     <ap>
         <DefaultUsername>{{ $http_auth_username ?? '' }}</DefaultUsername>
@@ -372,6 +380,23 @@
         <DisplayProvisionprompt>0</DisplayProvisionprompt>
         <PowerSaving>1</PowerSaving>
         <TimeoutToPowerSaving>{{ $resolve('timeout_to_power_saving', '360') }}</TimeoutToPowerSaving>
+    </background>
+@elseif ($profile === 'standard')
+    <UIconfig>
+        <DisplayLanguage>{{ $resolve('display_language', 'en;cn;tc;ru;it;fr;de;he;es;cat;eus;gal;tr;hr;slo;cz;nl;ko;ua;pt;pl;ar;jp;kr;fa;kz;') }}</DisplayLanguage>
+        <Currentmaterialversion>0x00000000</Currentmaterialversion>
+    </UIconfig>
+    <background>
+        <TimeoutToScreensaver>{{ $resolve('timeout_to_screensaver', '7200') }}</TimeoutToScreensaver>
+        <MissedCallPopup>1</MissedCallPopup>
+        <MWIPopup>1</MWIPopup>
+        <DeviceConnectPopup>1</DeviceConnectPopup>
+        <SMSPopup>1</SMSPopup>
+        <OtherPopup>1</OtherPopup>
+        <DisplayProvisionprompt>0</DisplayProvisionprompt>
+        <PowerSaving>{{ $resolve('power_saving', '1') }}</PowerSaving>
+        <TimeoutToPowerSaving>{{ $resolve('timeout_to_power_saving', '14400') }}</TimeoutToPowerSaving>
+        <ScreensaverType>{{ $resolve('screensaver_type', '0') }}</ScreensaverType>
     </background>
 @else
     <UIconfig>

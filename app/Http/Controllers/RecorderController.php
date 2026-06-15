@@ -45,6 +45,7 @@ class RecorderController extends Controller
                 'data_route' => route('recorder.data'),
                 'item_options' => route('cdrs.item.options'),
                 'call_recording_route' => route('cdrs.recording.options'),
+                'analytics_page' => route('recorder.analytics.index'),
             ],
             'permissions' => fn () => $this->recorderPermissions(),
             'pagination' => [
@@ -105,6 +106,7 @@ class RecorderController extends Controller
 
         return [
             'all_cdr_view' => userCheckPermission('xml_cdr_domain'),
+            'analytics_view' => userCheckPermission('recorder_analytics_view'),
             'call_recording_play' => userCheckPermission('call_recording_play'),
             'transcription_summary' => userCheckPermission('transcription_summary'),
             'search_sentiment' => userCheckPermission('xml_cdr_search_sentiment')

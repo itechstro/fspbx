@@ -16,6 +16,7 @@ use App\Http\Controllers\CallFlowController;
 use App\Http\Controllers\CallTranscriptionController;
 use App\Http\Controllers\CdrsController;
 use App\Http\Controllers\RecorderController;
+use App\Http\Controllers\RecorderAnalyticsController;
 use App\Http\Controllers\CharPmsWebhookController;
 use App\Http\Controllers\ConferenceCenterController;
 use App\Http\Controllers\ConferenceController;
@@ -604,6 +605,10 @@ Route::group(['middleware' => ['auth:sanctum', 'api.cookie.auth']], function () 
     Route::post('/call-detail-records/recordings/translate', [CallTranscriptionController::class, 'translate'])->name('cdrs.recording.translate');
 
     Route::get('/recorder/data', [RecorderController::class, 'getData'])->name('recorder.data');
+    Route::get('/recorder/analytics/report', [RecorderAnalyticsController::class, 'report'])->name('recorder.analytics.report');
+    Route::get('/recorder/analytics/export', [RecorderAnalyticsController::class, 'export'])->name('recorder.analytics.export');
+    Route::match(['get', 'put'], '/recorder/analytics/schedule', [RecorderAnalyticsController::class, 'schedule'])->name('recorder.analytics.schedule');
+    Route::post('/recorder/analytics/send', [RecorderAnalyticsController::class, 'send'])->name('recorder.analytics.send');
 
     // Account Settings
     Route::put('account-settings/update', [AccountSettingsController::class, 'update'])->name('account-settings.update');

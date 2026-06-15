@@ -32,20 +32,24 @@
         </dssSoft>
         @endforeach
 @elseif ($layout === 'standard')
-        @for ($page = 1; $page <= $pages; $page++)
-        <internal index="{{ $page }}">
-            @foreach (IbratroKeyXml::rowsForPage($lineKeys, $page, $perPage) as $row)
+        <AutoBLFList>{{ $ibratro_auto_blf_list ?? '1' }}</AutoBLFList>
+        <dssSide index="1">
+            @foreach ($lineKeys as $row)
+                @include('provisioning.ibratro.partials.fkey', ['row' => $row, 'index' => $row['device_key_id'] ?? '', 'withIcon' => true])
+            @endforeach
+        </dssSide>
+        @for ($page = 2; $page <= (int) ($sideKeyPages ?? 3); $page++)
+        <dssSide index="{{ $page }}">
+            @foreach (IbratroKeyXml::rowsForPage($memoryKeys, $page - 1, $perPage) as $row)
                 @include('provisioning.ibratro.partials.fkey', ['row' => $row, 'index' => $row['page_index'], 'withIcon' => true])
             @endforeach
-        </internal>
+        </dssSide>
         @endfor
-        @for ($page = 1; $page <= $pages; $page++)
-        <internal index="{{ $page }}">
-            @foreach (IbratroKeyXml::rowsForPage($memoryKeys, $page, $perPage) as $row)
-                @include('provisioning.ibratro.partials.fkey', ['row' => $row, 'index' => $row['page_index'], 'withIcon' => true])
-            @endforeach
-        </internal>
-        @endfor
+        @foreach ($programmableKeys as $row)
+        <dssSoft index="{{ $row['device_key_id'] ?? '' }}">
+@include('provisioning.ibratro.partials.key-fields', ['row' => $row, 'withIcon' => false])
+        </dssSoft>
+        @endforeach
 @elseif ($layout === 'video')
         @php
             $internalKeys = array_merge($lineKeys, $memoryKeys);

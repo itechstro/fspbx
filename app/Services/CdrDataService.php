@@ -262,6 +262,22 @@ class CdrDataService
         return $this->enrichCdrsWithContactNames($cdrs);
     }
 
+    public function recorderAnalyticsQuery(string $domainUuid, int $startEpoch, int $endEpoch)
+    {
+        $query = CDR::query()
+            ->where('direction', 'recorder')
+            ->where('domain_uuid', $domainUuid)
+            ->where('start_epoch', '>=', $startEpoch)
+            ->where('start_epoch', '<=', $endEpoch)
+            ->where('hangup_cause', '!=', 'LOSE_RACE')
+            ->whereNull('cc_member_session_uuid')
+            ->whereNull('originating_leg_uuid');
+
+        $this->applyPrimaryRecorderLegFilter($query);
+
+        return $query;
+    }
+
     private function enrichCdrsWithContactNames(mixed $cdrs): mixed
     {
         if ($cdrs instanceof AbstractPaginator) {

@@ -1,4 +1,4 @@
-{{-- version: 2.3.0 --}}
+{{-- version: 2.3.1 --}}
 
 @switch($flavor)
 
@@ -11,7 +11,7 @@
     'includeLineVideoCodec' => false,
     'keyLayout' => 'standard',
     'funcKeyPages' => 5,
-    'keysPerPage' => 8,
+    'keysPerPage' => 7,
     'sideKeyPages' => 3,
 ])
 @break
