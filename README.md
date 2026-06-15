@@ -55,7 +55,7 @@ Before you begin, ensure you have met the following requirements:
 1. **Download and run the installation script**
 
    ```bash
-    wget -O- https://raw.githubusercontent.com/nemerald-voip/fspbx/main/install/install-fspbx.sh | bash
+    wget -O- https://raw.githubusercontent.com/itechstro/fspbx/main/install/install-fspbx.sh | bash
    ```
 
 2. **Configure a custom domain and Let's Encrypt certificate (OPTIONAL)**

@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Services\Install\InstallSchema;
+use App\Services\Install\BrandingAssets;
 use App\Models\DefaultSettings;
 use App\Models\User;
 use App\Models\UserSetting;
@@ -120,6 +121,12 @@ class FSPBXInitialDBSeed extends Command
         $this->info("Running database migrations...");
         Artisan::call('migrate', ['--force' => true]); // --force to prevent confirmation prompt
         $this->info("Database migrations completed successfully.");
+
+        // Step 9: Install CloudPLAY Talk branding assets
+        $this->info("Installing branding assets...");
+        app(BrandingAssets::class)->install();
+        app(BrandingAssets::class)->ensureAppNameEnv();
+        $this->info("Branding assets installed successfully.");
 
         // Step 10: Run Recommended Settings Seeder
         $this->info("Seeding settings...");
@@ -538,22 +545,10 @@ class FSPBXInitialDBSeed extends Command
     private function displayCompletionMessage($username, $password)
     {
         $this->info("\n" . str_repeat('=', 60));
-        $this->info("\e[32m✅ FS PBX Installation Completed Successfully! \e[0m");
+        $this->info("\e[32m✅ CloudPLAY Talk Installation Completed Successfully! \e[0m");
         $this->info(str_repeat('=', 60) . "\n");
 
-        // FS PBX ASCII Logo
-        $this->line("\e[36m");
-        $this->line(" ███████████  █████████     ███████████  ███████████  █████ █████ ");
-        $this->line("░░███░░░░░░█ ███░░░░░███   ░░███░░░░░███░░███░░░░░███░░███ ░░███  ");
-        $this->line(" ░███   █ ░ ░███    ░░░     ░███    ░███ ░███    ░███ ░░███ ███   ");
-        $this->line(" ░███████   ░░█████████     ░██████████  ░██████████   ░░█████    ");
-        $this->line(" ░███░░░█    ░░░░░░░░███    ░███░░░░░░   ░███░░░░░███   ███░███   ");
-        $this->line(" ░███  ░     ███    ░███    ░███         ░███    ░███  ███ ░░███  ");
-        $this->line(" █████      ░░█████████     █████        ███████████  █████ █████ ");
-        $this->line("░░░░░        ░░░░░░░░░     ░░░░░        ░░░░░░░░░░░  ░░░░░ ░░░░░  ");
-        $this->line("\e[0m"); // Reset color
-
-        $this->info("\n\e[32m🎉 Welcome to FS PBX! 🎉\e[0m");
+        $this->info("\n\e[32m🎉 Welcome to CloudPLAY Talk! 🎉\e[0m");
         $this->info("\n" . str_repeat('=', 60));
 
         $this->info("\e[33m🔗 Login URL:\e[0m  " . config('app.url'));

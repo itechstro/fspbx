@@ -41,6 +41,8 @@ fi
 INSTALL_DIR="/var/www/fspbx"
 PUBLIC_DIR="$INSTALL_DIR/public"
 BACKUP_DIR="/var/www/fspbx_backup_$(date +%Y%m%d_%H%M%S)"
+FSPBX_REPO_URL="${FSPBX_REPO_URL:-https://github.com/itechstro/fspbx.git}"
+FSPBX_UPSTREAM_REPO_URL="${FSPBX_UPSTREAM_REPO_URL:-https://github.com/nemerald-voip/fspbx.git}"
 export PHP_VERSION="8.1"
 export FREESWITCH_VERSION="v1.10"
 
@@ -75,9 +77,15 @@ if [ -d "$INSTALL_DIR" ] && [ "$(ls -A $INSTALL_DIR 2>/dev/null)" ]; then
 fi
 
 # Clone FS PBX repository
-print_success "Cloning FS PBX repository..."
-git clone --depth 1 https://github.com/nemerald-voip/fspbx.git $INSTALL_DIR
+print_success "Cloning FS PBX repository from $FSPBX_REPO_URL..."
+git clone --depth 1 "$FSPBX_REPO_URL" "$INSTALL_DIR"
 print_success "FS PBX repository cloned successfully."
+
+# Track upstream changes from the original FS PBX project.
+if ! git -C "$INSTALL_DIR" remote get-url upstream &>/dev/null; then
+    git -C "$INSTALL_DIR" remote add upstream "$FSPBX_UPSTREAM_REPO_URL"
+    print_success "Configured upstream remote: $FSPBX_UPSTREAM_REPO_URL"
+fi
 
 # Ensure public directory exists
 mkdir -p $PUBLIC_DIR
