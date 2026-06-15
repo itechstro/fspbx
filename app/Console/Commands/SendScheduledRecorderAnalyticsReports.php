@@ -44,7 +44,8 @@ class SendScheduledRecorderAnalyticsReports extends Command
                 $schedule->domain_uuid,
                 $start->toIso8601String(),
                 $end->toIso8601String(),
-                $emails
+                $emails,
+                (bool) $schedule->include_executive_summary,
             )->onQueue('emails');
 
             $schedule->update(['last_sent_at' => now()]);

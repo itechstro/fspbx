@@ -34,6 +34,7 @@ return [
         'api_key' => env('OPENAI_API_KEY'),
         'speech_timeout' => env('OPENAI_SPEECH_TIMEOUT', 60),
         'speech_max_attempts' => env('OPENAI_SPEECH_MAX_ATTEMPTS', 2),
+        'executive_summary_timeout' => env('OPENAI_EXECUTIVE_SUMMARY_TIMEOUT', 120),
     ],
 
     'google' => [

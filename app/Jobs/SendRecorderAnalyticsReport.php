@@ -28,6 +28,7 @@ class SendRecorderAnalyticsReport implements ShouldQueue
         public string $startPeriod,
         public string $endPeriod,
         public array $emails,
+        public bool $includeExecutiveSummary = false,
     ) {
     }
 
@@ -53,6 +54,11 @@ class SendRecorderAnalyticsReport implements ShouldQueue
                 $this->domainUuid,
                 Carbon::parse($this->startPeriod),
                 Carbon::parse($this->endPeriod)
+            );
+
+            $report = $analyticsService->maybeAttachExecutiveSummary(
+                $report,
+                $this->includeExecutiveSummary
             );
 
             $payload = array_merge($report, [

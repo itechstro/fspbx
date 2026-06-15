@@ -20,6 +20,7 @@ class RecorderAnalyticsReportSchedule extends Model
     protected $fillable = [
         'domain_uuid',
         'enabled',
+        'include_executive_summary',
         'emails',
         'frequency',
         'send_time',
@@ -30,6 +31,7 @@ class RecorderAnalyticsReportSchedule extends Model
 
     protected $casts = [
         'enabled' => 'boolean',
+        'include_executive_summary' => 'boolean',
         'emails' => 'array',
         'day_of_week' => 'integer',
         'day_of_month' => 'integer',

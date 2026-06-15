@@ -112,6 +112,41 @@
         </ol>
     @endif
 
+    @php($executiveSummary = $data['executive_summary'] ?? null)
+    @if(!empty($executiveSummary))
+        <div class="section-title">AI Executive Summary</div>
+        @if(!empty($executiveSummary['overview']))
+            <p>{{ $executiveSummary['overview'] }}</p>
+        @endif
+        @if(!empty($executiveSummary['highlights']))
+            <p><strong>Highlights</strong></p>
+            <ul style="margin-top:0; padding-left:20px;">
+                @foreach($executiveSummary['highlights'] as $item)
+                    <li>{{ $item }}</li>
+                @endforeach
+            </ul>
+        @endif
+        @if(!empty($executiveSummary['concerns']))
+            <p><strong>Concerns</strong></p>
+            <ul style="margin-top:0; padding-left:20px;">
+                @foreach($executiveSummary['concerns'] as $item)
+                    <li>{{ $item }}</li>
+                @endforeach
+            </ul>
+        @endif
+        @if(!empty($executiveSummary['recommendations']))
+            <p><strong>Recommendations</strong></p>
+            <ul style="margin-top:0; padding-left:20px;">
+                @foreach($executiveSummary['recommendations'] as $item)
+                    <li>{{ $item }}</li>
+                @endforeach
+            </ul>
+        @endif
+    @elseif(!empty($data['executive_summary_error']))
+        <div class="section-title">AI Executive Summary</div>
+        <p class="muted">Executive summary was not included: {{ $data['executive_summary_error'] }}</p>
+    @endif
+
     <div class="section-title">Recorded Calls</div>
     @php($emailCalls = array_slice($data['calls'] ?? [], 0, 25))
     @if(empty($emailCalls))

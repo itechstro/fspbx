@@ -47,6 +47,39 @@ No summary topics for this period.
 @endforeach
 @endif
 
+AI Executive Summary
+@php($executiveSummary = $data['executive_summary'] ?? null)
+@if(!empty($executiveSummary))
+@if(!empty($executiveSummary['overview']))
+{{ $executiveSummary['overview'] }}
+
+@endif
+@if(!empty($executiveSummary['highlights']))
+Highlights:
+@foreach($executiveSummary['highlights'] as $item)
+- {{ $item }}
+@endforeach
+
+@endif
+@if(!empty($executiveSummary['concerns']))
+Concerns:
+@foreach($executiveSummary['concerns'] as $item)
+- {{ $item }}
+@endforeach
+
+@endif
+@if(!empty($executiveSummary['recommendations']))
+Recommendations:
+@foreach($executiveSummary['recommendations'] as $item)
+- {{ $item }}
+@endforeach
+
+@endif
+@elseif(!empty($data['executive_summary_error']))
+Executive summary was not included: {{ $data['executive_summary_error'] }}
+
+@endif
+
 Recorded Calls
 @php($emailCalls = array_slice($data['calls'] ?? [], 0, 25))
 @if(empty($emailCalls))

@@ -445,4 +445,95 @@ class OpenAIService
 
         return implode("\n", $lines);
     }
+
+    public function isConfigured(): bool
+    {
+        return ! empty($this->apiKey);
+    }
+
+    /**
+     * Generate a synchronous executive summary from structured analytics context.
+     *
+     * @return array{overview?: string, highlights?: array, concerns?: array, recommendations?: array}
+     */
+    public function createExecutiveSummary(array $context, string $model = 'gpt-4.1-mini'): array
+    {
+        if (empty($this->apiKey)) {
+            throw new \RuntimeException('OpenAI API key is not configured.');
+        }
+
+        $url = 'https://api.openai.com/v1/responses';
+        $timeout = (int) config('services.openai.executive_summary_timeout', 120);
+
+        $instructions = implode("\n", [
+            'You are an executive reporting assistant for a business phone recorder analytics dashboard.',
+            'Synthesize the provided period stats, trends, topics, and per-call summaries into a concise leadership brief.',
+            'Rules:',
+            '- Use only information present in the input; do not invent calls, metrics, or outcomes.',
+            '- Write in plain, practical business language.',
+            '- Keep overview to 2-4 short paragraphs.',
+            '- Highlights should capture positive trends, wins, or useful patterns.',
+            '- Concerns should capture risks, negative sentiment patterns, or operational issues supported by the data.',
+            '- Recommendations should be actionable next steps for managers.',
+            '- If a section has nothing meaningful to say, return an empty array for that field.',
+            '- Return ONLY valid JSON matching the schema below.',
+            '',
+            'Output JSON schema:',
+            '{',
+            '  "overview": "string",',
+            '  "highlights": ["string"],',
+            '  "concerns": ["string"],',
+            '  "recommendations": ["string"]',
+            '}',
+        ]);
+
+        $input = implode("\n\n", [
+            'Using the recorder analytics context below, produce the Output JSON.',
+            'Return ONLY the JSON object (no markdown, no commentary).',
+            'Analytics context JSON:',
+            json_encode($context, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
+        ]);
+
+        $resp = Http::withToken($this->apiKey)
+            ->acceptJson()
+            ->timeout($timeout)
+            ->post($url, [
+                'model' => $model,
+                'background' => false,
+                'instructions' => $instructions,
+                'input' => $input,
+                'store' => false,
+            ])
+            ->throw()
+            ->json();
+
+        $text = (string) data_get($resp, 'output_text', '');
+        if ($text === '') {
+            $text = (string) data_get($resp, 'output.0.content.0.text', '');
+        }
+
+        return $this->parseJsonResponseText($text);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function parseJsonResponseText(string $outputText): array
+    {
+        $json = trim($outputText);
+        if ($json === '') {
+            throw new \RuntimeException('OpenAI returned an empty response.');
+        }
+
+        if (str_starts_with($json, '```')) {
+            $json = trim(preg_replace('/^```(?:json)?|```$/m', '', $json));
+        }
+
+        $decoded = json_decode($json, true);
+        if (json_last_error() !== JSON_ERROR_NONE || ! is_array($decoded)) {
+            throw new \RuntimeException('Invalid JSON from OpenAI: ' . json_last_error_msg());
+        }
+
+        return $decoded;
+    }
 }

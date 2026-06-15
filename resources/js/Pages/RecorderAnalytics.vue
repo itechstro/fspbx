@@ -28,8 +28,20 @@
                         Export CSV
                         <Spinner class="ml-2" :show="exporting" />
                     </button>
+                    <button type="button" @click="generateExecutiveSummary"
+                        :disabled="generatingExecutiveSummary || !report || !canGenerateExecutiveSummary"
+                        class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-50">
+                        Generate Summary
+                        <Spinner class="ml-2" :show="generatingExecutiveSummary" />
+                    </button>
                 </div>
                 <p v-if="report?.period_label" class="mt-3 text-sm text-gray-500">{{ report.period_label }}</p>
+                <p v-if="report && !executiveSummaryAvailable" class="mt-2 text-sm text-amber-700">
+                    AI executive summary requires an OpenAI API key in server settings.
+                </p>
+                <p v-else-if="report && !canGenerateExecutiveSummary" class="mt-2 text-sm text-gray-500">
+                    Generate Summary needs at least one summarized call in this period.
+                </p>
             </div>
 
             <div v-if="loading && !report" class="rounded-lg bg-white p-12 text-center text-sm text-gray-500 ring-1 ring-gray-200">
@@ -43,6 +55,55 @@
                     <StatCard label="Average Duration" :value="report.summary.average_duration" />
                     <StatCard label="Transcribed" :value="report.summary.transcribed_count" />
                     <StatCard label="Summarized" :value="report.summary.summarized_count" />
+                </div>
+
+                <div class="rounded-lg bg-white p-5 ring-1 ring-gray-200">
+                    <div>
+                        <h2 class="text-sm font-semibold text-gray-900">AI Executive Summary</h2>
+                        <p class="mt-1 text-sm text-gray-500">
+                            Leadership brief across the selected period. Use Generate Summary above, or include it in emailed reports below.
+                        </p>
+                    </div>
+
+                    <p v-if="!executiveSummaryAvailable" class="mt-4 text-sm text-amber-700">
+                        OpenAI API key is not configured on this server.
+                    </p>
+
+                    <p v-else-if="!canGenerateExecutiveSummary" class="mt-4 text-sm text-gray-500">
+                        No summarized calls are available for this period.
+                    </p>
+
+                    <p v-else-if="!executiveSummary" class="mt-4 text-sm text-gray-500">
+                        Click Generate Summary to create the brief for this date range.
+                    </p>
+
+                    <div v-if="executiveSummary" class="mt-5 space-y-5 text-sm text-gray-700">
+                        <div v-if="executiveSummary.overview">
+                            <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Overview</h3>
+                            <p class="whitespace-pre-line">{{ executiveSummary.overview }}</p>
+                        </div>
+
+                        <div v-if="executiveSummary.highlights?.length">
+                            <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Highlights</h3>
+                            <ul class="list-disc space-y-1 pl-5">
+                                <li v-for="item in executiveSummary.highlights" :key="item">{{ item }}</li>
+                            </ul>
+                        </div>
+
+                        <div v-if="executiveSummary.concerns?.length">
+                            <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Concerns</h3>
+                            <ul class="list-disc space-y-1 pl-5">
+                                <li v-for="item in executiveSummary.concerns" :key="item">{{ item }}</li>
+                            </ul>
+                        </div>
+
+                        <div v-if="executiveSummary.recommendations?.length">
+                            <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Recommendations</h3>
+                            <ul class="list-disc space-y-1 pl-5">
+                                <li v-for="item in executiveSummary.recommendations" :key="item">{{ item }}</li>
+                            </ul>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -173,6 +234,11 @@
                     <textarea v-model="sendEmailsText" rows="3"
                         class="mt-1 block w-full rounded-md border-0 py-2 text-sm text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600"
                         placeholder="email1@example.com, email2@example.com"></textarea>
+                    <label v-if="executiveSummaryAvailable" class="mt-4 inline-flex items-center gap-2 text-sm text-gray-700">
+                        <input v-model="sendIncludeExecutiveSummary" type="checkbox"
+                            class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-600" />
+                        Include AI executive summary
+                    </label>
                     <button type="button" @click="sendReportNow" :disabled="sending"
                         class="mt-4 inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-50">
                         Send Report
@@ -191,6 +257,12 @@
                             <input v-model="schedule.enabled" type="checkbox"
                                 class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-600" />
                             Enable scheduled report
+                        </label>
+
+                        <label v-if="executiveSummaryAvailable" class="inline-flex items-center gap-2 text-sm text-gray-700">
+                            <input v-model="schedule.include_executive_summary" type="checkbox"
+                                class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-600" />
+                            Include AI executive summary
                         </label>
 
                         <div>
@@ -279,13 +351,16 @@ const props = defineProps({
     timezone: String,
     routes: Object,
     permissions: Object,
+    executiveSummaryAvailable: Boolean,
 });
 
 const loading = ref(false);
 const exporting = ref(false);
+const generatingExecutiveSummary = ref(false);
 const sending = ref(false);
 const savingSchedule = ref(false);
 const report = ref(null);
+const executiveSummary = ref(null);
 const notificationShow = ref(false);
 const notificationType = ref(null);
 const notificationMessages = ref('');
@@ -302,6 +377,7 @@ const filterData = ref({
 
 const schedule = ref({
     enabled: false,
+    include_executive_summary: false,
     emails: [],
     frequency: 'weekly',
     send_time: '08:00',
@@ -311,6 +387,7 @@ const schedule = ref({
 
 const sendEmailsText = ref('');
 const scheduleEmailsText = ref('');
+const sendIncludeExecutiveSummary = ref(false);
 
 const weekDays = [
     { value: 0, label: 'Sunday' },
@@ -405,6 +482,10 @@ const sentimentBreakdown = computed(() => {
 
 const sentimentTotal = computed(() => sentimentBreakdown.value.reduce((sum, item) => sum + item.count, 0));
 
+const canGenerateExecutiveSummary = computed(() => {
+    return props.executiveSummaryAvailable && (report.value?.summary?.summarized_count ?? 0) > 0;
+});
+
 const sentimentChartData = computed(() => ({
     labels: sentimentBreakdown.value.map((item) => item.label),
     datasets: [{
@@ -458,6 +539,7 @@ const parseEmails = (value) => {
 
 const loadReport = () => {
     loading.value = true;
+    executiveSummary.value = null;
 
     axios.get(props.routes.report_route, {
         params: {
@@ -470,6 +552,31 @@ const loadReport = () => {
         .catch(handleErrorResponse)
         .finally(() => {
             loading.value = false;
+        });
+};
+
+const generateExecutiveSummary = () => {
+    if (!props.executiveSummaryAvailable) {
+        showNotification('error', { executive_summary: ['OpenAI API key is not configured on this server.'] });
+        return;
+    }
+
+    if (!canGenerateExecutiveSummary.value) {
+        showNotification('error', { executive_summary: ['No summarized calls are available for this period.'] });
+        return;
+    }
+
+    generatingExecutiveSummary.value = true;
+
+    axios.post(props.routes.executive_summary_route, {
+        filter: filterData.value,
+    })
+        .then((response) => {
+            executiveSummary.value = response.data.executive_summary ?? null;
+        })
+        .catch(handleErrorResponse)
+        .finally(() => {
+            generatingExecutiveSummary.value = false;
         });
 };
 
@@ -511,6 +618,7 @@ const loadSchedule = () => {
             const row = response.data.schedule ?? {};
             schedule.value = {
                 enabled: !!row.enabled,
+                include_executive_summary: !!row.include_executive_summary,
                 emails: row.emails ?? [],
                 frequency: row.frequency ?? 'weekly',
                 send_time: row.send_time ?? '08:00',
@@ -536,6 +644,7 @@ const sendReportNow = () => {
 
     axios.post(props.routes.send_route, {
         emails,
+        include_executive_summary: sendIncludeExecutiveSummary.value,
         filter: filterData.value,
     })
         .then((response) => {

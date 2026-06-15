@@ -607,6 +607,7 @@ Route::group(['middleware' => ['auth:sanctum', 'api.cookie.auth']], function () 
     Route::get('/recorder/data', [RecorderController::class, 'getData'])->name('recorder.data');
     Route::get('/recorder/analytics/report', [RecorderAnalyticsController::class, 'report'])->name('recorder.analytics.report');
     Route::get('/recorder/analytics/export', [RecorderAnalyticsController::class, 'export'])->name('recorder.analytics.export');
+    Route::post('/recorder/analytics/executive-summary', [RecorderAnalyticsController::class, 'executiveSummary'])->name('recorder.analytics.executive-summary');
     Route::match(['get', 'put'], '/recorder/analytics/schedule', [RecorderAnalyticsController::class, 'schedule'])->name('recorder.analytics.schedule');
     Route::post('/recorder/analytics/send', [RecorderAnalyticsController::class, 'send'])->name('recorder.analytics.send');
 

@@ -46,6 +46,7 @@ class RecorderAnalyticsController extends Controller
                 'current_page' => route('recorder.analytics.index'),
                 'report_route' => route('recorder.analytics.report'),
                 'export_route' => route('recorder.analytics.export'),
+                'executive_summary_route' => route('recorder.analytics.executive-summary'),
                 'schedule_route' => route('recorder.analytics.schedule'),
                 'send_route' => route('recorder.analytics.send'),
                 'recorder_page' => route('recorder.index'),
@@ -53,6 +54,7 @@ class RecorderAnalyticsController extends Controller
             'permissions' => fn () => [
                 'schedule' => userCheckPermission('recorder_analytics_schedule'),
             ],
+            'executiveSummaryAvailable' => $this->analyticsService->isExecutiveSummaryAvailable(),
         ]);
     }
 
@@ -83,6 +85,37 @@ class RecorderAnalyticsController extends Controller
         ]);
     }
 
+    public function executiveSummary(Request $request)
+    {
+        $this->authorizeAnalytics();
+
+        if (! $this->analyticsService->isExecutiveSummaryAvailable()) {
+            return response()->json([
+                'errors' => ['executive_summary' => ['OpenAI API key is not configured.']],
+            ], 422);
+        }
+
+        $domainUuid = session('domain_uuid');
+        [$startPeriod, $endPeriod] = $this->resolveDateRange($request, $domainUuid);
+        $report = $this->analyticsService->buildReport($domainUuid, $startPeriod, $endPeriod);
+
+        try {
+            return response()->json([
+                'executive_summary' => $this->analyticsService->generateExecutiveSummary($report),
+            ]);
+        } catch (\RuntimeException $exception) {
+            return response()->json([
+                'errors' => ['executive_summary' => [$exception->getMessage()]],
+            ], 422);
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return response()->json([
+                'errors' => ['executive_summary' => ['Unable to generate executive summary. Please try again.']],
+            ], 502);
+        }
+    }
+
     public function schedule(Request $request)
     {
         $this->authorizeAnalytics();
@@ -99,6 +132,7 @@ class RecorderAnalyticsController extends Controller
                     ['domain_uuid' => $domainUuid],
                     [
                         'enabled' => false,
+                        'include_executive_summary' => false,
                         'emails' => [],
                         'frequency' => 'weekly',
                         'send_time' => '08:00',
@@ -112,6 +146,7 @@ class RecorderAnalyticsController extends Controller
 
         $data = $request->validate([
             'enabled' => ['required', 'boolean'],
+            'include_executive_summary' => ['sometimes', 'boolean'],
             'emails' => ['nullable', 'array'],
             'emails.*' => ['email'],
             'frequency' => ['required', 'in:daily,weekly,monthly'],
@@ -132,6 +167,7 @@ class RecorderAnalyticsController extends Controller
             ['domain_uuid' => $domainUuid],
             [
                 'enabled' => (bool) $data['enabled'],
+                'include_executive_summary' => (bool) ($data['include_executive_summary'] ?? false),
                 'emails' => $emails,
                 'frequency' => $data['frequency'],
                 'send_time' => $data['send_time'],
@@ -165,6 +201,7 @@ class RecorderAnalyticsController extends Controller
             'filter.dateRange' => ['required', 'array', 'size:2'],
             'filter.dateRange.0' => ['required', 'date'],
             'filter.dateRange.1' => ['required', 'date'],
+            'include_executive_summary' => ['sometimes', 'boolean'],
         ]);
 
         $emails = $this->analyticsService->normalizeEmails($data['emails']);
@@ -180,7 +217,8 @@ class RecorderAnalyticsController extends Controller
             $domainUuid,
             $startPeriod->toIso8601String(),
             $endPeriod->toIso8601String(),
-            $emails
+            $emails,
+            (bool) ($data['include_executive_summary'] ?? false),
         )->onQueue('emails');
 
         return response()->json([

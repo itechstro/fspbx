@@ -11,7 +11,13 @@ class RecorderAnalyticsService
     public function __construct(
         protected CdrDataService $cdrDataService,
         protected ContactCallerIdResolver $contactCallerIdResolver,
+        protected OpenAIService $openAIService,
     ) {
+    }
+
+    public function isExecutiveSummaryAvailable(): bool
+    {
+        return $this->openAIService->isConfigured();
     }
 
     public function buildReport(string $domainUuid, Carbon $startUtc, Carbon $endUtc): array
@@ -188,6 +194,82 @@ class RecorderAnalyticsService
         $end = collect($report['calls_by_day'] ?? [])->pluck('date')->last() ?? $start;
 
         return sprintf('recorder-analytics-%s-to-%s.csv', $start, $end);
+    }
+
+    public function buildExecutiveSummaryContext(array $report): array
+    {
+        $callSummaries = collect($report['calls'] ?? [])
+            ->filter(fn (array $call) => trim((string) ($call['summary'] ?? '')) !== '')
+            ->take(40)
+            ->map(fn (array $call) => [
+                'date' => $call['date'] ?? null,
+                'caller' => $call['caller'] ?? null,
+                'dialed' => $call['dialed'] ?? null,
+                'sentiment' => $call['sentiment'] ?? null,
+                'summary' => $call['summary'] ?? null,
+            ])
+            ->values()
+            ->all();
+
+        return [
+            'period_label' => $report['period_label'] ?? null,
+            'generated_at' => $report['generated_at'] ?? null,
+            'summary' => $report['summary'] ?? [],
+            'calls_by_day' => $report['calls_by_day'] ?? [],
+            'status_breakdown' => $report['status_breakdown'] ?? [],
+            'top_topics' => $report['top_topics'] ?? [],
+            'call_summaries' => $callSummaries,
+        ];
+    }
+
+    public function generateExecutiveSummary(array $report): array
+    {
+        if (! $this->isExecutiveSummaryAvailable()) {
+            throw new \RuntimeException('OpenAI API key is not configured.');
+        }
+
+        $summarizedCount = (int) data_get($report, 'summary.summarized_count', 0);
+        if ($summarizedCount < 1) {
+            throw new \RuntimeException('No summarized calls are available for this period.');
+        }
+
+        $decoded = $this->openAIService->createExecutiveSummary(
+            $this->buildExecutiveSummaryContext($report)
+        );
+
+        return [
+            'overview' => trim((string) ($decoded['overview'] ?? '')) ?: null,
+            'highlights' => $this->normalizeSummaryList($decoded['highlights'] ?? []),
+            'concerns' => $this->normalizeSummaryList($decoded['concerns'] ?? []),
+            'recommendations' => $this->normalizeSummaryList($decoded['recommendations'] ?? []),
+            'generated_at' => now()->toIso8601String(),
+        ];
+    }
+
+    public function maybeAttachExecutiveSummary(array $report, bool $includeExecutiveSummary): array
+    {
+        if (! $includeExecutiveSummary) {
+            return $report;
+        }
+
+        try {
+            $report['executive_summary'] = $this->generateExecutiveSummary($report);
+        } catch (\Throwable $exception) {
+            report($exception);
+            $report['executive_summary'] = null;
+            $report['executive_summary_error'] = $exception->getMessage();
+        }
+
+        return $report;
+    }
+
+    protected function normalizeSummaryList(mixed $items): array
+    {
+        return collect((array) $items)
+            ->map(fn ($item) => trim((string) $item))
+            ->filter()
+            ->values()
+            ->all();
     }
 
     public function scheduledPeriod(string $frequency, string $domainUuid): array
