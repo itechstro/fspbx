@@ -15,6 +15,7 @@ use App\Http\Controllers\CallBlockController;
 use App\Http\Controllers\CallFlowController;
 use App\Http\Controllers\CallTranscriptionController;
 use App\Http\Controllers\CdrsController;
+use App\Http\Controllers\RecorderController;
 use App\Http\Controllers\CharPmsWebhookController;
 use App\Http\Controllers\ConferenceCenterController;
 use App\Http\Controllers\ConferenceController;
@@ -601,6 +602,8 @@ Route::group(['middleware' => ['auth:sanctum', 'api.cookie.auth']], function () 
     Route::post('/call-detail-records/recordings/transcribe', [CallTranscriptionController::class, 'transcribe'])->name('cdrs.recording.transcribe');
     Route::post('/call-detail-records/recordings/summarize', [CallTranscriptionController::class, 'summarize'])->name('cdrs.recording.summarize');
     Route::post('/call-detail-records/recordings/translate', [CallTranscriptionController::class, 'translate'])->name('cdrs.recording.translate');
+
+    Route::get('/recorder/data', [RecorderController::class, 'getData'])->name('recorder.data');
 
     // Account Settings
     Route::put('account-settings/update', [AccountSettingsController::class, 'update'])->name('account-settings.update');

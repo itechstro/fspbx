@@ -50,6 +50,10 @@ class SummarizeCallTranscription implements ShouldQueue
                     'summary_status' => 'failed',
                     'summary_error'  => 'No utterances available for summarization.',
                 ]);
+
+                app(\App\Services\CallTranscription\CallTranscriptionService::class)
+                    ->maybeDispatchTranscriptionEmail($row);
+
                 return;
             }
 
@@ -112,6 +116,9 @@ class SummarizeCallTranscription implements ShouldQueue
                 'summary_status' => 'failed',
                 'summary_error'  => Str::limit($short, 1000), // cap length for DB
             ]);
+
+            app(\App\Services\CallTranscription\CallTranscriptionService::class)
+                ->maybeDispatchTranscriptionEmail($row);
 
         } catch (\Throwable $inner) {
             // Never let failed() crash; log both

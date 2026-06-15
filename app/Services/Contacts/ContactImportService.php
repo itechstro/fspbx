@@ -104,7 +104,10 @@ class ContactImportService
                 $number = $this->stringValue($row['phone_number'] ?? null);
             }
 
-            if ($number === null) {
+            $extension = $this->stringValue($row["phone_{$index}_extension"] ?? null)
+                ?? ($index === 1 ? $this->stringValue($row['phone_extension'] ?? null) : null);
+
+            if ($number === null && $extension === null) {
                 continue;
             }
 
@@ -114,8 +117,7 @@ class ContactImportService
             $phones[] = [
                 'phone_number' => $number,
                 'phone_label' => $label,
-                'phone_extension' => $this->stringValue($row["phone_{$index}_extension"] ?? null)
-                    ?? ($index === 1 ? $this->stringValue($row['phone_extension'] ?? null) : null),
+                'phone_extension' => $extension,
                 'phone_speed_dial' => $this->stringValue($row["phone_{$index}_speed_dial"] ?? null)
                     ?? ($index === 1 ? $this->stringValue($row['phone_speed_dial'] ?? null) : null),
                 'phone_type_voice' => 1,

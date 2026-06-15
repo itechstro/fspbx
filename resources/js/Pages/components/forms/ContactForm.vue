@@ -125,7 +125,7 @@
 
                                                 <!-- Phones -->
                                                 <StaticElement name="phones_header" tag="h4" content="Phone Numbers"
-                                                    description="Voice, mobile, fax, and speed-dial codes for this contact." />
+                                                    description="Use Number for external phones. For recorder or site codes, enter the code in Extension and leave Number blank." />
 
                                                 <ListElement name="phones" :sort="false" size="sm"
                                                     :controls="{ add: permissions.phone, remove: permissions.phone }"
@@ -137,10 +137,11 @@
                                                                 :items="phoneLabels" :search="true" :native="false"
                                                                 :floating="false" :columns="{ sm: { container: 4 } }" />
                                                             <TextElement name="phone_number" label="Number"
-                                                                placeholder="Phone number" :floating="false"
+                                                                placeholder="Phone number (optional)" :floating="false"
                                                                 :columns="{ sm: { container: 4 } }" />
                                                             <TextElement name="phone_extension" label="Extension"
-                                                                :floating="false" :columns="{ sm: { container: 4 } }" />
+                                                                placeholder="Extension or site code" :floating="false"
+                                                                :columns="{ sm: { container: 4 } }" />
                                                             <TextElement name="phone_speed_dial" label="Speed Dial"
                                                                 :floating="false" :columns="{ sm: { container: 4 } }" />
                                                             <ToggleElement name="phone_primary" text="Primary"
@@ -607,7 +608,7 @@ const mapPhones = (rows = []) => rows.map((row) => ({
     phone_speed_dial: row.phone_speed_dial ?? null,
     phone_primary: flagValue(row.phone_primary),
     phone_type_voice: row.phone_type_voice === undefined || row.phone_type_voice === null
-        ? (row.phone_number ? "1" : "0")
+        ? ((row.phone_number || row.phone_extension) ? "1" : "0")
         : flagValue(row.phone_type_voice),
     phone_type_fax: flagValue(row.phone_type_fax),
     phone_type_text: flagValue(row.phone_type_text),

@@ -105,7 +105,7 @@ class DashboardController extends Controller
         //     ->whereRaw("start_stamp >= '" . date('Y-m-d') . " 00:00:00.00 " . get_domain_setting('time_zone') . "'")
         //     ->count();
 
-        $cdrDataService = new CdrDataService();
+        $cdrDataService = app(CdrDataService::class);
         $timezone = get_local_time_zone($domain_uuid);
         $startPeriod = Carbon::now($timezone)->startOfDay()->setTimeZone('UTC')->getTimestamp();
         $endPeriod = Carbon::now($timezone)->endOfDay()->setTimeZone('UTC')->getTimestamp();

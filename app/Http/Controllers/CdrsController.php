@@ -90,9 +90,6 @@ class CdrsController extends Controller
                 'permissions' => function () {
                     return $this->getPermissions();
                 },
-                'showRecorderFilter' => function () use ($domain_uuid) {
-                    return $this->cdrDataService->isRecorderFilterEnabled($domain_uuid);
-                },
                 'pagination' => [
                     'per_page' => fspbx_pagination_per_page(),
                     'per_page_options' => fspbx_pagination_options(),
@@ -144,7 +141,7 @@ class CdrsController extends Controller
                 throw new \Exception("Failed to fetch item details. Item not found");
             }
 
-            if ($item->direction === 'recorder' && !$this->cdrDataService->isRecorderFilterEnabled($item->domain_uuid)) {
+            if ($item->direction === 'recorder') {
                 throw new \Exception("Failed to fetch item details. Item not found");
             }
 
@@ -209,7 +206,7 @@ class CdrsController extends Controller
                 throw new \Exception("Failed to fetch item details. Item not found");
             }
 
-            if ($item->direction === 'recorder' && !$this->cdrDataService->isRecorderFilterEnabled($item->domain_uuid)) {
+            if ($item->direction === 'recorder') {
                 throw new \Exception("Failed to fetch item details. Item not found");
             }
 
@@ -634,7 +631,9 @@ class CdrsController extends Controller
         $config = $transcriptionService->getCachedConfig(session('domain_uuid') ?? null);
         $isCallTranscriptionServiceEnabled = (bool) ($config['enabled'] ?? false);
 
-        $permissions['search_sentiment'] = userCheckPermission('xml_cdr_search_sentiment') && $isCallTranscriptionServiceEnabled;
+        $permissions['search_sentiment'] = userCheckPermission('xml_cdr_search_sentiment')
+            && $isCallTranscriptionServiceEnabled
+            && (bool) ($config['auto_summarize'] ?? false);
 
         return $permissions;
     }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Webhooks\Jobs;
 
+use App\Models\CDR;
 use App\Models\CallTranscription;
 use App\Services\CallTranscription\CallTranscriptionService;
 use Spatie\WebhookClient\Models\WebhookCall;
@@ -43,18 +44,34 @@ class ProcessAssemblyAiWebhookJob extends SpatieProcessWebhookJob
             // Remove heavy fields like "words" everywhere in the structure
             $sanitized = $full ? $this->deepUnsetKeys($full, ['words']) : null;
 
-            $row->update([
+            $direction = CDR::query()
+                ->where('xml_cdr_uuid', $row->xml_cdr_uuid)
+                ->value('direction');
+
+            $shouldSummarize = $service->shouldAutoSummarize($row->domain_uuid, $direction);
+
+            $updates = [
                 'status'          => 'completed',
                 'result_payload'  => $sanitized ?: null,
                 'completed_at'    => now(),
                 'error_message'   => null,
-                'summary_status'       => 'pending',
-                'summary_error'        => null,
-                'summary_requested_at' => now(),
-            ]);
+            ];
 
-            // Dispatch the job for summaries
-            dispatch(new \App\Jobs\SummarizeCallTranscription($row->uuid))->onQueue('transcriptions');
+            if ($shouldSummarize) {
+                $updates['summary_status'] = 'pending';
+                $updates['summary_error'] = null;
+                $updates['summary_requested_at'] = now();
+            }
+
+            $row->update($updates);
+
+            if ($shouldSummarize) {
+                dispatch(new \App\Jobs\SummarizeCallTranscription($row->uuid))->onQueue('transcriptions');
+            } elseif ($service->shouldAutoTranslate($row->domain_uuid, $direction)) {
+                dispatch(new \App\Jobs\TranslateCallTranscription($row->uuid))->onQueue('transcriptions');
+            } else {
+                $service->maybeDispatchTranscriptionEmail($row);
+            }
 
         } elseif ($status === 'error') {
             // Pull the current transcript for error details if useful

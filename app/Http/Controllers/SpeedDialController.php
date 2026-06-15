@@ -74,7 +74,7 @@ class SpeedDialController extends Controller
         $domainUuid = session('domain_uuid');
         $data = $data->where('domain_uuid', $domainUuid);
         $data->with(['primaryPhone' => function ($query) {
-            $query->select('contact_phone_uuid', 'contact_uuid', 'phone_number', 'phone_speed_dial');
+            $query->select('contact_phone_uuid', 'contact_uuid', 'phone_number', 'phone_extension', 'phone_speed_dial');
         }]);
         $data->with(['speedDialUser' => function ($query) {
             $query->select('contact_user_uuid', 'contact_uuid', 'user_uuid')->with(['user' => function ($query) {

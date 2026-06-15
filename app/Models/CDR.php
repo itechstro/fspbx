@@ -32,7 +32,9 @@ class CDR extends Model
         'created_at_formatted',
         'caller_id_number_formatted',
         'caller_destination_formatted',
+        'caller_destination_name_formatted',
         'destination_number_formatted',
+        'destination_number_name_formatted',
         'caller_id_name_formatted',
         'start_date',
         'start_time',
@@ -58,13 +60,58 @@ class CDR extends Model
 
     public function getCallerIdNameFormattedAttribute()
     {
-        // If the "name" looks like a US +1 number, normalize it
-        if (preg_match('/^(?:\+?1)?[2-9]\d{9}$/', $this->caller_id_name)) {
-            return $this->formatCdrPhoneNumber($this->caller_id_name);
+        $name = $this->resolveCallerIdDisplayName();
+
+        if ($name === null || $name === '') {
+            return null;
         }
 
-        // Otherwise return as-is (because it's likely a real name)
-        return $this->caller_id_name;
+        if ($this->callerIdNameLooksLikePhone($name)) {
+            return $this->formatCdrPhoneNumber($name);
+        }
+
+        return $name;
+    }
+
+    protected function resolveCallerIdDisplayName(): ?string
+    {
+        $contactName = trim((string) ($this->attributes['resolved_caller_id_name'] ?? ''));
+
+        if ($contactName !== '') {
+            return $contactName;
+        }
+
+        $raw = trim((string) ($this->caller_id_name ?? ''));
+
+        if ($raw !== '' && ! $this->callerIdNameLooksLikePhone($raw) && ! $this->callerIdNameIsDigitsOnly($raw)) {
+            return $raw;
+        }
+
+        return $raw !== '' ? $raw : null;
+    }
+
+    protected function callerIdNameLooksLikePhone(?string $name): bool
+    {
+        $name = trim((string) $name);
+
+        if ($name === '') {
+            return false;
+        }
+
+        if (preg_match('/^(?:\+?1)?[2-9]\d{9}$/', $name)) {
+            return true;
+        }
+
+        $digits = phoneNumberDigits($name);
+
+        return (bool) preg_match('/^1?[2-9]\d{9}$/', $digits);
+    }
+
+    protected function callerIdNameIsDigitsOnly(?string $name): bool
+    {
+        $digits = phoneNumberDigits($name);
+
+        return $digits !== '' && ctype_digit($digits);
     }
 
     public function getCallerDestinationFormattedAttribute()
@@ -76,6 +123,13 @@ class CDR extends Model
         return $this->formatCdrPhoneNumber($this->caller_destination);
     }
 
+    public function getCallerDestinationNameFormattedAttribute(): ?string
+    {
+        $name = trim((string) ($this->attributes['resolved_dialed_name'] ?? ''));
+
+        return $name !== '' ? $name : null;
+    }
+
     public function getDestinationNumberFormattedAttribute()
     {
         if ($this->destination_number === null || $this->destination_number === '') {
@@ -83,6 +137,13 @@ class CDR extends Model
         }
 
         return $this->formatCdrPhoneNumber($this->destination_number);
+    }
+
+    public function getDestinationNumberNameFormattedAttribute(): ?string
+    {
+        $name = trim((string) ($this->attributes['resolved_recipient_name'] ?? ''));
+
+        return $name !== '' ? $name : null;
     }
 
     public function getStartDateAttribute()

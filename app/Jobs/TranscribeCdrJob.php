@@ -4,6 +4,8 @@ namespace App\Jobs;
 
 use Illuminate\Bus\Queueable;
 use App\Models\CallTranscription;
+use App\Models\CDR;
+use App\Services\CdrDataService;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Queue\InteractsWithQueue;
@@ -76,7 +78,14 @@ class TranscribeCdrJob implements ShouldQueue
     public function handle(CallTranscriptionService $service): void
     {
         Redis::throttle('transcriptions')->allow(1)->every(1)->then(function () use ($service) {
-    
+            $direction = CDR::query()
+                ->where('xml_cdr_uuid', $this->xmlCdrUuid)
+                ->value('direction');
+
+            if ($direction === 'recorder' && ! app(CdrDataService::class)->isPrimaryRecorderLeg($this->xmlCdrUuid)) {
+                return;
+            }
+
             $providerKey = $service->currentProviderKey($this->domainUuid);
 
             if (!$providerKey) {
@@ -96,6 +105,7 @@ class TranscribeCdrJob implements ShouldQueue
                     'completed_at'    => null,
                     'failed_at'       => null,
                     'error_message'   => null,
+                    'notification_email_sent_at' => null,
                 ]
             );
     

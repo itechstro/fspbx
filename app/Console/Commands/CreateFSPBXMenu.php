@@ -117,6 +117,7 @@ class CreateFSPBXMenu extends Command
                     ['title' => 'Bridges', 'link' => '/bridges', 'groups' => ['superadmin']],
                     ['title' => 'Call Block', 'link' => '/call-blocks', 'groups' => ['superadmin', 'admin', 'user']],
                     ['title' => 'Call History', 'link' => '/call-detail-records', 'groups' => ['superadmin', 'admin', 'user']],
+                    ['title' => 'Recorder', 'link' => '/recorder', 'groups' => ['superadmin', 'admin', 'user']],
                     ['title' => 'Call Flows', 'link' => '/call-flows', 'groups' => ['superadmin', 'admin']],
                     ['title' => 'Conference Centers', 'link' => '/conference-centers', 'groups' => ['superadmin', 'admin']],
                     ['title' => 'Conferences', 'link' => '/conferences', 'groups' => ['superadmin', 'admin']],

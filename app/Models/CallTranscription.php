@@ -27,6 +27,7 @@ class CallTranscription extends Model
         'summary_completed_at'   => 'datetime',
         'translation_requested_at' => 'datetime',
         'translation_completed_at' => 'datetime',
+        'notification_email_sent_at' => 'datetime',
     ];
 
     protected $fillable = [
@@ -34,6 +35,7 @@ class CallTranscription extends Model
         'error_message','request_payload','response_payload','result_payload',
         'summary_external_id', 'summary_status', 'summary_error', 'summary_payload', 'summary_requested_at', 'summary_completed_at',
         'translation_external_id', 'translation_status', 'translation_error', 'translation_payload', 'translation_requested_at', 'translation_completed_at', 'translation_target_language',
+        'notification_email_sent_at',
         'requested_at','completed_at',
     ];
 }

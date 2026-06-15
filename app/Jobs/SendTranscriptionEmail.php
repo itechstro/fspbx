@@ -74,11 +74,48 @@ class SendTranscriptionEmail implements ShouldQueue
         Redis::throttle('transcriptions')->allow(1)->every(1)->then(function () {
 
             $transcription = CallTranscription::find($this->transcriptionUuid);
-            if (!$transcription) return;
+            if (!$transcription) {
+                return;
+            }
+
+            if ($transcription->notification_email_sent_at) {
+                return;
+            }
+
+            $transcriptionService = app(\App\Services\CallTranscription\CallTranscriptionService::class);
+            if (! $transcriptionService->isTranscriptionEmailReady($transcription)) {
+                if ($this->attempts() < $this->tries) {
+                    $this->release(90);
+                }
+
+                return;
+            }
+
+            $claimed = CallTranscription::query()
+                ->where('uuid', $transcription->uuid)
+                ->whereNull('notification_email_sent_at')
+                ->update(['notification_email_sent_at' => now()]);
+
+            if (! $claimed) {
+                return;
+            }
+
+            $transcription = $transcription->fresh();
+            if (! $transcription || ! $transcriptionService->hasEmailContent($transcription)) {
+                CallTranscription::query()
+                    ->where('uuid', $this->transcriptionUuid)
+                    ->update(['notification_email_sent_at' => null]);
+
+                if ($this->attempts() < $this->tries) {
+                    $this->release(90);
+                }
+
+                return;
+            }
 
             // 1. Decode Payloads
-            $summaryPayload = $transcription->summary_payload;
-            $resultPayload  = $transcription->result_payload;
+            $summaryPayload = $transcription->summary_payload ?? [];
+            $resultPayload  = $transcription->result_payload ?? [];
 
             // 2. Create Speaker Map (The most important logic)
             // Maps "A" -> "Vanessa (Agent)" and "B" -> "Customer"
@@ -101,13 +138,21 @@ class SendTranscriptionEmail implements ShouldQueue
             }
 
             // 3. Prepare Display Data
+            $summaryText = trim((string) ($summaryPayload['summary'] ?? ''));
+            $hasSummary = $summaryText !== '' && $summaryText !== 'No summary available.';
+            $hasTranslation = (bool) (
+                data_get($transcription->translation_payload, 'text')
+                || data_get($transcription->translation_payload, 'utterances')
+            );
+
             $data = [
                 'id'             => $transcription->uuid,
                 'date'           => $transcription->created_at->format('F j, Y @ g:i A'),
                 'duration'       => gmdate("i:s", $resultPayload['audio_duration'] ?? 0),
-                'sentiment'      => ucfirst($summaryPayload['sentiment_overall'] ?? 'Neutral'),
-                'summary'        => $summaryPayload['summary'] ?? 'No summary available.',
-                'action_items'   => $summaryPayload['action_items'] ?? [],
+                'has_summary'    => $hasSummary,
+                'sentiment'      => $hasSummary ? ucfirst($summaryPayload['sentiment_overall'] ?? 'Neutral') : null,
+                'summary'        => $hasSummary ? $summaryText : null,
+                'action_items'   => $hasSummary ? ($summaryPayload['action_items'] ?? []) : [],
                 'utterances'     => $resultPayload['utterances'] ?? [],
                 'speaker_map'    => $speakerMap,
                 'agent_label'    => $agentLabel,
@@ -115,9 +160,11 @@ class SendTranscriptionEmail implements ShouldQueue
                 'translation_utterances' => data_get($transcription->translation_payload, 'utterances', []),
                 'translation_summary' => data_get($transcription->translation_payload, 'summary_text'),
                 'translation_target_language' => $transcription->translation_target_language,
-                'email_subject'  => data_get($transcription->translation_payload, 'text')
-                    ? 'New transcription and translation'
-                    : 'New transcription'
+                'email_subject'  => match (true) {
+                    $hasTranslation => 'New transcription and translation',
+                    $hasSummary => 'New call transcription summary',
+                    default => 'New call transcription',
+                },
             ];
 
             // 4. Send Email

@@ -2,10 +2,10 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\CdrDataService;
 use Inertia\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Session;
-use PhpParser\Node\Expr\FuncCall;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -39,7 +39,7 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         return array_merge(parent::share($request), [
-            'menus' => Session::get('menu'),
+            'menus' => fn () => $this->visibleMenus(),
 
             'domainSelectPermission' => Session::get('domain_select'),
 
@@ -103,5 +103,55 @@ class HandleInertiaRequests extends Middleware
 
         // logger($permissions);
         return $permissions;
+    }
+
+    private function visibleMenus()
+    {
+        $menus = Session::get('menu');
+
+        if (empty($menus)) {
+            return $menus;
+        }
+
+        if (app(CdrDataService::class)->isRecorderEnabled(session('domain_uuid'))) {
+            return $menus;
+        }
+
+        return $this->filterRecorderMenuItems($menus);
+    }
+
+    private function filterRecorderMenuItems($menus): array
+    {
+        $filtered = [];
+
+        foreach ($menus as $menu) {
+            if ($this->isRecorderMenuLink($menu->menu_item_link ?? null)) {
+                continue;
+            }
+
+            $item = clone $menu;
+
+            if (! empty($menu->child_menu)) {
+                $item->child_menu = collect($menu->child_menu)
+                    ->reject(fn ($child) => $this->isRecorderMenuLink($child->menu_item_link ?? null))
+                    ->values()
+                    ->all();
+            }
+
+            $filtered[] = $item;
+        }
+
+        return $filtered;
+    }
+
+    private function isRecorderMenuLink(?string $link): bool
+    {
+        if ($link === null || $link === '') {
+            return false;
+        }
+
+        $path = parse_url($link, PHP_URL_PATH) ?? $link;
+
+        return rtrim($path, '/') === '/recorder';
     }
 }

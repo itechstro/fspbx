@@ -35,14 +35,36 @@ class SpeedDialPhone extends Model
         'update_user'
     ];
 
-    protected $appends = ['phone_number_formatted'];
+    protected $appends = ['phone_number_formatted', 'phone_list_display'];
 
     /**
      * Accessor: Get phone number formatted
      */
     public function getPhoneNumberFormattedAttribute()
     {
-        return formatPhoneNumber($this->phone_number, "US", PhoneNumberFormat::NATIONAL);
+        $number = trim((string) ($this->phone_number ?? ''));
+
+        if ($number === '') {
+            return null;
+        }
+
+        return formatPhoneNumber($number, 'US', PhoneNumberFormat::NATIONAL);
+    }
+
+    public function getPhoneListDisplayAttribute(): ?string
+    {
+        $number = trim((string) ($this->phone_number ?? ''));
+        $extension = trim((string) ($this->phone_extension ?? ''));
+
+        if ($number !== '') {
+            return $this->phone_number_formatted ?: $number;
+        }
+
+        if ($extension !== '') {
+            return 'extension: ' . $extension;
+        }
+
+        return null;
     }
 
     /**

@@ -21,7 +21,7 @@ class CallTranscriptionReady extends BaseMailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Call transcription ready',
+            subject: $this->data['email_subject'] ?? 'Call transcription ready',
         );
     }
 

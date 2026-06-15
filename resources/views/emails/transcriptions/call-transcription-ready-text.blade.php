@@ -2,6 +2,7 @@ CALL TRANSCRIPTION REPORT
 =========================
 Date:      {{ $data['date'] }}
 Duration:  {{ $data['duration'] }}
+@if(!empty($data['has_summary']))
 Sentiment: {{ $data['sentiment'] }}
 
 EXECUTIVE SUMMARY
@@ -12,6 +13,7 @@ EXECUTIVE SUMMARY
 SUMMARY TRANSLATION @if(!empty($data['translation_target_language']))({{ $data['translation_target_language'] }})@endif
 --------------------------------------------------------------------
 {{ $data['translation_summary'] }}
+@endif
 @endif
 
 @if(!empty($data['action_items']))

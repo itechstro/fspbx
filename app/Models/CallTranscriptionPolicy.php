@@ -20,11 +20,18 @@ class CallTranscriptionPolicy extends Model
         'domain_uuid',
         'enabled',
         'auto_transcribe',
+        'auto_summarize',
+        'auto_transcribe_recorder',
+        'auto_summarize_recorder',
         'auto_translate',
+        'auto_translate_recorder',
         'provider_uuid',
         'email_transcription',
+        'email_transcription_recorder',
         'email_translation',
+        'email_translation_recorder',
         'email',
+        'email_recorder',
         'translation_language',
     ];
 

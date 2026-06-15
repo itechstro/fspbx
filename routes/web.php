@@ -17,6 +17,7 @@ use App\Http\Controllers\CallRecordingController;
 use App\Http\Controllers\CallFlowController;
 use App\Http\Controllers\CallRoutingOptionsController;
 use App\Http\Controllers\CdrsController;
+use App\Http\Controllers\RecorderController;
 use App\Http\Controllers\ConferenceCenterController;
 use App\Http\Controllers\ConferenceController;
 use App\Http\Controllers\ConferenceControlController;
@@ -177,6 +178,9 @@ Route::group(['middleware' => 'auth'], function () {
     Route::get('/call-detail-records', [CdrsController::class, 'index'])->name('cdrs.index');
     Route::post('/call-detail-records', [CdrsController::class, 'index'])->name('cdrs.download');
     Route::post('/call-detail-records/export', [CdrsController::class, 'export'])->name('cdrs.export');
+
+    // SIPREC recorder calls
+    Route::get('/recorder', [RecorderController::class, 'index'])->name('recorder.index');
 
     //Extension Statistics
     Route::get('/extension-statistics', [ExtensionStatisticsController::class, 'index'])->name('extension-statistics.index');

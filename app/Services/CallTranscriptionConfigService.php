@@ -48,11 +48,20 @@ class CallTranscriptionConfigService
         // Effective: domain overrides if set; else system
         $enabled       = $domain?->enabled ?? ($system?->enabled ?? false);
         $auto_transcribe = $domain?->auto_transcribe ?? ($system?->auto_transcribe ?? false);
+        $auto_summarize = $domain?->auto_summarize ?? ($system?->auto_summarize ?? false);
+        $auto_transcribe_recorder = $domain?->auto_transcribe_recorder ?? ($system?->auto_transcribe_recorder ?? false);
+        $auto_summarize_recorder = $domain?->auto_summarize_recorder ?? ($system?->auto_summarize_recorder ?? false);
         $auto_translate = $domain?->auto_translate ?? ($system?->auto_translate ?? false);
+        $auto_translate_recorder = $domain?->auto_translate_recorder ?? ($system?->auto_translate_recorder ?? false);
         $providerUuid  = $domain?->provider_uuid ?? ($system?->provider_uuid ?? null);
         $emailTranscription = $domain?->email_transcription ?? ($system?->email_transcription ?? false);
+        $emailTranscriptionRecorder = $domain?->email_transcription_recorder ?? ($system?->email_transcription_recorder ?? false);
         $emailTranslation = $domain?->email_translation ?? ($system?->email_translation ?? false);
+        $emailTranslationRecorder = $domain?->email_translation_recorder ?? ($system?->email_translation_recorder ?? false);
         $email              = $domain?->email ?? ($system?->email ?? null);
+        $emailRecorder      = $domain?->email_recorder ?? ($system?->email_recorder ?? null);
+        $translationLanguage = $domain?->translation_language
+            ?? ($system?->translation_language ?? null);
 
         // 2) Provider row (may be null if not set yet)
         $provider = null;
@@ -89,10 +98,18 @@ class CallTranscriptionConfigService
         return [
             'enabled'          => $enabled,
             'auto_transcribe'  => $auto_transcribe,
+            'auto_summarize'   => $auto_summarize,
+            'auto_transcribe_recorder' => $auto_transcribe_recorder,
+            'auto_summarize_recorder'  => $auto_summarize_recorder,
             'auto_translate'   => $auto_translate,
+            'auto_translate_recorder' => $auto_translate_recorder,
             'email_transcription' => $emailTranscription,
+            'email_transcription_recorder' => $emailTranscriptionRecorder,
             'email_translation' => $emailTranslation,
+            'email_translation_recorder' => $emailTranslationRecorder,
             'email' => $email,
+            'email_recorder' => $emailRecorder,
+            'translation_language' => $translationLanguage,
             'provider_uuid'    => $providerUuid,
             'provider_key'     => $providerKey,
             'provider_active'  => $providerActive,

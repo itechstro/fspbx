@@ -66,11 +66,18 @@ class CallTranscriptionController extends Controller
         // Effective: domain overrides if set; else system
         $enabled       = $domain?->enabled ?? ($system?->enabled ?? false);
         $auto_transcribe       = $domain?->auto_transcribe ?? ($system?->auto_transcribe ?? false);
+        $auto_summarize        = $domain?->auto_summarize ?? ($system?->auto_summarize ?? false);
+        $auto_transcribe_recorder = $domain?->auto_transcribe_recorder ?? ($system?->auto_transcribe_recorder ?? false);
+        $auto_summarize_recorder  = $domain?->auto_summarize_recorder ?? ($system?->auto_summarize_recorder ?? false);
         $auto_translate       = $domain?->auto_translate ?? ($system?->auto_translate ?? false);
+        $auto_translate_recorder = $domain?->auto_translate_recorder ?? ($system?->auto_translate_recorder ?? false);
         $providerUuid  = $domain?->provider_uuid ?? ($system?->provider_uuid ?? null);
         $emailTranscription = $domain?->email_transcription ?? ($system?->email_transcription ?? false);
+        $emailTranscriptionRecorder = $domain?->email_transcription_recorder ?? ($system?->email_transcription_recorder ?? false);
         $emailTranslation = $domain?->email_translation ?? ($system?->email_translation ?? false);
+        $emailTranslationRecorder = $domain?->email_translation_recorder ?? ($system?->email_translation_recorder ?? false);
         $email              = $domain?->email ?? ($system?->email ?? null);
+        $emailRecorder      = $domain?->email_recorder ?? ($system?->email_recorder ?? null);
         $translationLanguage = $domain?->translation_language
             ?? ($system?->translation_language ?? null);
 
@@ -79,11 +86,18 @@ class CallTranscriptionController extends Controller
             'domain_uuid'   => $domainUuid,
             'enabled'       => (bool) $enabled,
             'auto_transcribe' => (bool) $auto_transcribe,
+            'auto_summarize' => (bool) $auto_summarize,
+            'auto_transcribe_recorder' => (bool) $auto_transcribe_recorder,
+            'auto_summarize_recorder' => (bool) $auto_summarize_recorder,
             'auto_translate' => (bool) $auto_translate,
+            'auto_translate_recorder' => (bool) $auto_translate_recorder,
             'provider_uuid' => $providerUuid,
             'email_transcription' => (bool) $emailTranscription,
+            'email_transcription_recorder' => (bool) $emailTranscriptionRecorder,
             'email_translation' => (bool) $emailTranslation,
+            'email_translation_recorder' => (bool) $emailTranslationRecorder,
             'email'              => $email,
+            'email_recorder'     => $emailRecorder,
             'translation_language' => $translationLanguage,
         ]);
     }
@@ -103,12 +117,19 @@ class CallTranscriptionController extends Controller
                 [
                     'enabled'       => (bool) $data['enabled'],
                     'auto_transcribe'       => (bool) $data['auto_transcribe'],
+                    'auto_summarize' => (bool) ($data['auto_summarize'] ?? false),
+                    'auto_transcribe_recorder' => (bool) ($data['auto_transcribe_recorder'] ?? false),
+                    'auto_summarize_recorder' => (bool) ($data['auto_summarize_recorder'] ?? false),
                     'auto_translate' => (bool) ($data['auto_translate'] ?? false),
+                    'auto_translate_recorder' => (bool) ($data['auto_translate_recorder'] ?? false),
                     // In domain scope this may be null to inherit system provider
                     'provider_uuid' => $data['provider_uuid'] ?? null,
                     'email_transcription'       => (bool) $data['email_transcription'],
+                    'email_transcription_recorder' => (bool) ($data['email_transcription_recorder'] ?? false),
                     'email_translation' => (bool) ($data['email_translation'] ?? false),
+                    'email_translation_recorder' => (bool) ($data['email_translation_recorder'] ?? false),
                     'email'       => $data['email'] ?? null,
+                    'email_recorder' => $data['email_recorder'] ?? null,
                     'translation_language' => $data['translation_language'] ?? null,
                 ]
             );

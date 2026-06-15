@@ -10,6 +10,7 @@ use App\Jobs\SendNewVoicemailNotificationByEmail;
 use App\Jobs\SendNewVoicemailNotificationBySms;
 use App\Jobs\SendRingGroupMissedCallNotificationByEmail;
 use App\Jobs\TranscribeCdrJob;
+use App\Models\CDR;
 use App\Models\VmNotifyProfile;
 use App\Services\CallTranscription\CallTranscriptionService;
 use Illuminate\Support\Facades\Log;
@@ -218,14 +219,22 @@ class ProcessFreeswitchWebhookJob extends SpatieProcessWebhookJob
 
         if (!$isCallTranscriptionServiceEnabled) return;
 
-        $shouldTranscribe = $transcriptionService->shouldAutoTranscribe($data['domain_uuid'] ?? null);
+        $direction = CDR::query()
+            ->where('xml_cdr_uuid', $data['uuid'] ?? null)
+            ->value('direction');
+
+        $shouldTranscribe = $transcriptionService->shouldAutoTranscribe($data['domain_uuid'] ?? null, $direction);
 
         if ($shouldTranscribe) {
-            TranscribeCdrJob::dispatch(
+            $job = TranscribeCdrJob::dispatch(
                 $data['uuid'],
                 $data['domain_uuid'] ?? null,
                 $data['options'] ?? []
             );
+
+            if ($direction === 'recorder') {
+                $job->delay(now()->addSeconds(60));
+            }
         }
     }
 

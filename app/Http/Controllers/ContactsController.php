@@ -397,6 +397,7 @@ class ContactsController extends Controller
                     'contact_uuid',
                     'phone_label',
                     'phone_number',
+                    'phone_extension',
                     'phone_speed_dial'
                 );
             }])

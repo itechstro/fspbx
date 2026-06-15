@@ -56,6 +56,9 @@ class FetchTranscriptionSummary implements ShouldQueue
                     'summary_status' => 'failed',
                     'summary_error'  => (string) data_get($raw, 'error.message') ?: 'OpenAI reported failure.',
                 ]);
+
+                app(CallTranscriptionService::class)->maybeDispatchTranscriptionEmail($row);
+
                 return;
             }
 
@@ -78,6 +81,9 @@ class FetchTranscriptionSummary implements ShouldQueue
                             'raw_response'    => $raw,
                         ],
                     ]);
+
+                    app(CallTranscriptionService::class)->maybeDispatchTranscriptionEmail($row);
+
                     return;
                 }
 
@@ -91,25 +97,13 @@ class FetchTranscriptionSummary implements ShouldQueue
 
                 // Check if transcript should be emailed
                 $transcriptionService = app(CallTranscriptionService::class);
-                $cfg = $transcriptionService->emailDeliveryConfig($row->domain_uuid ?? null);
-
-                $autoTranslate = $transcriptionService->shouldAutoTranslate($row->domain_uuid ?? null);
-                $translationEmailEnabled = (bool) ($cfg['translation_enabled'] ?? false);
-                $hasEmailRecipient = !empty($cfg['email']);
-
-                // Avoid duplicate emails: when auto-translate + translation email are enabled,
-                // send only once after translation completes.
-                $shouldSendSummaryEmail = (bool) ($cfg['enabled'] ?? false)
-                    && $hasEmailRecipient
-                    && !($autoTranslate && $translationEmailEnabled);
-
-                if ($shouldSendSummaryEmail) {
-                    SendTranscriptionEmail::dispatch($row->uuid, $cfg['email']);
-                }
+                $direction = $transcriptionService->cdrDirectionForTranscription($row->xml_cdr_uuid ?? null);
 
                 // Auto-translate only after summary is completed so translation can include summary text.
-                if ($autoTranslate) {
+                if ($transcriptionService->shouldAutoTranslate($row->domain_uuid ?? null, $direction)) {
                     TranslateCallTranscription::dispatch($row->uuid)->onQueue('transcriptions');
+                } else {
+                    $transcriptionService->maybeDispatchTranscriptionEmail($row);
                 }
 
                 return;
@@ -155,6 +149,8 @@ class FetchTranscriptionSummary implements ShouldQueue
                     'summary_status' => 'failed',
                     'summary_error'  => Str::limit($short, 1000),
                 ]);
+
+                app(CallTranscriptionService::class)->maybeDispatchTranscriptionEmail($row);
             }
         } catch (\Throwable $inner) {
             // Never let failed() crash; log both

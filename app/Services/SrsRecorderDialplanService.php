@@ -13,7 +13,7 @@ use Illuminate\Support\Str;
 
 class SrsRecorderDialplanService
 {
-    public const SETTING_SUBCATEGORY = 'show_recorder_filter';
+    public const SETTING_SUBCATEGORY = 'enable_recorder';
 
     public const CONFERENCE_PROFILE_NAME = 'recorder';
 
@@ -36,6 +36,10 @@ class SrsRecorderDialplanService
     public function isRecorderEnabledForDomain(string $domainUuid): bool
     {
         $value = get_domain_setting(self::SETTING_SUBCATEGORY, $domainUuid);
+
+        if ($value === null) {
+            $value = get_domain_setting('show_recorder_filter', $domainUuid);
+        }
 
         if ($value === null) {
             return true;

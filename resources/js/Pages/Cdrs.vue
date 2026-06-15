@@ -120,6 +120,8 @@
                             <ChevronDownIcon v-else-if="sortData.name === 'destination_number' && sortData.order === 'desc'" class="h-4 w-4 text-gray-500" />
                         </div>
                     </TableColumnHeader>
+                    <TableColumnHeader header="Recipient Name"
+                        class="px-2 py-3.5 text-left text-sm font-semibold text-gray-900" />
                     <TableColumnHeader class="px-2 py-3.5 text-left text-sm font-semibold text-gray-900">
                         <div class="flex items-center cursor-pointer select-none" @click="handleSortRequest('start_epoch')">
                             <span class="mr-2">Date</span>
@@ -215,6 +217,8 @@
                             :text="row.caller_destination_formatted" />
                         <TableField class="whitespace-nowrap px-2 py-2 text-sm text-gray-500"
                             :text="row.destination_number_formatted" />
+                        <TableField class="whitespace-nowrap px-2 py-2 text-sm text-gray-500"
+                            :text="row.destination_number_name_formatted" />
                         <TableField class="whitespace-nowrap px-2 py-2 text-sm text-gray-500" :text="row.start_date" />
                         <TableField class="whitespace-nowrap px-2 py-2 text-sm text-gray-500" :text="row.start_time" />
                         <TableField class="whitespace-nowrap px-2 py-2 text-sm text-gray-500"
@@ -391,18 +395,10 @@ const props = defineProps({
     csvUrl: Object,
     routes: Object,
     permissions: Object,
-    showRecorderFilter: {
-        type: Boolean,
-        default: true,
-    },
 });
 
 
 onMounted(() => {
-    if (!props.showRecorderFilter && filterData.value.direction?.value === 'recorder') {
-        filterData.value.direction = null;
-    }
-
     getData();
     getEntities();
 })
@@ -473,19 +469,11 @@ const callBlockAdvancedActions = (row) => [
     },
 ];
 
-const callDirections = computed(() => {
-    const directions = [
-        { value: 'outbound', name: 'Outbound' },
-        { value: 'inbound', name: 'Inbound' },
-        { value: 'local', name: 'Local' },
-    ];
-
-    if (props.showRecorderFilter) {
-        directions.unshift({ value: 'recorder', name: 'Recorder' });
-    }
-
-    return directions;
-});
+const callDirections = computed(() => [
+    { value: 'outbound', name: 'Outbound' },
+    { value: 'inbound', name: 'Inbound' },
+    { value: 'local', name: 'Local' },
+]);
 
 const statusOptions = [
     { name: 'Answered', value: 'answered' },

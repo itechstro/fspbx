@@ -139,15 +139,15 @@ class ContactService
             'contact_phone_uuid',
             $contact,
             $rows,
-            fn (array $row) => trim((string) ($row['phone_number'] ?? '')) === '',
+            fn (array $row) => ! $this->contactPhoneRowHasValue($row),
             fn (array $row) => [
                 'phone_label' => $this->blankToNull($row['phone_label'] ?? null),
-                'phone_number' => trim((string) $row['phone_number']),
+                'phone_number' => $this->blankToNull($row['phone_number'] ?? null),
                 'phone_extension' => $this->blankToNull($row['phone_extension'] ?? null),
                 'phone_speed_dial' => $this->blankToNull($row['phone_speed_dial'] ?? null),
                 'phone_primary' => $this->toFlag($row['phone_primary'] ?? null),
                 'phone_type_voice' => $this->toFlag($row['phone_type_voice'] ?? (
-                    trim((string) ($row['phone_number'] ?? '')) !== '' ? '1' : null
+                    $this->contactPhoneRowHasValue($row) ? '1' : null
                 )),
                 'phone_type_fax' => $this->toFlag($row['phone_type_fax'] ?? null),
                 'phone_type_video' => $this->toFlag($row['phone_type_video'] ?? null),
@@ -155,6 +155,17 @@ class ContactService
                 'phone_description' => $this->blankToNull($row['phone_description'] ?? null),
             ]
         );
+    }
+
+    private function contactPhoneRowHasValue(array $row): bool
+    {
+        foreach (['phone_number', 'phone_extension', 'phone_speed_dial'] as $field) {
+            if (trim((string) ($row[$field] ?? '')) !== '') {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function syncEmails(VContact $contact, array $rows): void

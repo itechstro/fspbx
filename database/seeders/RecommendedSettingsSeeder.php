@@ -853,11 +853,11 @@ class RecommendedSettingsSeeder extends Seeder
             ],
             [
                 'default_setting_category'      => 'xml_cdr',
-                'default_setting_subcategory'   => 'show_recorder_filter',
+                'default_setting_subcategory'   => 'enable_recorder',
                 'default_setting_name'          => 'boolean',
                 'default_setting_value'         => 'true',
                 'default_setting_enabled'       => true,
-                'default_setting_description'   => 'Show recorder calls in Call History and provision srs_recorder, recorder_catch_<domain> dialplans, and the recorder conference profile.',
+                'default_setting_description'   => 'Enable the Recorder module and provision srs_recorder, recorder_catch_<domain> dialplans, and the recorder conference profile.',
             ],
 
             // Add more settings here...

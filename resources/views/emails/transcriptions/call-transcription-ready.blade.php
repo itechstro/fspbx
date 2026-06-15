@@ -56,8 +56,9 @@
             {{ $data['date'] }} &bull; Duration: {{ $data['duration'] }}
         </div>
         <div style="margin-top: 15px;">
+            @if(!empty($data['has_summary']))
             @php
-                $badgeClass = match(strtolower($data['sentiment'])) {
+                $badgeClass = match(strtolower($data['sentiment'] ?? 'neutral')) {
                     'positive' => 'badge-positive',
                     'negative' => 'badge-negative',
                     default => 'badge-neutral',
@@ -66,9 +67,11 @@
             <span class="badge {{ $badgeClass }}">
                 Sentiment: {{ $data['sentiment'] }}
             </span>
+            @endif
         </div>
     </div>
 
+    @if(!empty($data['has_summary']))
     <!-- Executive Summary -->
     <div class="section">
         <div class="section-title">Executive Summary</div>
@@ -88,6 +91,7 @@
             </div>
         @endif
     </div>
+    @endif
 
     <!-- Action Items -->
     @if(!empty($data['action_items']))

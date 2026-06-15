@@ -100,7 +100,7 @@
 
                     <TableField class="whitespace-nowrap px-2 py-2 text-sm text-gray-500">
                         <span v-if="row.primary_phone" class="flex items-center">
-                            {{ row.primary_phone.phone_number_formatted }}
+                            {{ row.primary_phone.phone_list_display }}
                         </span>
                     </TableField>
                     <TableField class="whitespace-nowrap px-2 py-2 text-sm text-gray-500">

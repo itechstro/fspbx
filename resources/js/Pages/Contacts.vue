@@ -199,7 +199,7 @@
 
                         <TableField class="whitespace-nowrap px-2 py-2 text-sm text-gray-500">
                             <span v-if="row.primary_phone">
-                                {{ row.primary_phone.phone_number_formatted || row.primary_phone.phone_number }}
+                                {{ row.primary_phone.phone_list_display }}
                             </span>
                         </TableField>
 
@@ -243,10 +243,11 @@
                             :text="row.contact_category" />
                         <TableField class="whitespace-nowrap px-2 py-2 text-sm text-gray-500">
                             <span v-if="row.primary_phone">
-                                <span v-if="row.primary_phone.phone_label" class="text-gray-400 mr-1">
+                                <span v-if="row.primary_phone.phone_label && row.primary_phone.phone_number"
+                                    class="text-gray-400 mr-1">
                                     {{ row.primary_phone.phone_label }}:
                                 </span>
-                                {{ row.primary_phone.phone_number }}
+                                {{ row.primary_phone.phone_list_display }}
                             </span>
                         </TableField>
                     </template>

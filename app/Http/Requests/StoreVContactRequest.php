@@ -34,6 +34,7 @@ class StoreVContactRequest extends FormRequest
             }
 
             $this->validateCallingCard($validator);
+            $this->validatePhones($validator);
         });
     }
 
@@ -246,6 +247,30 @@ class StoreVContactRequest extends FormRequest
 
         if ($password === '') {
             $validator->errors()->add('calling_card_password', 'Enter a PIN.');
+        }
+    }
+
+    private function validatePhones(Validator $validator): void
+    {
+        foreach ($this->input('phones', []) as $index => $phone) {
+            if (! is_array($phone)) {
+                continue;
+            }
+
+            $number = trim((string) ($phone['phone_number'] ?? ''));
+            $extension = trim((string) ($phone['phone_extension'] ?? ''));
+            $speedDial = trim((string) ($phone['phone_speed_dial'] ?? ''));
+
+            if ($number === '' && $extension === '' && $speedDial === '') {
+                continue;
+            }
+
+            if ($number === '' && $extension === '') {
+                $validator->errors()->add(
+                    "phones.$index.phone_number",
+                    'Enter a phone number or extension.'
+                );
+            }
         }
     }
 

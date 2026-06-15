@@ -10,10 +10,14 @@ use App\Data\Api\V1\CdrCallFlowStepData;
 use App\Exceptions\ApiException;
 use App\Models\Dialplans;
 use App\Models\Extensions;
+use App\Services\Contacts\ContactCallerIdResolver;
+use Illuminate\Pagination\AbstractPaginator;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 
 class CdrDataService
 {
+    public function __construct(private ContactCallerIdResolver $contactCallerIdResolver) {}
 
     public function getData($params = [])
     {
@@ -70,8 +74,10 @@ class CdrDataService
                 AllowedFilter::callback('endPeriod', function ($query, $value) {
                     $query->where('start_epoch', '<=', $value);
                 }),
-                AllowedFilter::callback('direction', function ($query, $value) use ($currentDomain) {
-                    if ($value === 'recorder' && !$this->isRecorderFilterEnabled($currentDomain)) {
+                AllowedFilter::callback('direction', function ($query, $value) {
+                    if ($value === 'recorder') {
+                        $query->whereRaw('1 = 0');
+
                         return;
                     }
 
@@ -92,21 +98,7 @@ class CdrDataService
                         });
                     });
                 }),
-                AllowedFilter::callback('sentiment', function ($query, $value) {
-                    if ($value === null) return;
-
-                    $value = strtolower(trim((string) $value['value']));
-                    $allowed = ['negative', 'neutral', 'positive'];
-
-                    if (!in_array($value, $allowed, true)) {
-                        return; // ignore invalid values
-                    }
-
-                    $query->whereHas('callTranscription', function ($tq) use ($value) {
-                        // Postgres jsonb: this compiles to summary_payload->>'sentiment_overall' = ?
-                        $tq->where('summary_payload->sentiment_overall', $value);
-                    });
-                }),
+                AllowedFilter::callback('sentiment', $this->sentimentFilterCallback()),
                 AllowedFilter::callback('entity', function ($query, $value) {
                     switch ($value['type']) {
                         case 'queue':
@@ -190,6 +182,99 @@ class CdrDataService
             $cdrs = $cdrs->cursor();
         }
         // logger($cdrs);
+
+        return $this->enrichCdrsWithContactNames($cdrs);
+    }
+
+    public function getRecorderData($params = [])
+    {
+        $currentDomain = $params['domain_uuid'];
+
+        if (empty($params['filter']['showGlobal'])) {
+            $params['filter']['showGlobal'] = 'false';
+        }
+
+        $cdrs = QueryBuilder::for(CDR::class, request()->merge($params))
+            ->select([
+                'xml_cdr_uuid',
+                'direction',
+                'caller_id_name',
+                'caller_id_number',
+                'caller_destination',
+                'domain_uuid',
+                'sip_call_id',
+                'start_epoch',
+                'end_epoch',
+                'duration',
+                'record_path',
+                'record_name',
+                'status',
+            ])
+            ->with([
+                'domain:domain_uuid,domain_name,domain_description',
+            ])
+            ->where('direction', 'recorder')
+            ->allowedFilters([
+                AllowedFilter::callback('startPeriod', function ($query, $value) {
+                    $query->where('start_epoch', '>=', $value);
+                }),
+                AllowedFilter::callback('endPeriod', function ($query, $value) {
+                    $query->where('start_epoch', '<=', $value);
+                }),
+                AllowedFilter::callback('search', function ($query, $value) {
+                    $query->where(function ($q) use ($value) {
+                        $q->where('caller_id_name', 'ilike', "%{$value}%")
+                            ->orWhere('caller_id_number', 'ilike', "%{$value}%")
+                            ->orWhere('caller_destination', 'ilike', "%{$value}%")
+                            ->orWhere('record_name', 'ilike', "%{$value}%")
+                            ->orWhere('sip_call_id', 'ilike', "%{$value}%")
+                            ->orWhere('xml_cdr_uuid', 'ilike', "%{$value}%");
+                    });
+                }),
+                AllowedFilter::callback('showGlobal', function ($query, $value) use ($currentDomain) {
+                    if (!$value || $value === '0' || $value === 0 || $value === 'false') {
+                        $query->where('domain_uuid', $currentDomain);
+                    }
+                }),
+                AllowedFilter::callback('sentiment', $this->sentimentFilterCallback()),
+            ])
+            ->where('hangup_cause', '!=', 'LOSE_RACE')
+            ->whereNull('cc_member_session_uuid')
+            ->whereNull('originating_leg_uuid')
+            ->allowedSorts([
+                'caller_id_name',
+                'caller_id_number',
+                'caller_destination',
+                'record_name',
+                'start_epoch',
+                'duration',
+            ])
+            ->defaultSort('-start_epoch');
+
+        $this->applyPrimaryRecorderLegFilter($cdrs);
+
+        if ($params['paginate']) {
+            $cdrs = $cdrs->paginate($params['paginate']);
+        } else {
+            $cdrs = $cdrs->cursor();
+        }
+
+        return $this->enrichCdrsWithContactNames($cdrs);
+    }
+
+    private function enrichCdrsWithContactNames(mixed $cdrs): mixed
+    {
+        if ($cdrs instanceof AbstractPaginator) {
+            $this->contactCallerIdResolver->enrichCollection($cdrs->getCollection());
+
+            return $cdrs;
+        }
+
+        if ($cdrs instanceof Collection) {
+            $this->contactCallerIdResolver->enrichCollection($cdrs);
+
+            return $cdrs;
+        }
 
         return $cdrs;
     }
@@ -442,8 +527,10 @@ class CdrDataService
             });
         }
 
-        if (!empty($filters['direction'])) {
-            if ($filters['direction'] !== 'recorder' || $this->isRecorderFilterEnabled($filters['domain_uuid'] ?? null)) {
+        if (! empty($filters['direction'])) {
+            if ($filters['direction'] === 'recorder') {
+                $query->whereRaw('1 = 0');
+            } else {
                 $query->where('direction', $filters['direction']);
             }
         }
@@ -611,7 +698,7 @@ class CdrDataService
             ->with('archive_recording:xml_cdr_uuid,object_key')
             ->first();
 
-        if (! $cdr || ($cdr->direction === 'recorder' && ! $this->isRecorderFilterEnabled($domainUuid))) {
+        if (! $cdr || $cdr->direction === 'recorder') {
             throw new ApiException(404, 'invalid_request_error', 'CDR not found.', 'resource_missing', 'xml_cdr_uuid');
         }
 
@@ -1094,9 +1181,13 @@ class CdrDataService
         return $row;
     }
 
-    public function isRecorderFilterEnabled(?string $domainUuid = null): bool
+    public function isRecorderEnabled(?string $domainUuid = null): bool
     {
-        $value = get_domain_setting('show_recorder_filter', $domainUuid);
+        $value = get_domain_setting('enable_recorder', $domainUuid);
+
+        if ($value === null) {
+            $value = get_domain_setting('show_recorder_filter', $domainUuid);
+        }
 
         if ($value === null) {
             return true;
@@ -1107,13 +1198,124 @@ class CdrDataService
 
     protected function applyExcludeRecorderCdrs($query, ?string $domainUuid = null): void
     {
-        if ($this->isRecorderFilterEnabled($domainUuid)) {
-            return;
-        }
-
         $query->where(function ($q) {
             $q->whereNull('direction')
                 ->orWhere('direction', '!=', 'recorder');
         });
+    }
+
+    /**
+     * SIPREC can create multiple recorder CDRs for one call. Keep the best leg per group.
+     */
+    protected function applyPrimaryRecorderLegFilter($query): void
+    {
+        $table = (new CDR)->getTable();
+
+        $query->whereNotExists(function ($sub) use ($table) {
+            $sub->selectRaw('1')
+                ->from("{$table} as recorder_dup")
+                ->where('recorder_dup.direction', 'recorder')
+                ->whereColumn('recorder_dup.domain_uuid', "{$table}.domain_uuid")
+                ->whereColumn('recorder_dup.start_epoch', "{$table}.start_epoch")
+                ->whereColumn('recorder_dup.caller_id_number', "{$table}.caller_id_number")
+                ->whereRaw(
+                    "COALESCE(recorder_dup.caller_destination, '') = COALESCE({$table}.caller_destination, '')"
+                )
+                ->whereColumn('recorder_dup.xml_cdr_uuid', '!=', "{$table}.xml_cdr_uuid")
+                ->where(function ($q) use ($table) {
+                    $q->whereColumn('recorder_dup.duration', '<', "{$table}.duration")
+                        ->orWhere(function ($q2) use ($table) {
+                            $q2->whereColumn('recorder_dup.duration', '=', "{$table}.duration")
+                                ->whereColumn('recorder_dup.xml_cdr_uuid', '<', "{$table}.xml_cdr_uuid");
+                        });
+                });
+        });
+    }
+
+    public function isPrimaryRecorderLeg(?string $xmlCdrUuid): bool
+    {
+        if (! $xmlCdrUuid) {
+            return false;
+        }
+
+        $primaryUuid = $this->resolvePrimaryRecorderLegUuid($xmlCdrUuid);
+
+        return $primaryUuid !== null && $primaryUuid === $xmlCdrUuid;
+    }
+
+    public function resolvePrimaryRecorderLegUuid(?string $xmlCdrUuid): ?string
+    {
+        if (! $xmlCdrUuid) {
+            return null;
+        }
+
+        $cdr = CDR::query()
+            ->where('xml_cdr_uuid', $xmlCdrUuid)
+            ->where('direction', 'recorder')
+            ->first(['xml_cdr_uuid', 'domain_uuid', 'start_epoch', 'caller_id_number', 'caller_destination', 'duration']);
+
+        if (! $cdr) {
+            return $xmlCdrUuid;
+        }
+
+        $siblings = $this->recorderLegSiblingsQuery($cdr)
+            ->with(['callTranscription:uuid,xml_cdr_uuid,status,error_message,result_payload'])
+            ->get(['xml_cdr_uuid', 'domain_uuid', 'start_epoch', 'caller_id_number', 'caller_destination', 'duration']);
+
+        if ($siblings->count() <= 1) {
+            return $cdr->xml_cdr_uuid;
+        }
+
+        return (string) $this->rankRecorderLegs($siblings)->first()->xml_cdr_uuid;
+    }
+
+    protected function recorderLegSiblingsQuery(CDR $cdr)
+    {
+        $destination = (string) ($cdr->caller_destination ?? '');
+
+        return CDR::query()
+            ->where('direction', 'recorder')
+            ->where('domain_uuid', $cdr->domain_uuid)
+            ->where('start_epoch', $cdr->start_epoch)
+            ->where('caller_id_number', $cdr->caller_id_number)
+            ->whereRaw("COALESCE(caller_destination, '') = ?", [$destination]);
+    }
+
+    protected function rankRecorderLegs(Collection $legs): Collection
+    {
+        return $legs->sortBy(function (CDR $cdr) {
+            $tx = $cdr->callTranscription;
+            $utterances = (array) data_get($tx?->result_payload, 'utterances', []);
+            $hasSpeech = ($tx?->status ?? null) === 'completed' && $utterances !== [];
+            $noSpeechFailure = ($tx?->status ?? null) === 'failed'
+                && str_contains((string) ($tx?->error_message ?? ''), 'no spoken audio');
+
+            return [
+                $hasSpeech ? 0 : 1,
+                $noSpeechFailure ? 1 : 0,
+                (int) $cdr->duration,
+                (string) $cdr->xml_cdr_uuid,
+            ];
+        })->values();
+    }
+
+    private function sentimentFilterCallback(): callable
+    {
+        return function ($query, $value) {
+            if ($value === null) {
+                return;
+            }
+
+            $value = strtolower(trim((string) $value['value']));
+            $allowed = ['negative', 'neutral', 'positive'];
+
+            if (! in_array($value, $allowed, true)) {
+                return;
+            }
+
+            $query->whereHas('callTranscription', function ($tq) use ($value) {
+                $tq->where('summary_payload->sentiment_overall', $value);
+            });
+        };
     }
 }

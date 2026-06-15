@@ -54,6 +54,10 @@ class FetchTranscriptionTranslation implements ShouldQueue
                     'translation_status' => 'failed',
                     'translation_error' => (string) data_get($raw, 'error.message') ?: 'OpenAI reported failure.',
                 ]);
+
+                app(\App\Services\CallTranscription\CallTranscriptionService::class)
+                    ->maybeDispatchTranscriptionEmail($row);
+
                 return;
             }
 
@@ -64,6 +68,10 @@ class FetchTranscriptionTranslation implements ShouldQueue
                         'translation_error' => 'OpenAI returned empty translation output.',
                         'translation_payload' => ['raw_response' => $raw],
                     ]);
+
+                    app(\App\Services\CallTranscription\CallTranscriptionService::class)
+                        ->maybeDispatchTranscriptionEmail($row);
+
                     return;
                 }
 
@@ -78,6 +86,10 @@ class FetchTranscriptionTranslation implements ShouldQueue
                         'translation_error' => 'OpenAI returned empty translation output.',
                         'translation_payload' => ['raw_response' => $raw],
                     ]);
+
+                    app(\App\Services\CallTranscription\CallTranscriptionService::class)
+                        ->maybeDispatchTranscriptionEmail($row);
+
                     return;
                 }
 
@@ -92,10 +104,7 @@ class FetchTranscriptionTranslation implements ShouldQueue
                 ]);
 
                 $transcriptionService = app(\App\Services\CallTranscription\CallTranscriptionService::class);
-                $cfg = $transcriptionService->emailDeliveryConfig($row->domain_uuid ?? null);
-                if (($cfg['translation_enabled'] ?? false) && !empty($cfg['email'])) {
-                    SendTranscriptionEmail::dispatch($row->uuid, $cfg['email']);
-                }
+                $transcriptionService->maybeDispatchTranscriptionEmail($row);
                 return;
             }
 
