@@ -141,13 +141,13 @@ class CdrsController extends Controller
                 throw new \Exception("Failed to fetch item details. Item not found");
             }
 
-            if ($item->direction === 'recorder') {
-                throw new \Exception("Failed to fetch item details. Item not found");
-            }
-
             $this->item_domain_uuid = $item->domain_uuid;
 
-            $item->call_flow = $this->cdrDataService->buildCallFlowSummary($item);
+            if ($item->direction !== 'recorder') {
+                $item->call_flow = $this->cdrDataService->buildCallFlowSummary($item);
+            } else {
+                $item->call_flow = collect();
+            }
 
             // logger($callFlowSummary->all());
 
@@ -203,10 +203,6 @@ class CdrsController extends Controller
 
             // If item doesn't exist throw and error 
             if (!$item) {
-                throw new \Exception("Failed to fetch item details. Item not found");
-            }
-
-            if ($item->direction === 'recorder') {
                 throw new \Exception("Failed to fetch item details. Item not found");
             }
 

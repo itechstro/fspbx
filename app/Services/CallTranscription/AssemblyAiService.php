@@ -10,6 +10,8 @@ class AssemblyAiService implements TranscriptionProviderInterface
 {
     public array $payload;
 
+    private const IAB_CATEGORY_LANGUAGES = ['de', 'en', 'es', 'fr', 'hi', 'it', 'nl', 'pt'];
+
     public function __construct(
         private array $conn,    // ['api_key','region'|'base_url','timeout']
         private array $options,  // provider config JSON already mapped to AAI options (raw)
@@ -18,7 +20,11 @@ class AssemblyAiService implements TranscriptionProviderInterface
     // ---- public API ----
     public function transcribe(string $audioUrl, array $options = []): array
     {
-        $this->payload = ['audio_url' => $audioUrl] + $this->pruneNulls($this->merge($this->options, $options));
+        $merged = $this->applyLanguageFeatureRestrictions(
+            $this->pruneNulls($this->merge($this->options, $options))
+        );
+
+        $this->payload = ['audio_url' => $audioUrl] + $merged;
 
         // add webhook info
         $this->payload['webhook_url']              = route('webhook-client-assemblyai'); // public URL
@@ -213,4 +219,32 @@ class AssemblyAiService implements TranscriptionProviderInterface
         return $a;
     }
 
+    /**
+     * Drop AssemblyAI options that are not valid for the selected/detected language.
+     */
+    private function applyLanguageFeatureRestrictions(array $payload): array
+    {
+        if (empty($payload['iab_categories'])) {
+            return $payload;
+        }
+
+        $explicitLanguage = strtolower((string) ($payload['language_code'] ?? ''));
+        if ($explicitLanguage !== '') {
+            if (! in_array($explicitLanguage, self::IAB_CATEGORY_LANGUAGES, true)) {
+                unset($payload['iab_categories']);
+            }
+
+            return $payload;
+        }
+
+        if (! empty($payload['language_detection'])) {
+            // Auto-detected language may differ from expected_languages; IAB categories
+            // only work for a fixed set of languages, so disable them when detecting.
+            unset($payload['iab_categories']);
+
+            return $payload;
+        }
+
+        return $payload;
+    }
 }
