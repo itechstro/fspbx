@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\Redis;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Queue\InteractsWithQueue;
 use App\Jobs\FetchTranscriptionSummary;
+use App\Exceptions\DomainUsageLimitExceededException;
+use App\Services\DomainUsageService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 
@@ -23,13 +25,32 @@ class SummarizeCallTranscription implements ShouldQueue
 
     public function __construct(public string $uuid) {}
 
-    public function handle(): void
+    public function handle(DomainUsageService $domainUsageService): void
     {
         // Allow only 2 tasks every 1 second
-        Redis::throttle('summaries')->allow(2)->every(1)->then(function () {
+        Redis::throttle('summaries')->allow(2)->every(1)->then(function () use ($domainUsageService) {
 
             $row = CallTranscription::find($this->uuid);
             if (!$row) return;
+
+            try {
+                $domainUsageService->assertWithinLimit('ai_summary_requests', 1, $row->domain_uuid);
+                $domainUsageService->assertWithinLimit(
+                    'ai_spend_usd_monthly',
+                    (float) data_get(ai_usage_rates(), 'openai.reserve_summary_usd', 0.01),
+                    $row->domain_uuid
+                );
+            } catch (DomainUsageLimitExceededException $exception) {
+                $row->update([
+                    'summary_status' => 'failed',
+                    'summary_error' => $exception->getMessage(),
+                ]);
+
+                app(\App\Services\CallTranscription\CallTranscriptionService::class)
+                    ->maybeDispatchTranscriptionEmail($row);
+
+                return;
+            }
 
             $full = (array) $row->result_payload;
 
@@ -74,6 +95,7 @@ class SummarizeCallTranscription implements ShouldQueue
 
             $row->update([
                 'summary_provider'   => 'openai',
+                'summary_model'      => 'gpt-5-nano',
                 'summary_external_id'=> $responseId,
                 'summary_status'     => in_array($status, ['queued','in_progress']) ? $status : 'queued',
                 'summary_error'      => null,

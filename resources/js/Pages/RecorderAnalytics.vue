@@ -14,6 +14,16 @@
 
             <div class="rounded-lg bg-white p-4 ring-1 ring-gray-200">
                 <div class="flex flex-wrap items-end gap-4">
+                    <div class="relative min-w-64 flex-1">
+                        <label class="block text-xs font-medium text-gray-500">Search</label>
+                        <input
+                            v-model="filterData.search"
+                            type="search"
+                            class="mt-1 block w-full rounded-md border-0 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600"
+                            placeholder="Caller, dialed number, or summary text"
+                            @keydown.enter="loadReport"
+                        />
+                    </div>
                     <div class="relative z-10 min-w-64">
                         <DatePicker :dateRange="filterData.dateRange" :timezone="timezone" :clearable="false"
                             @update:date-range="handleUpdateDateRange" />
@@ -36,6 +46,9 @@
                     </button>
                 </div>
                 <p v-if="report?.period_label" class="mt-3 text-sm text-gray-500">{{ report.period_label }}</p>
+                <p v-if="filterData.search" class="mt-1 text-sm text-gray-500">
+                    Search filter applies to the report, CSV export, executive summary, and emailed reports.
+                </p>
                 <p v-if="report && !executiveSummaryAvailable" class="mt-2 text-sm text-amber-700">
                     AI executive summary requires an OpenAI API key in server settings.
                 </p>
@@ -192,7 +205,7 @@
                 <div class="rounded-lg bg-white p-5 ring-1 ring-gray-200">
                     <h2 class="mb-4 text-sm font-semibold text-gray-900">Recorded Calls</h2>
                     <div v-if="report.calls.length === 0" class="py-10 text-center text-sm text-gray-500">
-                        No recorder calls found for this period.
+                        No recorder calls found for this period<span v-if="filterData.search"> matching your search</span>.
                     </div>
                     <div v-else class="overflow-x-auto">
                         <table class="min-w-full text-sm">
@@ -229,7 +242,7 @@
             <div v-if="permissions.schedule" class="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div class="rounded-lg bg-white p-5 ring-1 ring-gray-200">
                     <h2 class="mb-1 text-sm font-semibold text-gray-900">Email Report Now</h2>
-                    <p class="mb-4 text-sm text-gray-500">Send the current date range to one or more recipients. Emails include a CSV attachment.</p>
+                    <p class="mb-4 text-sm text-gray-500">Send the current date range and search filter to one or more recipients. Emails include a CSV attachment.</p>
                     <label class="block text-sm font-medium text-gray-700">Recipients</label>
                     <textarea v-model="sendEmailsText" rows="3"
                         class="mt-1 block w-full rounded-md border-0 py-2 text-sm text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600"
@@ -250,6 +263,7 @@
                     <h2 class="mb-1 text-sm font-semibold text-gray-900">Scheduled Email</h2>
                     <p class="mb-4 text-sm text-gray-500">
                         Daily uses yesterday. Weekly uses the last 7 days ending yesterday. Monthly uses the previous calendar month.
+                        The saved search filter below applies to each scheduled report.
                     </p>
 
                     <div class="space-y-4">
@@ -373,6 +387,7 @@ const filterData = ref({
         startLocal.clone().startOf('day').toISOString(),
         endLocal.clone().endOf('day').toISOString(),
     ],
+    search: '',
 });
 
 const schedule = ref({
@@ -625,6 +640,9 @@ const loadSchedule = () => {
                 day_of_week: row.day_of_week ?? 1,
                 day_of_month: row.day_of_month ?? 1,
             };
+            if (row.search) {
+                filterData.value.search = row.search;
+            }
             scheduleEmailsText.value = (row.emails ?? []).join(', ');
             if (!sendEmailsText.value) {
                 sendEmailsText.value = scheduleEmailsText.value;
@@ -662,6 +680,7 @@ const saveSchedule = () => {
     axios.put(props.routes.schedule_route, {
         ...schedule.value,
         emails: parseEmails(scheduleEmailsText.value),
+        search: filterData.value.search || null,
     })
         .then((response) => {
             showNotification('success', response.data.messages ?? { success: ['Scheduled report settings saved.'] });

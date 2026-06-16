@@ -11,6 +11,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use App\Services\CallTranscription\CallTranscriptionService;
+use App\Services\CallTranscriptionCostService;
 
 class FetchTranscriptionSummary implements ShouldQueue
 {
@@ -94,6 +95,12 @@ class FetchTranscriptionSummary implements ShouldQueue
                     'summary_payload'      => $decoded,
                     'summary_completed_at' => now(),
                 ]);
+
+                app(CallTranscriptionCostService::class)->applySummaryCompletion(
+                    $row->refresh(),
+                    (string) ($retrieved['model'] ?? $row->summary_model ?? 'gpt-5-nano'),
+                    (array) ($retrieved['usage'] ?? [])
+                );
 
                 // Check if transcript should be emailed
                 $transcriptionService = app(CallTranscriptionService::class);

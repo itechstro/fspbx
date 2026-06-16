@@ -17,6 +17,7 @@ use App\Http\Controllers\CallRecordingController;
 use App\Http\Controllers\CallFlowController;
 use App\Http\Controllers\CallRoutingOptionsController;
 use App\Http\Controllers\CdrsController;
+use App\Http\Controllers\CallHistoryAnalyticsController;
 use App\Http\Controllers\RecorderController;
 use App\Http\Controllers\RecorderAnalyticsController;
 use App\Http\Controllers\ConferenceCenterController;
@@ -177,6 +178,7 @@ Route::group(['middleware' => 'auth'], function () {
 
     // Call Detail Records
     Route::get('/call-detail-records', [CdrsController::class, 'index'])->name('cdrs.index');
+    Route::get('/call-detail-records/analytics', [CallHistoryAnalyticsController::class, 'index'])->name('cdrs.analytics.index');
     Route::post('/call-detail-records', [CdrsController::class, 'index'])->name('cdrs.download');
     Route::post('/call-detail-records/export', [CdrsController::class, 'export'])->name('cdrs.export');
 
@@ -296,6 +298,10 @@ Route::group(['middleware' => 'auth'], function () {
 
     // Domain settings
     Route::get('domains/{domain}/settings', [\App\Http\Controllers\DomainSettingsController::class, 'index'])->name('domains.settings.index');
+
+    // Domain license / usage
+    Route::get('domains/{domain}/license', [\App\Http\Controllers\DomainLicenseController::class, 'index'])->name('domains.license.index');
+    Route::get('domains/{domain}/license/usage-details', [\App\Http\Controllers\DomainLicenseController::class, 'usageDetailsIndex'])->name('domains.license.usage-details.index');
 
     // Logs
     Route::get('logs', [LogsController::class, 'index'])->name('logs.index');

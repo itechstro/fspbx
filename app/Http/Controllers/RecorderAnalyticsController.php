@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\DomainUsageLimitExceededException;
 use App\Jobs\SendRecorderAnalyticsReport;
 use App\Models\RecorderAnalyticsReportSchedule;
 use App\Services\CdrDataService;
@@ -63,10 +64,10 @@ class RecorderAnalyticsController extends Controller
         $this->authorizeAnalytics();
 
         $domainUuid = session('domain_uuid');
-        [$startPeriod, $endPeriod] = $this->resolveDateRange($request, $domainUuid);
+        [$startPeriod, $endPeriod, $search] = $this->resolveReportFilters($request, $domainUuid);
 
         return response()->json(
-            $this->analyticsService->buildReport($domainUuid, $startPeriod, $endPeriod)
+            $this->analyticsService->buildReport($domainUuid, $startPeriod, $endPeriod, $search)
         );
     }
 
@@ -75,8 +76,8 @@ class RecorderAnalyticsController extends Controller
         $this->authorizeAnalytics();
 
         $domainUuid = session('domain_uuid');
-        [$startPeriod, $endPeriod] = $this->resolveDateRange($request, $domainUuid);
-        $report = $this->analyticsService->buildReport($domainUuid, $startPeriod, $endPeriod);
+        [$startPeriod, $endPeriod, $search] = $this->resolveReportFilters($request, $domainUuid);
+        $report = $this->analyticsService->buildReport($domainUuid, $startPeriod, $endPeriod, $search);
         $filename = $this->analyticsService->csvFilename($report);
 
         return response($this->analyticsService->buildCsvContent($report), 200, [
@@ -96,13 +97,17 @@ class RecorderAnalyticsController extends Controller
         }
 
         $domainUuid = session('domain_uuid');
-        [$startPeriod, $endPeriod] = $this->resolveDateRange($request, $domainUuid);
-        $report = $this->analyticsService->buildReport($domainUuid, $startPeriod, $endPeriod);
+        [$startPeriod, $endPeriod, $search] = $this->resolveReportFilters($request, $domainUuid);
+        $report = $this->analyticsService->buildReport($domainUuid, $startPeriod, $endPeriod, $search);
 
         try {
             return response()->json([
                 'executive_summary' => $this->analyticsService->generateExecutiveSummary($report),
             ]);
+        } catch (DomainUsageLimitExceededException $exception) {
+            return response()->json([
+                'errors' => $exception->toErrorBag(),
+            ], 403);
         } catch (\RuntimeException $exception) {
             return response()->json([
                 'errors' => ['executive_summary' => [$exception->getMessage()]],
@@ -153,6 +158,7 @@ class RecorderAnalyticsController extends Controller
             'send_time' => ['required', 'regex:/^(?:[01]\d|2[0-3]):[0-5]\d$/'],
             'day_of_week' => ['nullable', 'integer', 'between:0,6'],
             'day_of_month' => ['nullable', 'integer', 'between:1,28'],
+            'search' => ['nullable', 'string', 'max:200'],
         ]);
 
         $emails = $this->analyticsService->normalizeEmails($data['emails'] ?? []);
@@ -163,11 +169,15 @@ class RecorderAnalyticsController extends Controller
             ], 422);
         }
 
+        $search = trim((string) ($data['search'] ?? ''));
+        $search = $search !== '' ? $search : null;
+
         $schedule = RecorderAnalyticsReportSchedule::query()->updateOrCreate(
             ['domain_uuid' => $domainUuid],
             [
                 'enabled' => (bool) $data['enabled'],
                 'include_executive_summary' => (bool) ($data['include_executive_summary'] ?? false),
+                'search' => $search,
                 'emails' => $emails,
                 'frequency' => $data['frequency'],
                 'send_time' => $data['send_time'],
@@ -201,6 +211,7 @@ class RecorderAnalyticsController extends Controller
             'filter.dateRange' => ['required', 'array', 'size:2'],
             'filter.dateRange.0' => ['required', 'date'],
             'filter.dateRange.1' => ['required', 'date'],
+            'filter.search' => ['nullable', 'string', 'max:200'],
             'include_executive_summary' => ['sometimes', 'boolean'],
         ]);
 
@@ -211,7 +222,7 @@ class RecorderAnalyticsController extends Controller
             ], 422);
         }
 
-        [$startPeriod, $endPeriod] = $this->resolveDateRange($request, $domainUuid);
+        [$startPeriod, $endPeriod, $search] = $this->resolveReportFilters($request, $domainUuid);
 
         SendRecorderAnalyticsReport::dispatch(
             $domainUuid,
@@ -219,6 +230,7 @@ class RecorderAnalyticsController extends Controller
             $endPeriod->toIso8601String(),
             $emails,
             (bool) ($data['include_executive_summary'] ?? false),
+            $search,
         )->onQueue('emails');
 
         return response()->json([
@@ -250,5 +262,13 @@ class RecorderAnalyticsController extends Controller
         }
 
         return [$startPeriod, $endPeriod];
+    }
+
+    protected function resolveReportFilters(Request $request, string $domainUuid): array
+    {
+        [$startPeriod, $endPeriod] = $this->resolveDateRange($request, $domainUuid);
+        $search = trim((string) $request->input('filter.search', ''));
+
+        return [$startPeriod, $endPeriod, $search !== '' ? $search : null];
     }
 }

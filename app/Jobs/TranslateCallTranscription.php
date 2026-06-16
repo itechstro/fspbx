@@ -4,6 +4,8 @@ namespace App\Jobs;
 
 use App\Models\CallTranscription;
 use App\Models\CallTranscriptionPolicy;
+use App\Exceptions\DomainUsageLimitExceededException;
+use App\Services\DomainUsageService;
 use App\Services\OpenAIService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Support\Facades\Redis;
@@ -23,11 +25,26 @@ class TranslateCallTranscription implements ShouldQueue
 
     public function __construct(public string $uuid) {}
 
-    public function handle(): void
+    public function handle(DomainUsageService $domainUsageService): void
     {
-        Redis::throttle('translations')->allow(2)->every(1)->then(function () {
+        Redis::throttle('translations')->allow(2)->every(1)->then(function () use ($domainUsageService) {
             $row = CallTranscription::find($this->uuid);
             if (!$row) {
+                return;
+            }
+
+            try {
+                $domainUsageService->assertWithinLimit('ai_translation_requests', 1, $row->domain_uuid);
+                $domainUsageService->assertWithinLimit(
+                    'ai_spend_usd_monthly',
+                    (float) data_get(ai_usage_rates(), 'openai.reserve_translation_usd', 0.02),
+                    $row->domain_uuid
+                );
+            } catch (DomainUsageLimitExceededException $exception) {
+                $row->update([
+                    'translation_status' => 'failed',
+                    'translation_error' => $exception->getMessage(),
+                ]);
                 return;
             }
 
@@ -80,6 +97,7 @@ class TranslateCallTranscription implements ShouldQueue
             }
 
             $row->update([
+                'translation_model' => 'gpt-4.1-mini',
                 'translation_external_id' => $responseId,
                 'translation_status' => in_array($status, ['queued', 'in_progress']) ? $status : 'queued',
                 'translation_error' => null,

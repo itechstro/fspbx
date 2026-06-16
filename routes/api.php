@@ -17,6 +17,7 @@ use App\Http\Controllers\CallTranscriptionController;
 use App\Http\Controllers\CdrsController;
 use App\Http\Controllers\RecorderController;
 use App\Http\Controllers\RecorderAnalyticsController;
+use App\Http\Controllers\CallHistoryAnalyticsController;
 use App\Http\Controllers\CharPmsWebhookController;
 use App\Http\Controllers\ConferenceCenterController;
 use App\Http\Controllers\ConferenceController;
@@ -36,6 +37,8 @@ use App\Http\Controllers\DefaultSettingsController;
 use App\Http\Controllers\DomainController;
 use App\Http\Controllers\DomainGroupsController;
 use App\Http\Controllers\DomainSettingsController;
+use App\Http\Controllers\DomainLicenseController;
+use App\Http\Controllers\DomainUsageController;
 use App\Http\Controllers\EmailLogsController;
 use App\Http\Controllers\EmailQueueController;
 use App\Http\Controllers\ExtensionsController;
@@ -69,6 +72,7 @@ use App\Http\Controllers\SpeedDialController;
 use App\Http\Controllers\SwitchModuleController;
 use App\Http\Controllers\SwitchVariableController;
 use App\Http\Controllers\SystemController;
+use App\Http\Controllers\AiUsageRatesController;
 use App\Http\Controllers\SystemSettingsController;
 use App\Http\Controllers\TestEmailController;
 use App\Http\Controllers\TokenController;
@@ -611,6 +615,12 @@ Route::group(['middleware' => ['auth:sanctum', 'api.cookie.auth']], function () 
     Route::match(['get', 'put'], '/recorder/analytics/schedule', [RecorderAnalyticsController::class, 'schedule'])->name('recorder.analytics.schedule');
     Route::post('/recorder/analytics/send', [RecorderAnalyticsController::class, 'send'])->name('recorder.analytics.send');
 
+    Route::get('/call-detail-records/analytics/report', [CallHistoryAnalyticsController::class, 'report'])->name('cdrs.analytics.report');
+    Route::get('/call-detail-records/analytics/export', [CallHistoryAnalyticsController::class, 'export'])->name('cdrs.analytics.export');
+    Route::post('/call-detail-records/analytics/executive-summary', [CallHistoryAnalyticsController::class, 'executiveSummary'])->name('cdrs.analytics.executive-summary');
+    Route::match(['get', 'put'], '/call-detail-records/analytics/schedule', [CallHistoryAnalyticsController::class, 'schedule'])->name('cdrs.analytics.schedule');
+    Route::post('/call-detail-records/analytics/send', [CallHistoryAnalyticsController::class, 'send'])->name('cdrs.analytics.send');
+
     // Account Settings
     Route::put('account-settings/update', [AccountSettingsController::class, 'update'])->name('account-settings.update');
 
@@ -637,6 +647,11 @@ Route::group(['middleware' => ['auth:sanctum', 'api.cookie.auth']], function () 
     Route::post('domains/{domain}/settings/bulk-toggle', [DomainSettingsController::class, 'bulkToggle'])->name('domains.settings.bulk.toggle');
     Route::post('domains/{domain}/settings/copy', [DomainSettingsController::class, 'copy'])->name('domains.settings.copy');
     Route::post('domains/{domain}/settings/reload', [DomainSettingsController::class, 'reload'])->name('domains.settings.reload');
+    Route::get('domains/{domain}/usage', [DomainUsageController::class, 'show'])->name('domains.usage.show');
+    Route::get('domains/{domain}/license/usage', [DomainLicenseController::class, 'usage'])->name('domains.license.usage');
+    Route::get('domains/{domain}/license/usage-details/data', [DomainLicenseController::class, 'usageDetailsData'])->name('domains.license.usage-details.data');
+    Route::get('domains/{domain}/license/usage-details/export', [DomainLicenseController::class, 'usageDetailsExport'])->name('domains.license.usage-details.export');
+    Route::put('domains/{domain}/license', [DomainLicenseController::class, 'update'])->name('domains.license.update');
 
     // Messages CRM contacts (separate contacts table)
     Route::post('contacts', [ContactController::class, 'store'])->name('contacts.store');
@@ -692,6 +707,8 @@ Route::group(['middleware' => ['auth:sanctum', 'api.cookie.auth']], function () 
     // System Settings
     Route::put('system-settings/update', [SystemSettingsController::class, 'update'])->name('system-settings.update');
     Route::get('system-settings/payment_gateways', [SystemSettingsController::class, 'getPaymentGatewayData'])->name('system-settings.payment_gateways');
+    Route::get('ai-usage-rates', [AiUsageRatesController::class, 'show'])->name('ai-usage-rates.show');
+    Route::put('ai-usage-rates', [AiUsageRatesController::class, 'update'])->name('ai-usage-rates.update');
     Route::post('/gateways/test', [PaymentGatewayController::class, 'test'])->name('gateway.test');
 
     // System

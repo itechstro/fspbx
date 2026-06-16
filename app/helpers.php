@@ -74,6 +74,13 @@ if (!function_exists('isSuperAdmin')) {
     }
 }
 
+if (! function_exists('ai_usage_rates')) {
+    function ai_usage_rates(): array
+    {
+        return app(\App\Services\AiUsageRatesService::class)->getRates();
+    }
+}
+
 if (!function_exists('getDefaultSetting')) {
     function getDefaultSetting($category, $subcategory)
     {
@@ -1760,7 +1767,7 @@ if (!function_exists('buildDestinationAction')) {
                 ])->value('domain_setting_value');
 
                 if ($domainLimit !== null && $domainLimit !== '' && is_numeric($domainLimit)) {
-                    return (int)$domainLimit;
+                    return (float) $domainLimit;
                 }
             }
 
@@ -1772,7 +1779,7 @@ if (!function_exists('buildDestinationAction')) {
             ])->value('default_setting_value');
 
             if ($defaultLimit !== null && $defaultLimit !== '' && is_numeric($defaultLimit)) {
-                return (int)$defaultLimit;
+                return (float) $defaultLimit;
             }
 
             // 3. Unlimited if not found

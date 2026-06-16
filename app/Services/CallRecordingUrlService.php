@@ -20,12 +20,16 @@ class CallRecordingUrlService
     public function urlsForCdr(string $xmlCdrUuid, int $ttlSeconds = 600): array
     {
         $rec = CDR::query()
-            ->select('xml_cdr_uuid', 'record_path', 'record_name', 'domain_uuid')
+            ->select('xml_cdr_uuid', 'record_path', 'record_name', 'record_length', 'domain_uuid')
             ->with('archive_recording:xml_cdr_uuid,object_key')
             ->where('xml_cdr_uuid', $xmlCdrUuid)
             ->first();
 
         if (!$rec) {
+            return $this->emptyResponse();
+        }
+
+        if (! app(CdrDataService::class)->cdrHasRecording($rec)) {
             return $this->emptyResponse();
         }
 
@@ -80,7 +84,7 @@ class CallRecordingUrlService
         $file = (string) $rec->record_name;
         $absPath = $absDir !== '' && $file !== '' ? ($absDir . '/' . $file) : null;
 
-        if (!$absPath || !is_file($absPath)) {
+        if (! $absPath || ! is_file($absPath) || filesize($absPath) <= 0) {
             return $this->emptyResponse();
         }
 

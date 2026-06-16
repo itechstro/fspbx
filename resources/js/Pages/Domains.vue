@@ -101,6 +101,15 @@
 
                     <TableField class="px-2 py-2 text-sm flex-col sm:flex-row gap-2">
 
+                        <template v-if="permissions.domain_license_view">
+                            <a :href="routes.domain_license.replace('__DOMAIN__', row.domain_uuid)"
+                                class="inline-flex items-center px-2 py-1 rounded text-gray-700 hover:bg-gray-100 transition text-xs font-medium"
+                                title="License">
+                                <GraphicEqIcon class="w-4 h-4 mr-1" />
+                                License
+                            </a>
+                        </template>
+
                         <template v-if="permissions.domain_settings_view">
                             <a :href="routes.domain_settings.replace('__DOMAIN__', row.domain_uuid)"
                                 class="inline-flex items-center px-2 py-1 rounded text-gray-700 hover:bg-gray-100 transition text-xs font-medium"
@@ -216,6 +225,7 @@ import CreateDomainForm from "./components/forms/CreateDomainForm.vue";
 import UpdateDomainForm from "./components/forms/UpdateDomainForm.vue";
 import Notification from "./components/notifications/Notification.vue";
 import SettingsApplications from "@icons/SettingsApplications.vue"
+import GraphicEqIcon from "@icons/GraphicEqIcon.vue"
 
 const page = usePage()
 const itemOptions = ref({})

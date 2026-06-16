@@ -50,6 +50,7 @@ class DomainController extends Controller
                     // 'select_all' => route('devices.select.all'),
                     'bulk_delete' => route('domains.bulk.delete'),
                     'domain_settings' => route('domains.settings.index', ['domain' => '__DOMAIN__']),
+                    'domain_license' => route('domains.license.index', ['domain' => '__DOMAIN__']),
                     // 'bulk_update' => route('devices.bulk.update'),
                     'item_options' => route('domains.item.options'),
                     // 'restart' => route('devices.restart'),
@@ -471,6 +472,7 @@ class DomainController extends Controller
         $permissions['domain_update'] = userCheckPermission('domain_edit');
         $permissions['domain_destroy'] = userCheckPermission('domain_delete');
         $permissions['domain_settings_view'] = userCheckPermission('domain_setting_view');
+        $permissions['domain_license_view'] = userCheckPermission('domain_license_view');
 
         return $permissions;
     }

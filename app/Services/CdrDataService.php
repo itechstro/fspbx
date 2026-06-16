@@ -52,6 +52,7 @@ class CdrDataService
                 'duration',
                 'record_path',
                 'record_name',
+                'record_length',
                 'voicemail_message',
                 'missed_call',
                 'cc_cancel_reason',
@@ -66,6 +67,7 @@ class CdrDataService
             ->with([
                 'domain:domain_uuid,domain_name,domain_description',
                 'extension:extension_uuid,extension,effective_caller_id_name',
+                'archive_recording:xml_cdr_uuid,object_key',
             ])
             ->allowedFilters([
                 AllowedFilter::callback('startPeriod', function ($query, $value) {
@@ -208,10 +210,12 @@ class CdrDataService
                 'duration',
                 'record_path',
                 'record_name',
+                'record_length',
                 'status',
             ])
             ->with([
                 'domain:domain_uuid,domain_name,domain_description',
+                'archive_recording:xml_cdr_uuid,object_key',
             ])
             ->where('direction', 'recorder')
             ->allowedFilters([
@@ -262,7 +266,7 @@ class CdrDataService
         return $this->enrichCdrsWithContactNames($cdrs);
     }
 
-    public function recorderAnalyticsQuery(string $domainUuid, int $startEpoch, int $endEpoch)
+    public function recorderAnalyticsQuery(string $domainUuid, int $startEpoch, int $endEpoch, ?string $search = null)
     {
         $query = CDR::query()
             ->where('direction', 'recorder')
@@ -274,25 +278,162 @@ class CdrDataService
             ->whereNull('originating_leg_uuid');
 
         $this->applyPrimaryRecorderLegFilter($query);
+        $this->applyRecorderAnalyticsSearch($query, $search);
 
         return $query;
+    }
+
+    public function callHistoryAnalyticsQuery(string $domainUuid, int $startEpoch, int $endEpoch, array $filters = [])
+    {
+        $query = CDR::query()
+            ->where('domain_uuid', $domainUuid)
+            ->where('start_epoch', '>=', $startEpoch)
+            ->where('start_epoch', '<=', $endEpoch)
+            ->where('hangup_cause', '!=', 'LOSE_RACE')
+            ->whereNull('cc_member_session_uuid')
+            ->whereNull('originating_leg_uuid');
+
+        $this->applyExcludeRecorderCdrs($query, $domainUuid);
+        $this->applyCallHistoryAnalyticsFilters($query, $filters);
+
+        return $query;
+    }
+
+    public function applyCallHistoryAnalyticsFilters($query, array $filters = []): void
+    {
+        $search = trim((string) ($filters['search'] ?? ''));
+        if ($search !== '') {
+            $term = $this->normalizeSearchTerm($search);
+
+            $query->where(function ($q) use ($term) {
+                $q->where('caller_id_name', 'ilike', "%{$term}%")
+                    ->orWhere('caller_id_number', 'ilike', "%{$term}%")
+                    ->orWhere('caller_destination', 'ilike', "%{$term}%")
+                    ->orWhere('destination_number', 'ilike', "%{$term}%")
+                    ->orWhere('sip_call_id', 'ilike', "%{$term}%")
+                    ->orWhere('xml_cdr_uuid', 'ilike', "%{$term}%")
+                    ->orWhereHas('extension', function ($extQuery) use ($term) {
+                        $extQuery->where('extension', 'ilike', "%{$term}%")
+                            ->orWhere('effective_caller_id_name', 'ilike', "%{$term}%");
+                    })
+                    ->orWhereHas('callTranscription', function ($tq) use ($term) {
+                        $tq->where('summary_payload->>summary', 'ilike', "%{$term}%");
+                    });
+            });
+        }
+
+        $direction = trim((string) ($filters['direction'] ?? ''));
+        if (in_array($direction, ['inbound', 'outbound', 'local'], true)) {
+            $query->where('direction', $direction);
+        }
+
+        $status = trim((string) ($filters['status'] ?? ''));
+        if ($status !== '') {
+            $query->where(function ($q) use ($status) {
+                if ($status === 'missed call') {
+                    $q->orWhere(function ($q2) {
+                        $q2->where('voicemail_message', false)
+                            ->where('missed_call', true)
+                            ->where('hangup_cause', 'NORMAL_CLEARING')
+                            ->whereNull('cc_cancel_reason')
+                            ->whereNull('cc_cause');
+                    });
+                } elseif ($status === 'abandoned') {
+                    $q->orWhere(function ($q2) {
+                        $q2->where('voicemail_message', false)
+                            ->where('missed_call', true)
+                            ->where('hangup_cause', 'NORMAL_CLEARING')
+                            ->where('cc_cancel_reason', 'BREAK_OUT')
+                            ->where('cc_cause', 'cancel');
+                    });
+                } elseif ($status === 'voicemail') {
+                    $q->orWhere('voicemail_message', true);
+                } else {
+                    $q->orWhere('status', $status);
+                }
+            });
+        }
+
+        $entity = (array) ($filters['entity'] ?? []);
+        $entityType = (string) ($entity['type'] ?? '');
+        $entityValue = (string) ($entity['value'] ?? '');
+
+        if ($entityType === 'queue' && $entityValue !== '') {
+            $query->where('call_center_queue_uuid', $entityValue);
+        } elseif ($entityType === 'extension') {
+            if ($entityValue === '') {
+                $query->whereNull('xml_cdr_uuid');
+            } else {
+                $extension = Extensions::find($entityValue);
+                if ($extension) {
+                    $query->where(function ($q) use ($extension) {
+                        $q->where('extension_uuid', $extension->extension_uuid)
+                            ->orWhere('caller_id_number', $extension->extension)
+                            ->orWhere('caller_destination', $extension->extension)
+                            ->orWhere('source_number', $extension->extension)
+                            ->orWhere('destination_number', $extension->extension)
+                            ->orWhere('destination_number', '*99' . $extension->extension);
+                    });
+                }
+            }
+        }
+
+        $sentiment = strtolower(trim((string) ($filters['sentiment'] ?? '')));
+        if (in_array($sentiment, ['negative', 'neutral', 'positive'], true)) {
+            $query->whereHas('callTranscription', function ($tq) use ($sentiment) {
+                $tq->where('summary_payload->sentiment_overall', $sentiment);
+            });
+        }
+    }
+
+    public function applyRecorderAnalyticsSearch($query, ?string $search): void
+    {
+        $search = trim((string) $search);
+        if ($search === '') {
+            return;
+        }
+
+        $term = $this->normalizeSearchTerm($search);
+
+        $query->where(function ($q) use ($term) {
+            $q->where('caller_id_name', 'ilike', "%{$term}%")
+                ->orWhere('caller_id_number', 'ilike', "%{$term}%")
+                ->orWhere('caller_destination', 'ilike', "%{$term}%")
+                ->orWhere('destination_number', 'ilike', "%{$term}%")
+                ->orWhere('record_name', 'ilike', "%{$term}%")
+                ->orWhere('sip_call_id', 'ilike', "%{$term}%")
+                ->orWhere('xml_cdr_uuid', 'ilike', "%{$term}%")
+                ->orWhereHas('callTranscription', function ($tq) use ($term) {
+                    $tq->where('summary_payload->>summary', 'ilike', "%{$term}%");
+                });
+        });
     }
 
     private function enrichCdrsWithContactNames(mixed $cdrs): mixed
     {
         if ($cdrs instanceof AbstractPaginator) {
-            $this->contactCallerIdResolver->enrichCollection($cdrs->getCollection());
+            $collection = $cdrs->getCollection();
+            $this->contactCallerIdResolver->enrichCollection($collection);
+            $this->enrichCdrsWithRecordingAvailability($collection);
 
             return $cdrs;
         }
 
         if ($cdrs instanceof Collection) {
             $this->contactCallerIdResolver->enrichCollection($cdrs);
+            $this->enrichCdrsWithRecordingAvailability($cdrs);
 
             return $cdrs;
         }
 
         return $cdrs;
+    }
+
+    private function enrichCdrsWithRecordingAvailability(Collection $cdrs): void
+    {
+        foreach ($cdrs as $cdr) {
+            $cdr->setAttribute('has_recording', $this->cdrHasRecording($cdr));
+        }
     }
 
 
@@ -766,16 +907,32 @@ class CdrDataService
         $recordPath = trim((string) $cdr->record_path);
         $recordName = trim((string) $cdr->record_name);
 
+        if ($recordPath === '' && $recordName === '') {
+            return false;
+        }
+
+        if (isset($cdr->record_length) && (int) $cdr->record_length <= 0) {
+            return false;
+        }
+
         if ($recordPath === 'S3') {
             return $recordName !== ''
-                || ($cdr->archive_recording && !empty($cdr->archive_recording->object_key));
+                || ($cdr->archive_recording && ! empty($cdr->archive_recording->object_key));
         }
 
         if ($recordPath === '' || $recordName === '') {
             return false;
         }
 
-        return is_file(rtrim($recordPath, '/') . '/' . $recordName);
+        $fullPath = rtrim($recordPath, '/') . '/' . $recordName;
+
+        if (! is_file($fullPath)) {
+            return false;
+        }
+
+        $size = filesize($fullPath);
+
+        return $size !== false && $size > 0;
     }
 
     public function buildApiCallFlowData(CDR $cdr): array

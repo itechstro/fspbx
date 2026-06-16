@@ -86,6 +86,12 @@ use App\Console\Commands\Updates\Update228;
 use App\Console\Commands\Updates\Update229;
 use App\Console\Commands\Updates\Update230;
 use App\Console\Commands\Updates\Update231;
+use App\Console\Commands\Updates\Update232;
+use App\Console\Commands\Updates\Update233;
+use App\Console\Commands\Updates\Update234;
+use App\Console\Commands\Updates\Update235;
+use App\Console\Commands\Updates\Update236;
+use App\Console\Commands\Updates\Update237;
 use App\Console\Commands\Updates\Update0917;
 use App\Console\Commands\Updates\Update0918;
 use App\Console\Commands\Updates\Update0924;
@@ -248,6 +254,12 @@ class UpdateApp extends Command
             '1.8.8.36' => Update229::class,
             '1.8.8.37' => Update230::class,
             '1.8.8.38' => Update231::class,
+            '1.8.8.39' => Update232::class,
+            '1.8.8.40' => Update233::class,
+            '1.8.8.41' => Update234::class,
+            '1.8.8.42' => Update235::class,
+            '1.8.8.43' => Update236::class,
+            '1.8.8.44' => Update237::class,
             // Add more versions as needed
         ];
 

@@ -12,6 +12,9 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use App\Services\CallTranscription\CallTranscriptionService;
+use App\Services\CallTranscriptionConfigService;
+use App\Services\DomainUsageService;
+use App\Exceptions\DomainUsageLimitExceededException;
 use Exception;
 
 class TranscribeCdrJob implements ShouldQueue
@@ -75,9 +78,9 @@ class TranscribeCdrJob implements ShouldQueue
         $this->onQueue('transcriptions');
     }
 
-    public function handle(CallTranscriptionService $service): void
+    public function handle(CallTranscriptionService $service, DomainUsageService $domainUsageService): void
     {
-        Redis::throttle('transcriptions')->allow(1)->every(1)->then(function () use ($service) {
+        Redis::throttle('transcriptions')->allow(1)->every(1)->then(function () use ($service, $domainUsageService) {
             $direction = CDR::query()
                 ->where('xml_cdr_uuid', $this->xmlCdrUuid)
                 ->value('direction');
@@ -90,6 +93,37 @@ class TranscribeCdrJob implements ShouldQueue
 
             if (!$providerKey) {
                 throw new Exception("No transcription provider defined");
+            }
+
+            $transcriptionConfig = app(CallTranscriptionConfigService::class)->effective($this->domainUuid);
+            $requestPayload = (array) data_get($transcriptionConfig, 'provider_config.config', []);
+            $estimate = $domainUsageService->estimateTranscriptionCostForCdr($this->xmlCdrUuid, $requestPayload);
+
+            try {
+                $domainUsageService->assertWithinLimit(
+                    'ai_transcription_minutes',
+                    (float) ($estimate['duration_seconds'] ?? 0),
+                    $this->domainUuid
+                );
+                $domainUsageService->assertWithinLimit(
+                    'ai_spend_usd_monthly',
+                    (float) ($estimate['cost_usd'] ?? 0),
+                    $this->domainUuid
+                );
+            } catch (DomainUsageLimitExceededException $exception) {
+                CallTranscription::updateOrCreate(
+                    ['xml_cdr_uuid' => $this->xmlCdrUuid],
+                    [
+                        'domain_uuid' => $this->domainUuid,
+                        'provider_key' => $providerKey,
+                        'status' => 'failed',
+                        'error_message' => $exception->getMessage(),
+                        'requested_at' => now(),
+                        'completed_at' => now(),
+                    ]
+                );
+
+                return;
             }
 
             $row = \App\Models\CallTranscription::updateOrCreate(

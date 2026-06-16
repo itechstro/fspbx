@@ -245,6 +245,8 @@ class OpenAIService
             'raw'    => $resp,
             'status' => data_get($resp, 'status'),
             'text'   => $text, // may be '', caller should handle
+            'model'  => data_get($resp, 'model'),
+            'usage'  => $this->extractUsage($resp),
         ];
     }
 
@@ -454,7 +456,7 @@ class OpenAIService
     /**
      * Generate a synchronous executive summary from structured analytics context.
      *
-     * @return array{overview?: string, highlights?: array, concerns?: array, recommendations?: array}
+     * @return array{overview?: string, highlights?: array, concerns?: array, recommendations?: array, model?: string, usage?: array}
      */
     public function createExecutiveSummary(array $context, string $model = 'gpt-4.1-mini'): array
     {
@@ -512,7 +514,22 @@ class OpenAIService
             $text = (string) data_get($resp, 'output.0.content.0.text', '');
         }
 
-        return $this->parseJsonResponseText($text);
+        $decoded = $this->parseJsonResponseText($text);
+        $decoded['model'] = data_get($resp, 'model', $model);
+        $decoded['usage'] = $this->extractUsage($resp);
+
+        return $decoded;
+    }
+
+    public function extractUsage(array $response): array
+    {
+        $usage = (array) data_get($response, 'usage', []);
+
+        return [
+            'input_tokens' => (int) data_get($usage, 'input_tokens', 0),
+            'output_tokens' => (int) data_get($usage, 'output_tokens', 0),
+            'total_tokens' => (int) data_get($usage, 'total_tokens', 0),
+        ];
     }
 
     /**

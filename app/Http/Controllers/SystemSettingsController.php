@@ -33,11 +33,13 @@ class SystemSettingsController extends Controller
      * @param  Request  $request
      * @return Redirector|Response|RedirectResponse|Application
      */
-    public function index()
+    public function index(Request $request)
     {
-        if (!userCheckPermission("account_settings_list_view")) {
+        if (! userCheckPermission('account_settings_list_view') && ! userCheckPermission('ai_usage_rates_view')) {
             return redirect('/');
         }
+
+        $initialTab = $request->string('tab')->toString();
 
         return Inertia::render(
             $this->viewName,
@@ -59,10 +61,13 @@ class SystemSettingsController extends Controller
                     'transcription_policy_destroy_route' => route('call-transcription.policy.destroy'),
                     'assemblyai_route' => route('call-transcription.assemblyai'),
                     'assemblyai_store_route' => route('call-transcription.assemblyai.store'),
+                    'ai_usage_rates_show' => route('ai-usage-rates.show'),
+                    'ai_usage_rates_update' => route('ai-usage-rates.update'),
                 ],
                 'permissions' => function () {
                     return $this->getUserPermissions();
                 },
+                'initial_tab' => $initialTab,
             ]
         );
     }
@@ -217,6 +222,8 @@ class SystemSettingsController extends Controller
         $permissions = [];
         $permissions['payment_gateways_view'] = userCheckPermission('payment_gateways_view');
         $permissions['call_transcription_settings_view'] = userCheckPermission('call_transcription_settings_view');
+        $permissions['ai_usage_rates_view'] = userCheckPermission('ai_usage_rates_view');
+        $permissions['ai_usage_rates_edit'] = userCheckPermission('ai_usage_rates_edit');
 
         return $permissions;
     }

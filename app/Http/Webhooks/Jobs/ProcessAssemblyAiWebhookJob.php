@@ -5,6 +5,7 @@ namespace App\Http\Webhooks\Jobs;
 use App\Models\CDR;
 use App\Models\CallTranscription;
 use App\Services\CallTranscription\CallTranscriptionService;
+use App\Services\CallTranscriptionCostService;
 use Spatie\WebhookClient\Models\WebhookCall;
 use Spatie\WebhookClient\Jobs\ProcessWebhookJob as SpatieProcessWebhookJob;
 
@@ -18,7 +19,7 @@ class ProcessAssemblyAiWebhookJob extends SpatieProcessWebhookJob
 
     public function __construct(public WebhookCall $webhookCall) {}
 
-    public function handle(CallTranscriptionService $service): void
+    public function handle(CallTranscriptionService $service, CallTranscriptionCostService $costService): void
     {
 
         $payload = $this->webhookCall->payload;
@@ -64,6 +65,7 @@ class ProcessAssemblyAiWebhookJob extends SpatieProcessWebhookJob
             }
 
             $row->update($updates);
+            $costService->applyTranscriptionCompletion($row->refresh(), $full ?: []);
 
             if ($shouldSummarize) {
                 dispatch(new \App\Jobs\SummarizeCallTranscription($row->uuid))->onQueue('transcriptions');

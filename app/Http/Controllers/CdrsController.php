@@ -80,6 +80,7 @@ class CdrsController extends Controller
 
                 'routes' => [
                     'current_page' => route('cdrs.index'),
+                    'analytics_page' => route('cdrs.analytics.index'),
                     'export' => route('cdrs.export'),
                     'item_options' => route('cdrs.item.options'),
                     'data_route' => route('cdrs.data'),
@@ -195,7 +196,7 @@ class CdrsController extends Controller
                     'extension:extension_uuid,extension,effective_caller_id_name',
                 ])
                 ->with([
-                    'callTranscription:uuid,xml_cdr_uuid,domain_uuid,external_id,status,error_message,result_payload,summary_status,summary_error,summary_payload,translation_status,translation_error,translation_payload,translation_target_language'
+                    'callTranscription:uuid,xml_cdr_uuid,domain_uuid,external_id,status,error_message,result_payload,summary_status,summary_error,summary_payload,translation_status,translation_error,translation_payload,translation_target_language,translation_model,transcription_cost_usd,summary_cost_usd,translation_cost_usd,total_ai_cost_usd'
                 ])
                 ->first();
 
@@ -270,6 +271,12 @@ class CdrsController extends Controller
                                             $ct->translation_target_language
                                         ),
                                     ]);
+
+                                    app(\App\Services\CallTranscriptionCostService::class)->applyTranslationCompletion(
+                                        $ct->fresh(),
+                                        (string) ($retrieved['model'] ?? $ct->translation_model ?? 'gpt-4.1-mini'),
+                                        (array) ($retrieved['usage'] ?? [])
+                                    );
                                 }
                             }
                         }
@@ -303,6 +310,10 @@ class CdrsController extends Controller
                     'translation_utterances' => data_get($item->callTranscription->translation_payload, 'utterances', []),
                     'translation_summary' => data_get($item->callTranscription->translation_payload, 'summary_text'),
                     'translation_target_language' => $item->callTranscription->translation_target_language ?? data_get($item->callTranscription->translation_payload, 'target_language'),
+                    'transcription_cost_usd' => $item->callTranscription->transcription_cost_usd,
+                    'summary_cost_usd' => $item->callTranscription->summary_cost_usd,
+                    'translation_cost_usd' => $item->callTranscription->translation_cost_usd,
+                    'total_ai_cost_usd' => $item->callTranscription->total_ai_cost_usd,
 
                 ];
 
@@ -630,6 +641,7 @@ class CdrsController extends Controller
         $permissions['search_sentiment'] = userCheckPermission('xml_cdr_search_sentiment')
             && $isCallTranscriptionServiceEnabled
             && (bool) ($config['auto_summarize'] ?? false);
+        $permissions['analytics_view'] = userCheckPermission('cdr_analytics_view');
 
         return $permissions;
     }

@@ -11,6 +11,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
+use App\Services\CallTranscriptionCostService;
 
 class FetchTranscriptionTranslation implements ShouldQueue
 {
@@ -102,6 +103,12 @@ class FetchTranscriptionTranslation implements ShouldQueue
                         $row->translation_target_language
                     ),
                 ]);
+
+                app(CallTranscriptionCostService::class)->applyTranslationCompletion(
+                    $row->refresh(),
+                    (string) ($retrieved['model'] ?? $row->translation_model ?? 'gpt-4.1-mini'),
+                    (array) ($retrieved['usage'] ?? [])
+                );
 
                 $transcriptionService = app(\App\Services\CallTranscription\CallTranscriptionService::class);
                 $transcriptionService->maybeDispatchTranscriptionEmail($row);

@@ -7,6 +7,11 @@
 
                 <template #action>
 
+                    <a v-if="permissions.analytics_view" :href="routes.analytics_page"
+                        class="inline-flex items-center rounded-md bg-white px-2.5 py-1.5 mr-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
+                        Analytics
+                    </a>
+
                     <button v-if="page.props.auth.can.cdrs_export" type="button" @click.prevent="exportCsv"
                         :disabled="isExporting"
                         class="inline-flex items-center gap-x-1.5 rounded-md bg-indigo-600 px-2.5 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
@@ -236,8 +241,7 @@
                             class="whitespace-nowrap px-2 py-2 text-sm text-gray-500" :text="row.rtp_audio_in_mos" />
 
                         <TableField class="whitespace-nowrap px-2 py-1 text-sm text-gray-500">
-                            <template v-if="(row.record_name && row.record_path) || row.record_path === 'S3'
-                            " #action-buttons>
+                            <template v-if="row.has_recording" #action-buttons>
                                 <div class="flex items-center space-x-2 whitespace-nowrap">
                                     <PlayCircleIcon v-if="permissions.call_recording_play"
                                         @click="handleCallRecordingButtonClick(row.xml_cdr_uuid)"

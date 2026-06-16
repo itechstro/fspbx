@@ -132,7 +132,7 @@
                             :text="row.duration_formatted" />
 
                         <TableField class="whitespace-nowrap px-2 py-1 text-sm text-gray-500">
-                            <template v-if="(row.record_name && row.record_path) || row.record_path === 'S3'"
+                            <template v-if="row.has_recording" #action-buttons>
                                 #action-buttons>
                                 <PlayCircleIcon v-if="permissions.call_recording_play"
                                     @click="handleCallRecordingButtonClick(row.xml_cdr_uuid)"

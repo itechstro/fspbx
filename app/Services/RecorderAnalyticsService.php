@@ -3,7 +3,11 @@
 namespace App\Services;
 
 use App\Models\RecorderAnalyticsReportSchedule;
+use App\Models\RecorderAnalyticsExecutiveSummaryRun;
+use App\Exceptions\DomainUsageLimitExceededException;
 use App\Services\Contacts\ContactCallerIdResolver;
+use App\Services\DomainUsageService;
+use App\Services\AiCostEstimationService;
 use Illuminate\Support\Carbon;
 
 class RecorderAnalyticsService
@@ -12,6 +16,8 @@ class RecorderAnalyticsService
         protected CdrDataService $cdrDataService,
         protected ContactCallerIdResolver $contactCallerIdResolver,
         protected OpenAIService $openAIService,
+        protected DomainUsageService $domainUsageService,
+        protected AiCostEstimationService $costEstimationService,
     ) {
     }
 
@@ -20,14 +26,15 @@ class RecorderAnalyticsService
         return $this->openAIService->isConfigured();
     }
 
-    public function buildReport(string $domainUuid, Carbon $startUtc, Carbon $endUtc): array
+    public function buildReport(string $domainUuid, Carbon $startUtc, Carbon $endUtc, ?string $search = null): array
     {
+        $search = $this->normalizeSearch($search);
         $timezone = get_local_time_zone($domainUuid);
         $startEpoch = $startUtc->copy()->setTimezone('UTC')->timestamp;
         $endEpoch = $endUtc->copy()->setTimezone('UTC')->timestamp;
 
         $calls = $this->cdrDataService
-            ->recorderAnalyticsQuery($domainUuid, $startEpoch, $endEpoch)
+            ->recorderAnalyticsQuery($domainUuid, $startEpoch, $endEpoch, $search)
             ->with([
                 'callTranscription:uuid,xml_cdr_uuid,status,summary_status,summary_payload',
             ])
@@ -124,6 +131,10 @@ class RecorderAnalyticsService
             $endUtc->copy()->timezone($timezone)->format('M j, Y g:i A')
         );
 
+        if ($search !== null) {
+            $periodLabel .= sprintf(' · Search: "%s"', $search);
+        }
+
         ksort($callsByDay);
 
         $callsByDayRows = [];
@@ -140,10 +151,12 @@ class RecorderAnalyticsService
         $topTopics = array_values($topicCounts);
         usort($topTopics, fn ($a, $b) => $b['count'] <=> $a['count']);
         $topTopics = array_slice($topTopics, 0, 10);
+        $reportPeriod = $startUtc->copy()->timezone($timezone)->format('Y-m');
 
         return [
             'domain_uuid' => $domainUuid,
             'timezone' => $timezone,
+            'search' => $search,
             'period_label' => $periodLabel,
             'generated_at' => now($timezone)->format('M j, Y g:i A T'),
             'summary' => [
@@ -156,6 +169,7 @@ class RecorderAnalyticsService
                 'summarized_count' => $summarizedCount,
                 'sentiment' => $sentiment,
             ],
+            'usage' => $this->domainUsageService->buildSummary($domainUuid, $reportPeriod),
             'calls_by_day' => $callsByDayRows,
             'status_breakdown' => $statusRows,
             'top_topics' => $topTopics,
@@ -222,7 +236,7 @@ class RecorderAnalyticsService
         ];
     }
 
-    public function generateExecutiveSummary(array $report): array
+    public function generateExecutiveSummary(array $report, string $source = 'api'): array
     {
         if (! $this->isExecutiveSummaryAvailable()) {
             throw new \RuntimeException('OpenAI API key is not configured.');
@@ -233,9 +247,41 @@ class RecorderAnalyticsService
             throw new \RuntimeException('No summarized calls are available for this period.');
         }
 
+        $domainUuid = (string) ($report['domain_uuid'] ?? '');
+        $this->domainUsageService->assertWithinLimit('ai_executive_summary_requests', 1, $domainUuid);
+        $this->domainUsageService->assertWithinLimit(
+            'ai_spend_usd_monthly',
+            (float) data_get(ai_usage_rates(), 'openai.reserve_executive_summary_usd', 0.05),
+            $domainUuid
+        );
+
         $decoded = $this->openAIService->createExecutiveSummary(
             $this->buildExecutiveSummaryContext($report)
         );
+
+        $model = (string) ($decoded['model'] ?? 'gpt-4.1-mini');
+        $usage = (array) ($decoded['usage'] ?? []);
+        $estimate = $this->costEstimationService->estimateOpenAiUsage($model, $usage);
+
+        RecorderAnalyticsExecutiveSummaryRun::query()->create([
+            'domain_uuid' => $domainUuid,
+            'period_start' => null,
+            'period_end' => null,
+            'model' => $estimate['model'],
+            'input_tokens' => $estimate['input_tokens'],
+            'output_tokens' => $estimate['output_tokens'],
+            'total_tokens' => $estimate['total_tokens'],
+            'estimated_cost_usd' => $estimate['cost_usd'],
+            'source' => $source,
+        ]);
+
+        $this->domainUsageService->recordExecutiveSummaryUsage(
+            $domainUuid,
+            (float) $estimate['cost_usd'],
+            ['source' => $source]
+        );
+
+        unset($decoded['model'], $decoded['usage']);
 
         return [
             'overview' => trim((string) ($decoded['overview'] ?? '')) ?: null,
@@ -243,6 +289,8 @@ class RecorderAnalyticsService
             'concerns' => $this->normalizeSummaryList($decoded['concerns'] ?? []),
             'recommendations' => $this->normalizeSummaryList($decoded['recommendations'] ?? []),
             'generated_at' => now()->toIso8601String(),
+            'estimated_cost_usd' => $estimate['cost_usd'],
+            'usage' => $usage,
         ];
     }
 
@@ -253,7 +301,10 @@ class RecorderAnalyticsService
         }
 
         try {
-            $report['executive_summary'] = $this->generateExecutiveSummary($report);
+            $report['executive_summary'] = $this->generateExecutiveSummary($report, 'scheduled_email');
+        } catch (DomainUsageLimitExceededException $exception) {
+            $report['executive_summary'] = null;
+            $report['executive_summary_error'] = $exception->getMessage();
         } catch (\Throwable $exception) {
             report($exception);
             $report['executive_summary'] = null;
@@ -261,6 +312,13 @@ class RecorderAnalyticsService
         }
 
         return $report;
+    }
+
+    protected function normalizeSearch(?string $search): ?string
+    {
+        $search = trim((string) $search);
+
+        return $search !== '' ? $search : null;
     }
 
     protected function normalizeSummaryList(mixed $items): array
@@ -293,7 +351,7 @@ class RecorderAnalyticsService
         };
     }
 
-    public function isScheduleDue(RecorderAnalyticsReportSchedule $schedule): bool
+    public function isScheduleDue($schedule): bool
     {
         if (! $schedule->enabled || empty($schedule->emails)) {
             return false;

@@ -21,6 +21,7 @@ class RecorderAnalyticsReportSchedule extends Model
         'domain_uuid',
         'enabled',
         'include_executive_summary',
+        'search',
         'emails',
         'frequency',
         'send_time',
