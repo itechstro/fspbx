@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\RecorderAnalyticsReportSchedule;
 use App\Models\RecorderAnalyticsExecutiveSummaryRun;
 use App\Exceptions\DomainUsageLimitExceededException;
+use App\Services\Concerns\BuildsAnalyticsAiBreakdowns;
 use App\Services\Contacts\ContactCallerIdResolver;
 use App\Services\DomainUsageService;
 use App\Services\AiCostEstimationService;
@@ -12,6 +13,8 @@ use Illuminate\Support\Carbon;
 
 class RecorderAnalyticsService
 {
+    use BuildsAnalyticsAiBreakdowns;
+
     public function __construct(
         protected CdrDataService $cdrDataService,
         protected ContactCallerIdResolver $contactCallerIdResolver,
@@ -65,7 +68,8 @@ class RecorderAnalyticsService
         $summarizedCount = 0;
         $callRows = [];
         $callsByDay = [];
-        $statusBreakdown = [];
+        $transcriptionStatusCounts = [];
+        $summaryStatusCounts = [];
         $topicCounts = [];
 
         foreach ($calls as $call) {
@@ -93,8 +97,14 @@ class RecorderAnalyticsService
             $dateKey = $startLocal->format('Y-m-d');
             $callsByDay[$dateKey] = ($callsByDay[$dateKey] ?? 0) + 1;
 
-            $statusKey = trim((string) ($call->status ?? '')) ?: 'unknown';
-            $statusBreakdown[$statusKey] = ($statusBreakdown[$statusKey] ?? 0) + 1;
+            $this->bumpBreakdownCount(
+                $transcriptionStatusCounts,
+                $this->transcriptionStatusBucket($transcription)
+            );
+            $this->bumpBreakdownCount(
+                $summaryStatusCounts,
+                $this->summaryStatusBucket($transcription)
+            );
 
             foreach ((array) data_get($transcription?->summary_payload, 'key_points', []) as $topic) {
                 $topic = trim((string) $topic);
@@ -142,12 +152,6 @@ class RecorderAnalyticsService
             $callsByDayRows[] = ['date' => $date, 'count' => $count];
         }
 
-        $statusRows = [];
-        foreach ($statusBreakdown as $status => $count) {
-            $statusRows[] = ['status' => $status, 'count' => $count];
-        }
-        usort($statusRows, fn ($a, $b) => $b['count'] <=> $a['count']);
-
         $topTopics = array_values($topicCounts);
         usort($topTopics, fn ($a, $b) => $b['count'] <=> $a['count']);
         $topTopics = array_slice($topTopics, 0, 10);
@@ -171,7 +175,8 @@ class RecorderAnalyticsService
             ],
             'usage' => $this->domainUsageService->buildSummary($domainUuid, $reportPeriod),
             'calls_by_day' => $callsByDayRows,
-            'status_breakdown' => $statusRows,
+            'transcription_status_breakdown' => $this->formatTranscriptionStatusBreakdown($transcriptionStatusCounts),
+            'summary_status_breakdown' => $this->formatSummaryStatusBreakdown($summaryStatusCounts),
             'top_topics' => $topTopics,
             'calls' => $callRows,
         ];
@@ -230,7 +235,8 @@ class RecorderAnalyticsService
             'generated_at' => $report['generated_at'] ?? null,
             'summary' => $report['summary'] ?? [],
             'calls_by_day' => $report['calls_by_day'] ?? [],
-            'status_breakdown' => $report['status_breakdown'] ?? [],
+            'transcription_status_breakdown' => $report['transcription_status_breakdown'] ?? [],
+            'summary_status_breakdown' => $report['summary_status_breakdown'] ?? [],
             'top_topics' => $report['top_topics'] ?? [],
             'call_summaries' => $callSummaries,
         ];

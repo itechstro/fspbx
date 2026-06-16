@@ -3,11 +3,14 @@
 namespace App\Services;
 
 use App\Models\CallHistoryAnalyticsReportSchedule;
+use App\Services\Concerns\BuildsAnalyticsAiBreakdowns;
 use App\Services\Contacts\ContactCallerIdResolver;
 use Illuminate\Support\Carbon;
 
 class CallHistoryAnalyticsService
 {
+    use BuildsAnalyticsAiBreakdowns;
+
     public function __construct(
         protected CdrDataService $cdrDataService,
         protected ContactCallerIdResolver $contactCallerIdResolver,
@@ -54,6 +57,7 @@ class CallHistoryAnalyticsService
             ->callHistoryAnalyticsQuery($domainUuid, $startEpoch, $endEpoch, $filters)
             ->with([
                 'callTranscription:uuid,xml_cdr_uuid,status,summary_status,summary_payload',
+                'archive_recording:xml_cdr_uuid,object_key',
             ])
             ->orderByDesc('start_epoch')
             ->get([
@@ -67,6 +71,9 @@ class CallHistoryAnalyticsService
                 'start_epoch',
                 'duration',
                 'status',
+                'record_path',
+                'record_name',
+                'record_length',
             ]);
 
         $this->contactCallerIdResolver->enrichCollection($calls);
@@ -85,6 +92,9 @@ class CallHistoryAnalyticsService
         $callsByDay = [];
         $statusBreakdown = [];
         $directionBreakdown = [];
+        $recordingStatusCounts = [];
+        $transcriptionStatusCounts = [];
+        $summaryStatusCounts = [];
         $topicCounts = [];
 
         foreach ($calls as $call) {
@@ -117,6 +127,19 @@ class CallHistoryAnalyticsService
 
             $directionKey = trim((string) ($call->direction ?? '')) ?: 'unknown';
             $directionBreakdown[$directionKey] = ($directionBreakdown[$directionKey] ?? 0) + 1;
+
+            $this->bumpBreakdownCount(
+                $recordingStatusCounts,
+                $this->recordingStatusBucket($this->cdrDataService->cdrHasRecording($call))
+            );
+            $this->bumpBreakdownCount(
+                $transcriptionStatusCounts,
+                $this->transcriptionStatusBucket($transcription)
+            );
+            $this->bumpBreakdownCount(
+                $summaryStatusCounts,
+                $this->summaryStatusBucket($transcription)
+            );
 
             foreach ((array) data_get($transcription?->summary_payload, 'key_points', []) as $topic) {
                 $topic = trim((string) $topic);
@@ -180,6 +203,9 @@ class CallHistoryAnalyticsService
             'calls_by_day' => collect($callsByDay)->map(fn ($count, $date) => ['date' => $date, 'count' => $count])->values()->all(),
             'status_breakdown' => $this->sortedBreakdownRows($statusBreakdown),
             'direction_breakdown' => $this->sortedBreakdownRows($directionBreakdown),
+            'recording_status_breakdown' => $this->formatRecordingStatusBreakdown($recordingStatusCounts),
+            'transcription_status_breakdown' => $this->formatTranscriptionStatusBreakdown($transcriptionStatusCounts),
+            'summary_status_breakdown' => $this->formatSummaryStatusBreakdown($summaryStatusCounts),
             'top_topics' => collect($topicCounts)->values()->sortByDesc('count')->take(10)->values()->all(),
             'calls' => $callRows,
         ];

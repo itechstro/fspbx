@@ -184,6 +184,27 @@
                 </div>
 
                 <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                    <AnalyticsDoughnutCard
+                        title="Recording Availability"
+                        :breakdown="report.recording_status_breakdown"
+                        :colors="recordingStatusColors"
+                        empty-text="No recording data for this period."
+                    />
+                    <AnalyticsDoughnutCard
+                        title="Transcription Status"
+                        :breakdown="report.transcription_status_breakdown"
+                        :colors="transcriptionStatusColors"
+                        empty-text="No transcription data for this period."
+                    />
+                    <AnalyticsDoughnutCard
+                        title="Summary Status"
+                        :breakdown="report.summary_status_breakdown"
+                        :colors="summaryStatusColors"
+                        empty-text="No summary data for this period."
+                    />
+                </div>
+
+                <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
                     <div class="rounded-lg bg-white p-5 ring-1 ring-gray-200">
                         <h2 class="mb-4 text-sm font-semibold text-gray-900">Call Direction</h2>
                         <div v-if="directionTotal === 0" class="py-10 text-center text-sm text-gray-500">
@@ -395,6 +416,7 @@ import { Doughnut, Bar } from 'vue-chartjs';
 import { ArcElement, BarElement, CategoryScale, Chart as ChartJS, Legend, LinearScale, Tooltip } from 'chart.js';
 import MainLayout from '../Layouts/MainLayout.vue';
 import DatePicker from './components/general/DatePicker.vue';
+import AnalyticsDoughnutCard from './components/general/AnalyticsDoughnutCard.vue';
 import Spinner from './components/general/Spinner.vue';
 import Notification from './components/notifications/Notification.vue';
 import Multiselect from 'vue-multiselect';
@@ -513,6 +535,26 @@ const statusColors = [
     '#8b5cf6',
     '#6b7280',
 ];
+
+const recordingStatusColors = {
+    available: '#16a34a',
+    unavailable: '#dc2626',
+};
+
+const transcriptionStatusColors = {
+    none: '#d1d5db',
+    pending: '#f59e0b',
+    queued: '#0ea5e9',
+    in_progress: '#6366f1',
+    completed: '#16a34a',
+    failed: '#dc2626',
+    other: '#6b7280',
+};
+
+const summaryStatusColors = {
+    summarized: '#16a34a',
+    not_summarized: '#d1d5db',
+};
 
 const formatDirection = (direction) => {
     const value = String(direction || '').trim();

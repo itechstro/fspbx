@@ -92,12 +92,22 @@
         </table>
     @endif
 
-    @php($statusBreakdown = $data['status_breakdown'] ?? [])
-    @if(!empty($statusBreakdown))
-        <div class="section-title">Call Status</div>
+    @php($transcriptionStatusBreakdown = $data['transcription_status_breakdown'] ?? [])
+    @if(!empty($transcriptionStatusBreakdown))
+        <div class="section-title">Transcription Status</div>
         <div class="sentiment">
-            @foreach($statusBreakdown as $row)
-                <span>{{ ucwords(str_replace('_', ' ', $row['status'] ?? 'unknown')) }}: {{ $row['count'] ?? 0 }}</span>
+            @foreach($transcriptionStatusBreakdown as $row)
+                <span>{{ $row['label'] ?? '' }}: {{ $row['count'] ?? 0 }}</span>
+            @endforeach
+        </div>
+    @endif
+
+    @php($summaryStatusBreakdown = $data['summary_status_breakdown'] ?? [])
+    @if(!empty($summaryStatusBreakdown))
+        <div class="section-title">Summary Status</div>
+        <div class="sentiment">
+            @foreach($summaryStatusBreakdown as $row)
+                <span>{{ $row['label'] ?? '' }}: {{ $row['count'] ?? 0 }}</span>
             @endforeach
         </div>
     @endif

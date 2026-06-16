@@ -27,13 +27,23 @@ No daily call data for this period.
 @endforeach
 @endif
 
-Call Status
-@php($statusBreakdown = $data['status_breakdown'] ?? [])
-@if(empty($statusBreakdown))
-No status data for this period.
+Transcription Status
+@php($transcriptionStatusBreakdown = $data['transcription_status_breakdown'] ?? [])
+@if(empty($transcriptionStatusBreakdown))
+No transcription data for this period.
 @else
-@foreach($statusBreakdown as $row)
-{{ ucwords(str_replace('_', ' ', $row['status'] ?? 'unknown')) }}: {{ $row['count'] ?? 0 }}
+@foreach($transcriptionStatusBreakdown as $row)
+{{ $row['label'] ?? '' }}: {{ $row['count'] ?? 0 }}
+@endforeach
+@endif
+
+Summary Status
+@php($summaryStatusBreakdown = $data['summary_status_breakdown'] ?? [])
+@if(empty($summaryStatusBreakdown))
+No summary data for this period.
+@else
+@foreach($summaryStatusBreakdown as $row)
+{{ $row['label'] ?? '' }}: {{ $row['count'] ?? 0 }}
 @endforeach
 @endif
 

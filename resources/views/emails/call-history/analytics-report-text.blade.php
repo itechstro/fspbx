@@ -47,6 +47,36 @@ No status data for this period.
 @endforeach
 @endif
 
+Recording Availability
+@php($recordingStatusBreakdown = $data['recording_status_breakdown'] ?? [])
+@if(empty($recordingStatusBreakdown))
+No recording data for this period.
+@else
+@foreach($recordingStatusBreakdown as $row)
+{{ $row['label'] ?? '' }}: {{ $row['count'] ?? 0 }}
+@endforeach
+@endif
+
+Transcription Status
+@php($transcriptionStatusBreakdown = $data['transcription_status_breakdown'] ?? [])
+@if(empty($transcriptionStatusBreakdown))
+No transcription data for this period.
+@else
+@foreach($transcriptionStatusBreakdown as $row)
+{{ $row['label'] ?? '' }}: {{ $row['count'] ?? 0 }}
+@endforeach
+@endif
+
+Summary Status
+@php($summaryStatusBreakdown = $data['summary_status_breakdown'] ?? [])
+@if(empty($summaryStatusBreakdown))
+No summary data for this period.
+@else
+@foreach($summaryStatusBreakdown as $row)
+{{ $row['label'] ?? '' }}: {{ $row['count'] ?? 0 }}
+@endforeach
+@endif
+
 Top Topics
 @php($topTopics = $data['top_topics'] ?? [])
 @if(empty($topTopics))

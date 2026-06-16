@@ -112,6 +112,36 @@
         </div>
     @endif
 
+    @php($recordingStatusBreakdown = $data['recording_status_breakdown'] ?? [])
+    @if(!empty($recordingStatusBreakdown))
+        <div class="section-title">Recording Availability</div>
+        <div class="sentiment">
+            @foreach($recordingStatusBreakdown as $row)
+                <span>{{ $row['label'] ?? '' }}: {{ $row['count'] ?? 0 }}</span>
+            @endforeach
+        </div>
+    @endif
+
+    @php($transcriptionStatusBreakdown = $data['transcription_status_breakdown'] ?? [])
+    @if(!empty($transcriptionStatusBreakdown))
+        <div class="section-title">Transcription Status</div>
+        <div class="sentiment">
+            @foreach($transcriptionStatusBreakdown as $row)
+                <span>{{ $row['label'] ?? '' }}: {{ $row['count'] ?? 0 }}</span>
+            @endforeach
+        </div>
+    @endif
+
+    @php($summaryStatusBreakdown = $data['summary_status_breakdown'] ?? [])
+    @if(!empty($summaryStatusBreakdown))
+        <div class="section-title">Summary Status</div>
+        <div class="sentiment">
+            @foreach($summaryStatusBreakdown as $row)
+                <span>{{ $row['label'] ?? '' }}: {{ $row['count'] ?? 0 }}</span>
+            @endforeach
+        </div>
+    @endif
+
     @php($topTopics = $data['top_topics'] ?? [])
     @if(!empty($topTopics))
         <div class="section-title">Top Topics</div>
