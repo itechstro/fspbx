@@ -133,7 +133,6 @@
 
                         <TableField class="whitespace-nowrap px-2 py-1 text-sm text-gray-500">
                             <template v-if="row.has_recording" #action-buttons>
-                                #action-buttons>
                                 <PlayCircleIcon v-if="permissions.call_recording_play"
                                     @click="handleCallRecordingButtonClick(row.xml_cdr_uuid)"
                                     class="h-9 w-9 transition duration-500 ease-in-out py-2 rounded-full text-blue-400 hover:bg-blue-200 hover:text-blue-600 active:bg-blue-300 active:duration-150 cursor-pointer" />
