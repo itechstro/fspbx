@@ -1,7 +1,15 @@
+local billing_emergency = require "billing_emergency"
+
 extension_uuid = session:getVariable("extension_uuid");
 destination_number = session:getVariable("destination_number");
+domain_uuid = session:getVariable("domain_uuid");
 
 if extension_uuid == nil then
+    return
+end
+
+if billing_emergency.is_emergency_destination(domain_uuid, destination_number) then
+    freeswitch.consoleLog("info", "[check-ext-suspension] Emergency destination allowed: " .. tostring(destination_number))
     return
 end
 

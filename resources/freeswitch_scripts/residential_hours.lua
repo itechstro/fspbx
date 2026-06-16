@@ -1,11 +1,14 @@
 -- Retrieve variables passed from the dial plan
+local billing_emergency = require "billing_emergency"
+
 local local_wday = tonumber(session:getVariable("local_weekday"))  -- e.g., 1-7
 local local_hour = tonumber(session:getVariable("local_hour"))  -- e.g., 17
 local local_minute = tonumber(session:getVariable("local_minute"))  -- e.g., 30
 local wday = session:getVariable("weekday")  -- e.g., "1-7"
 local time_of_day = session:getVariable("time_of_day")  -- e.g., "17:00-22:00"
-local destination_number = session:getVariable("destination_number") 
-local domain_name = session:getVariable("domain_name") 
+local destination_number = session:getVariable("destination_number")
+local domain_uuid = session:getVariable("domain_uuid")
+local domain_name = session:getVariable("domain_name")
 local call_direction = session:getVariable("call_direction")
 freeswitch.consoleLog("INFO", "[residential_hours] Destination Number: " .. destination_number ..".\n")
 
@@ -15,8 +18,8 @@ if call_direction == "local" and destination_number == "*97" then
     return
 end
 
--- Check if the call is outbound and the destination number is either 911 or 933
-if call_direction == "outbound" and (destination_number == "911" or destination_number == "933") then
+-- Outbound emergency numbers configured for the domain are always allowed.
+if call_direction == "outbound" and billing_emergency.is_emergency_destination(domain_uuid, destination_number) then
     freeswitch.consoleLog("INFO", "[residential_hours] Outbound call to emergency number is always allowed. Exiting script.\n")
     return
 end

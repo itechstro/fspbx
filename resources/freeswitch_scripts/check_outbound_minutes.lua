@@ -1,4 +1,7 @@
+local billing_emergency = require "billing_emergency"
+
 domain_uuid = session:getVariable("domain_uuid")
+destination_number = session:getVariable("destination_number")
 call_direction = session:getVariable("call_direction")
 is_internal_call = session:getVariable("from_user_exists")
 
@@ -8,6 +11,11 @@ if not domain_uuid then
 end
 
 if call_direction ~= "outbound" then
+    return
+end
+
+if billing_emergency.is_emergency_destination(domain_uuid, destination_number) then
+    freeswitch.consoleLog("info", "[check-outbound-minutes] Emergency destination allowed: " .. tostring(destination_number))
     return
 end
 
