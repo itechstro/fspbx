@@ -8,6 +8,7 @@ use App\Services\CallTranscriptionCostService;
 use App\Services\DomainUsageService;
 use App\Services\OpenAIService;
 use Illuminate\Console\Command;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\DB;
 
 class BackfillTranscriptionCosts extends Command
@@ -154,6 +155,11 @@ class BackfillTranscriptionCosts extends Command
                 $retrieved = $openAIService->retrieveResponseById((string) $row->summary_external_id);
                 $usage = (array) ($retrieved['usage'] ?? []);
                 if ($usage === []) {
+                    if ($this->applyEstimatedSummaryCost($costService, $row, $force, $recordUsage)) {
+                        $updated++;
+                        continue;
+                    }
+
                     $skipped++;
                     continue;
                 }
@@ -167,6 +173,11 @@ class BackfillTranscriptionCosts extends Command
                 );
                 $updated++;
             } catch (\Throwable $exception) {
+                if ($this->applyEstimatedSummaryCost($costService, $row, $force, $recordUsage, $exception)) {
+                    $updated++;
+                    continue;
+                }
+
                 $failed++;
                 $this->warn("Summary backfill failed for {$row->uuid}: {$exception->getMessage()}");
             }
@@ -220,6 +231,11 @@ class BackfillTranscriptionCosts extends Command
                 $retrieved = $openAIService->retrieveResponseById((string) $row->translation_external_id);
                 $usage = (array) ($retrieved['usage'] ?? []);
                 if ($usage === []) {
+                    if ($this->applyEstimatedTranslationCost($costService, $row, $force, $recordUsage)) {
+                        $updated++;
+                        continue;
+                    }
+
                     $skipped++;
                     continue;
                 }
@@ -233,6 +249,11 @@ class BackfillTranscriptionCosts extends Command
                 );
                 $updated++;
             } catch (\Throwable $exception) {
+                if ($this->applyEstimatedTranslationCost($costService, $row, $force, $recordUsage, $exception)) {
+                    $updated++;
+                    continue;
+                }
+
                 $failed++;
                 $this->warn("Translation backfill failed for {$row->uuid}: {$exception->getMessage()}");
             }
@@ -276,6 +297,68 @@ class BackfillTranscriptionCosts extends Command
         }
 
         $this->info('Rebuilt domain usage ledger from transcription rows.');
+    }
+
+    protected function applyEstimatedSummaryCost(
+        CallTranscriptionCostService $costService,
+        CallTranscription $row,
+        bool $force,
+        bool $recordUsage,
+        ?\Throwable $exception = null,
+    ): bool {
+        if (! is_array($row->summary_payload) || $row->summary_payload === []) {
+            return false;
+        }
+
+        if ($exception !== null && ! $this->isOpenAiResponseUnavailable($exception)) {
+            return false;
+        }
+
+        $costService->applySummaryCompletionFromStoredData($row, $force, $recordUsage);
+
+        if ($exception !== null) {
+            $this->line("Summary backfill estimated for {$row->uuid} (OpenAI response no longer available).");
+        } else {
+            $this->line("Summary backfill estimated for {$row->uuid} (OpenAI usage missing from response).");
+        }
+
+        return true;
+    }
+
+    protected function applyEstimatedTranslationCost(
+        CallTranscriptionCostService $costService,
+        CallTranscription $row,
+        bool $force,
+        bool $recordUsage,
+        ?\Throwable $exception = null,
+    ): bool {
+        if (! is_array($row->translation_payload) || $row->translation_payload === []) {
+            return false;
+        }
+
+        if ($exception !== null && ! $this->isOpenAiResponseUnavailable($exception)) {
+            return false;
+        }
+
+        $costService->applyTranslationCompletionFromStoredData($row, $force, $recordUsage);
+
+        if ($exception !== null) {
+            $this->line("Translation backfill estimated for {$row->uuid} (OpenAI response no longer available).");
+        } else {
+            $this->line("Translation backfill estimated for {$row->uuid} (OpenAI usage missing from response).");
+        }
+
+        return true;
+    }
+
+    protected function isOpenAiResponseUnavailable(\Throwable $exception): bool
+    {
+        if ($exception instanceof RequestException && $exception->response?->status() === 404) {
+            return true;
+        }
+
+        return str_contains($exception->getMessage(), 'status code 404')
+            || str_contains($exception->getMessage(), 'not found');
     }
 
     protected function resolveDomainUuid(?string $domain): ?string

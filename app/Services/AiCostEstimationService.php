@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Models\CallTranscription;
+
 class AiCostEstimationService
 {
     public function __construct(
@@ -78,6 +80,114 @@ class AiCostEstimationService
         $translation = (float) data_get($row, 'translation_cost_usd', 0);
 
         return round($transcription + $summary + $translation, 6);
+    }
+
+    /**
+     * Estimate summary usage when OpenAI no longer returns the background response.
+     */
+    public function estimateOpenAiSummaryFromStoredRow(CallTranscription $row): array
+    {
+        $model = (string) ($row->summary_model ?? 'gpt-5-nano');
+
+        if ((int) ($row->summary_input_tokens ?? 0) > 0 || (int) ($row->summary_output_tokens ?? 0) > 0) {
+            return $this->estimateOpenAiUsage($model, [
+                'input_tokens' => (int) ($row->summary_input_tokens ?? 0),
+                'output_tokens' => (int) ($row->summary_output_tokens ?? 0),
+            ]);
+        }
+
+        $lines = $this->buildUtteranceLines((array) data_get($row->result_payload, 'utterances', []));
+        $inputText = implode("\n", array_merge(
+            [
+                'Using the utterances below (speaker-labeled, no timestamps), produce the Output JSON.',
+                'Return ONLY the JSON object (no markdown, no commentary).',
+                '',
+                'Utterances:',
+            ],
+            $lines,
+        ));
+        $outputText = json_encode($row->summary_payload ?? [], JSON_UNESCAPED_UNICODE) ?: '';
+
+        $inputTokens = $this->estimateTokensFromText($inputText) + 280;
+        $outputTokens = $this->estimateTokensFromText($outputText);
+
+        return $this->estimateOpenAiUsage($model, [
+            'input_tokens' => $inputTokens,
+            'output_tokens' => $outputTokens,
+        ]);
+    }
+
+    /**
+     * Estimate translation usage when OpenAI no longer returns the background response.
+     */
+    public function estimateOpenAiTranslationFromStoredRow(CallTranscription $row): array
+    {
+        $model = (string) ($row->translation_model ?? 'gpt-4.1-mini');
+
+        if ((int) ($row->translation_input_tokens ?? 0) > 0 || (int) ($row->translation_output_tokens ?? 0) > 0) {
+            return $this->estimateOpenAiUsage($model, [
+                'input_tokens' => (int) ($row->translation_input_tokens ?? 0),
+                'output_tokens' => (int) ($row->translation_output_tokens ?? 0),
+            ]);
+        }
+
+        $utterances = (array) data_get($row->result_payload, 'utterances', []);
+        $summaryText = trim((string) data_get($row->summary_payload, 'summary', ''));
+        $targetLanguage = trim((string) ($row->translation_target_language ?? 'unknown'));
+
+        if ($utterances !== []) {
+            $inputText = implode("\n\n", [
+                "Target language: {$targetLanguage}",
+                'Utterances JSON:',
+                json_encode($utterances, JSON_UNESCAPED_UNICODE) ?: '',
+                'Summary:',
+                $summaryText !== '' ? $summaryText : '[none]',
+            ]);
+            $outputText = json_encode($row->translation_payload ?? [], JSON_UNESCAPED_UNICODE) ?: '';
+        } else {
+            $transcriptText = trim((string) data_get($row->result_payload, 'text', ''));
+            $inputText = implode("\n\n", [
+                "Target language: {$targetLanguage}",
+                'Transcript:',
+                $transcriptText,
+                'Summary:',
+                $summaryText !== '' ? $summaryText : '[none]',
+            ]);
+            $outputText = json_encode($row->translation_payload ?? [], JSON_UNESCAPED_UNICODE) ?: '';
+        }
+
+        $inputTokens = $this->estimateTokensFromText($inputText) + 180;
+        $outputTokens = $this->estimateTokensFromText($outputText);
+
+        return $this->estimateOpenAiUsage($model, [
+            'input_tokens' => $inputTokens,
+            'output_tokens' => $outputTokens,
+        ]);
+    }
+
+    protected function buildUtteranceLines(array $utterances): array
+    {
+        $lines = [];
+
+        foreach ($utterances as $utterance) {
+            $speaker = data_get($utterance, 'speaker');
+            $text = trim((string) data_get($utterance, 'text', ''));
+            if ($speaker && $text !== '') {
+                $lines[] = "{$speaker}: {$text}";
+            }
+        }
+
+        return $lines;
+    }
+
+    protected function estimateTokensFromText(string $text): int
+    {
+        $text = trim($text);
+        if ($text === '') {
+            return 0;
+        }
+
+        return max(1, (int) ceil(mb_strlen($text, 'UTF-8') / 4));
     }
 
     protected function normalizeSpeechModel(?string $speechModel): string

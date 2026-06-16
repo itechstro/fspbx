@@ -98,6 +98,25 @@ class CallTranscriptionCostService
         return $row->refresh();
     }
 
+    public function applySummaryCompletionFromStoredData(
+        CallTranscription $row,
+        bool $force = false,
+        bool $recordUsage = true,
+    ): CallTranscription {
+        $estimate = $this->costEstimationService->estimateOpenAiSummaryFromStoredRow($row);
+
+        return $this->applySummaryCompletion(
+            $row,
+            $estimate['model'],
+            [
+                'input_tokens' => $estimate['input_tokens'],
+                'output_tokens' => $estimate['output_tokens'],
+            ],
+            $force,
+            $recordUsage,
+        );
+    }
+
     public function applyTranslationCompletion(
         CallTranscription $row,
         ?string $model,
@@ -134,5 +153,24 @@ class CallTranscriptionCostService
         }
 
         return $row->refresh();
+    }
+
+    public function applyTranslationCompletionFromStoredData(
+        CallTranscription $row,
+        bool $force = false,
+        bool $recordUsage = true,
+    ): CallTranscription {
+        $estimate = $this->costEstimationService->estimateOpenAiTranslationFromStoredRow($row);
+
+        return $this->applyTranslationCompletion(
+            $row,
+            $estimate['model'],
+            [
+                'input_tokens' => $estimate['input_tokens'],
+                'output_tokens' => $estimate['output_tokens'],
+            ],
+            $force,
+            $recordUsage,
+        );
     }
 }
