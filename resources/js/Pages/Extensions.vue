@@ -345,6 +345,17 @@
         </div>
     </ConfirmationModal>
 
+    <ConfirmationModal
+        :show="showCreateContactsConfirmationModal"
+        @close="showCreateContactsConfirmationModal = false"
+        @confirm="confirmCreateContactsAction"
+        header="Create contacts"
+        text="Create phonebook contacts for the selected extensions? Extensions that already have a contact will be skipped."
+        confirm-button-label="Create contacts"
+        cancel-button-label="Cancel"
+        :loading="isBulkCreateContactsLoading"
+    />
+
     <Notification :show="notificationShow" :type="notificationType" :messages="notificationMessages"
         @update:show="hideNotification" />
 
@@ -390,6 +401,9 @@ const notificationType = ref(null);
 const notificationMessages = ref(null);
 const notificationShow = ref(null);
 const showDeleteConfirmationModal = ref(false);
+const showCreateContactsConfirmationModal = ref(false);
+const isBulkCreateContactsLoading = ref(false);
+const confirmCreateContactsAction = ref(null);
 const isRegsLoading = ref(false)
 const showUploadModal = ref(false);
 const isUploadingFile = ref(null);
@@ -448,6 +462,14 @@ const bulkActions = computed(() => {
             id: 'bulk_update',
             label: 'Edit',
             icon: 'PencilSquareIcon'
+        });
+    }
+
+    if (permissions.value.contact_add) {
+        actions.push({
+            id: 'bulk_create_contacts',
+            label: 'Create contacts',
+            icon: 'UserPlusIcon',
         });
     }
 
@@ -610,6 +632,27 @@ const handleSingleItemDeleteRequest = (uuid) => {
     confirmDeleteAction.value = () => executeBulkDelete([uuid]);
 };
 
+const executeBulkCreateContacts = (items = selectedItems.value) => {
+    isBulkCreateContactsLoading.value = true;
+
+    axios.post(props.routes.bulk_create_contacts, { items })
+        .then((response) => {
+            showNotification(
+                response.data.created > 0 ? 'success' : 'error',
+                response.data.messages,
+            );
+            refreshCurrentPage();
+            handleClearSelection();
+        })
+        .catch((error) => {
+            handleErrorResponse(error);
+        })
+        .finally(() => {
+            showCreateContactsConfirmationModal.value = false;
+            isBulkCreateContactsLoading.value = false;
+        });
+};
+
 const executeBulkDelete = (items = selectedItems.value) => {
     isModalLoading.value = true;
     axios.post(props.routes.bulk_delete, { 
@@ -639,6 +682,10 @@ const handleBulkActionRequest = (action) => {
     if (action === 'bulk_update') {
         getItemOptions(null, { include_mobile_app_bulk: true, mode: 'bulk_update' });
         bulkUpdateModalTrigger.value = true;
+    }
+    if (action === 'bulk_create_contacts') {
+        showCreateContactsConfirmationModal.value = true;
+        confirmCreateContactsAction.value = () => executeBulkCreateContacts();
     }
 };
 
@@ -768,6 +815,10 @@ const handleSearchButtonClick = () => {
 
 const refreshCurrentPage = () => {
     getData(currentPage.value)
+
+    if (showUpdateModal.value && itemOptions.value?.item?.extension_uuid) {
+        getItemOptions(itemOptions.value.item.extension_uuid);
+    }
 };
 
 const handleFiltersReset = () => {

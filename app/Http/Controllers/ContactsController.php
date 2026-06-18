@@ -18,6 +18,7 @@ use App\Models\VContactAttachment;
 use App\Services\ContactService;
 use App\Services\ContactVisibilityService;
 use App\Services\Contacts\ContactCallingCardService;
+use App\Services\Contacts\ContactFromAccountService;
 use App\Services\Contacts\ContactUserLinkService;
 use App\Services\Contacts\ContactImportService;
 use App\Services\Contacts\ContactVcardService;
@@ -44,6 +45,7 @@ class ContactsController extends Controller
         private ContactImportService $contactImportService,
         private ContactVcardService $contactVcardService,
         private ContactCallingCardService $contactCallingCardService,
+        private ContactFromAccountService $contactFromAccountService,
     ) {}
 
     public function index(Request $request)
@@ -106,6 +108,122 @@ class ContactsController extends Controller
                 'messages' => ['error' => ['Failed to create contact.']],
             ], 500);
         }
+    }
+
+    public function storeFromExtension(Extensions $extension): JsonResponse
+    {
+        if (! userCheckPermission('contact_add')) {
+            return response()->json([
+                'messages' => ['error' => ['Access denied.']],
+            ], 403);
+        }
+
+        if ($extension->domain_uuid !== session('domain_uuid')) {
+            return response()->json([
+                'messages' => ['error' => ['Access denied.']],
+            ], 403);
+        }
+
+        try {
+            $contact = $this->contactFromAccountService->createFromExtension($extension);
+
+            return response()->json([
+                'messages' => ['success' => ['Contact created and linked to this extension.']],
+                'contact_uuid' => $contact->contact_uuid,
+                'contact_label' => $this->contactLabel($contact),
+            ], 201);
+        } catch (\RuntimeException $exception) {
+            return response()->json([
+                'messages' => ['error' => [$exception->getMessage()]],
+            ], 422);
+        } catch (\Throwable $e) {
+            logger('ContactsController@storeFromExtension error: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
+
+            return response()->json([
+                'messages' => ['error' => ['Failed to create contact from extension.']],
+            ], 500);
+        }
+    }
+
+    public function storeFromUser(User $user): JsonResponse
+    {
+        if (! userCheckPermission('contact_add')) {
+            return response()->json([
+                'messages' => ['error' => ['Access denied.']],
+            ], 403);
+        }
+
+        if ($user->domain_uuid !== session('domain_uuid')) {
+            return response()->json([
+                'messages' => ['error' => ['Access denied.']],
+            ], 403);
+        }
+
+        try {
+            $contact = $this->contactFromAccountService->createFromUser($user);
+
+            return response()->json([
+                'messages' => ['success' => ['Contact created and linked to this user.']],
+                'contact_uuid' => $contact->contact_uuid,
+                'contact_label' => $this->contactLabel($contact),
+            ], 201);
+        } catch (\RuntimeException $exception) {
+            return response()->json([
+                'messages' => ['error' => [$exception->getMessage()]],
+            ], 422);
+        } catch (\Throwable $e) {
+            logger('ContactsController@storeFromUser error: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
+
+            return response()->json([
+                'messages' => ['error' => ['Failed to create contact from user.']],
+            ], 500);
+        }
+    }
+
+    public function bulkStoreFromExtensions(Request $request): JsonResponse
+    {
+        if (! userCheckPermission('contact_add')) {
+            return response()->json([
+                'messages' => ['error' => ['Access denied.']],
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'items' => ['required', 'array', 'min:1'],
+            'items.*' => ['uuid'],
+        ]);
+
+        $result = $this->contactFromAccountService->bulkCreateFromExtensions($validated['items']);
+
+        return response()->json([
+            'messages' => $this->bulkCreateMessages($result, 'extension'),
+            'created' => $result['created'],
+            'skipped' => $result['skipped'],
+            'failed' => count($result['failed']),
+        ]);
+    }
+
+    public function bulkStoreFromUsers(Request $request): JsonResponse
+    {
+        if (! userCheckPermission('contact_add')) {
+            return response()->json([
+                'messages' => ['error' => ['Access denied.']],
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'items' => ['required', 'array', 'min:1'],
+            'items.*' => ['uuid'],
+        ]);
+
+        $result = $this->contactFromAccountService->bulkCreateFromUsers($validated['items']);
+
+        return response()->json([
+            'messages' => $this->bulkCreateMessages($result, 'user'),
+            'created' => $result['created'],
+            'skipped' => $result['skipped'],
+            'failed' => count($result['failed']),
+        ]);
     }
 
     public function update(UpdateVContactRequest $request, VContact $v_contact): JsonResponse
@@ -757,6 +875,7 @@ class ContactsController extends Controller
     {
         return [
             ['value' => 'individual', 'label' => 'Individual'],
+            ['value' => 'user', 'label' => 'User'],
             ['value' => 'organization', 'label' => 'Organization'],
         ];
     }
@@ -786,6 +905,44 @@ class ContactsController extends Controller
         return collect($values)
             ->map(fn (string $value) => ['value' => $value, 'label' => ucfirst($value)])
             ->all();
+    }
+
+    private function contactLabel(VContact $contact): string
+    {
+        $name = trim("{$contact->contact_name_given} {$contact->contact_name_family}");
+
+        return $name !== '' ? $name : (trim((string) $contact->contact_organization) ?: $contact->contact_uuid);
+    }
+
+    /**
+     * @param  array{created: int, skipped: int, failed: array<int, array{uuid: string, label: string, message: string}>}  $result
+     * @return array<string, array<int, string>>
+     */
+    private function bulkCreateMessages(array $result, string $sourceLabel): array
+    {
+        $messages = [];
+
+        if ($result['created'] > 0) {
+            $messages['success'][] = "Created {$result['created']} contact(s) from {$sourceLabel}(s).";
+        }
+
+        if ($result['skipped'] > 0) {
+            $messages['skipped'][] = "Skipped {$result['skipped']} {$sourceLabel}(s) that already have a contact or were not found.";
+        }
+
+        foreach ($result['failed'] as $index => $failure) {
+            $messages['error_' . ($index + 1)][] = "{$failure['label']}: {$failure['message']}";
+        }
+
+        if ($result['created'] === 0 && $result['skipped'] === 0 && $result['failed'] === []) {
+            $messages['error'][] = 'No contacts were created.';
+        }
+
+        if ($result['created'] === 0 && ! isset($messages['error']) && $result['failed'] === []) {
+            $messages['error'][] = "No contacts were created from the selected {$sourceLabel}(s).";
+        }
+
+        return $messages;
     }
 
     private function contactIsAccessible(VContact $contact): bool

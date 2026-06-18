@@ -29,7 +29,7 @@ class ContactCsvImport implements ToCollection, WithHeadingRow, WithGroupedHeadi
     public function rules(): array
     {
         return [
-            '*.contact_type' => ['nullable', 'string', Rule::in(['individual', 'organization'])],
+            '*.contact_type' => ['nullable', 'string', Rule::in(['individual', 'user', 'organization'])],
             '*.contact_organization' => ['nullable', 'string', 'max:255'],
             '*.contact_name_given' => ['nullable', 'string', 'max:255'],
             '*.contact_name_family' => ['nullable', 'string', 'max:255'],
@@ -43,7 +43,7 @@ class ContactCsvImport implements ToCollection, WithHeadingRow, WithGroupedHeadi
     public function customValidationMessages(): array
     {
         return [
-            '*.contact_type.in' => 'Contact type must be individual or organization.',
+            '*.contact_type.in' => 'Contact type must be individual, user, or organization.',
         ];
     }
 

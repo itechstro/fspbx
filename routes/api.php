@@ -684,6 +684,10 @@ Route::group(['middleware' => ['auth:sanctum', 'api.cookie.auth']], function () 
     // Phonebook contacts (v_contacts)
     Route::get('phonebook-contacts/data', [ContactsController::class, 'getData'])->name('phonebook-contacts.data');
     Route::post('phonebook-contacts', [ContactsController::class, 'store'])->name('phonebook-contacts.store');
+    Route::post('phonebook-contacts/from-extension/{extension}', [ContactsController::class, 'storeFromExtension'])->name('phonebook-contacts.from-extension');
+    Route::post('phonebook-contacts/from-user/{user}', [ContactsController::class, 'storeFromUser'])->name('phonebook-contacts.from-user');
+    Route::post('phonebook-contacts/bulk-from-extensions', [ContactsController::class, 'bulkStoreFromExtensions'])->name('phonebook-contacts.bulk-from-extensions');
+    Route::post('phonebook-contacts/bulk-from-users', [ContactsController::class, 'bulkStoreFromUsers'])->name('phonebook-contacts.bulk-from-users');
     Route::put('phonebook-contacts/{v_contact}', [ContactsController::class, 'update'])->name('phonebook-contacts.update');
     Route::delete('phonebook-contacts/{v_contact}', [ContactsController::class, 'destroy'])->name('phonebook-contacts.destroy');
     Route::post('phonebook-contacts/item-options', [ContactsController::class, 'getItemOptions'])->name('phonebook-contacts.item.options');

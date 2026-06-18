@@ -213,7 +213,7 @@
 
     <UpdateUserForm :show="showUpdateModal" :options="itemOptions" :loading="isModalLoading" :header="'Update User'"
         @close="showUpdateModal = false" @error="handleErrorResponse" @success="showNotification"
-        @refresh-data="handleSearchButtonClick" />
+        @refresh-data="refreshUserModalData" />
 
     <CreateUserForm :show="showCreateModal" :options="itemOptions" :loading="isModalLoading" :header="'Create User'"
         @close="showCreateModal = false" @error="handleErrorResponse" @success="showNotification" @open-edit-form="handleEditButtonClick"
@@ -224,6 +224,17 @@
         @confirm="confirmDeleteAction" :header="'Confirm Deletion'"
         :text="'This action will permanently delete the selected user(s). Are you sure you want to proceed?'"
         :confirm-button-label="'Delete'" cancel-button-label="Cancel" />
+
+    <ConfirmationModal
+        :show="showCreateContactsConfirmationModal"
+        @close="showCreateContactsConfirmationModal = false"
+        @confirm="confirmCreateContactsAction"
+        header="Create contacts"
+        text="Create phonebook contacts for the selected users? Users that already have a contact will be skipped."
+        confirm-button-label="Create contacts"
+        cancel-button-label="Cancel"
+        :loading="isBulkCreateContactsLoading"
+    />
 
     <Notification :show="notificationShow" :type="notificationType" :messages="notificationMessages"
         @update:show="hideNotification" />
@@ -266,6 +277,9 @@ const notificationType = ref(null);
 const notificationMessages = ref(null);
 const notificationShow = ref(null);
 const showDeleteConfirmationModal = ref(false);
+const showCreateContactsConfirmationModal = ref(false);
+const isBulkCreateContactsLoading = ref(false);
+const confirmCreateContactsAction = ref(null);
 
 const props = defineProps({
     data: Object,
@@ -306,6 +320,14 @@ const bulkActions = computed(() => {
         });
     }
 
+    if (props.permissions?.contact_add) {
+        actions.push({
+            id: 'bulk_create_contacts',
+            label: 'Create contacts',
+            icon: 'UserPlusIcon',
+        });
+    }
+
     return actions;
 });
 
@@ -319,6 +341,27 @@ const handleEditButtonClick = (itemUuid) => {
 const handleSingleItemDeleteRequest = (uuid) => {
     showDeleteConfirmationModal.value = true;
     confirmDeleteAction.value = () => executeBulkDelete([uuid]);
+};
+
+const executeBulkCreateContacts = (items = selectedItems.value) => {
+    isBulkCreateContactsLoading.value = true;
+
+    axios.post(props.routes.bulk_create_contacts, { items })
+        .then((response) => {
+            showNotification(
+                response.data.created > 0 ? 'success' : 'error',
+                response.data.messages,
+            );
+            refreshUserModalData();
+            handleClearSelection();
+        })
+        .catch((error) => {
+            handleErrorResponse(error);
+        })
+        .finally(() => {
+            showCreateContactsConfirmationModal.value = false;
+            isBulkCreateContactsLoading.value = false;
+        });
 };
 
 const executeBulkDelete = (items = selectedItems.value) => {
@@ -338,6 +381,10 @@ const handleBulkActionRequest = (action) => {
     if (action === 'bulk_delete') {
         showDeleteConfirmationModal.value = true;
         confirmDeleteAction.value = () => executeBulkDelete();
+    }
+    if (action === 'bulk_create_contacts') {
+        showCreateContactsConfirmationModal.value = true;
+        confirmCreateContactsAction.value = () => executeBulkCreateContacts();
     }
     if (action === 'bulk_update') {
         formErrors.value = [];
@@ -395,6 +442,14 @@ const handleSearchButtonClick = () => {
             handleClearSelection();
         }
     });
+};
+
+const refreshUserModalData = () => {
+    handleSearchButtonClick();
+
+    if (showUpdateModal.value && itemOptions.value?.item?.user_uuid) {
+        getItemOptions(itemOptions.value.item.user_uuid);
+    }
 };
 
 const handleFiltersReset = () => {

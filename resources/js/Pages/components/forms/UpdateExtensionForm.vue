@@ -348,6 +348,7 @@
                                                 <FormTab name="advanced" label="Advanced Settings" :elements="[
                                                     'advanced_title',
                                                     'phonebook_contact_uuid',
+                                                    'create_phonebook_contact',
                                                     'linked_phonebook_contact_user_note',
                                                     'directory_visible',
                                                     'directory_exten_visible',
@@ -1642,6 +1643,13 @@
                                                     description="Direct extension link for CloudPLAY and provisioning. Takes priority over a phonebook contact linked on the portal user."
                                                     :conditions="[() => options.permissions?.extension_update]" />
 
+                                                <ButtonElement name="create_phonebook_contact" button-label="Create contact"
+                                                    :secondary="true" align="left"
+                                                    @click="handleCreatePhonebookContact"
+                                                    :loading="isCreatingPhonebookContact"
+                                                    description="Create a phonebook contact from this extension's name, email, and number, then link it here."
+                                                    :conditions="[() => options.permissions?.contact_add && !linkedPhonebookContact && options.routes?.create_phonebook_contact]" />
+
                                                 <StaticElement name="linked_phonebook_contact_user_note"
                                                     :conditions="[() => linkedPhonebookContact && linkedPhonebookContact.link_type === 'user']">
                                                     <div class="mb-4 rounded-md border border-amber-100 bg-amber-50 px-3 py-2 text-sm text-amber-900">
@@ -1938,6 +1946,30 @@ const props = defineProps({
 });
 
 const linkedPhonebookContact = computed(() => props.options?.linked_phonebook_contact ?? null);
+const isCreatingPhonebookContact = ref(false);
+
+const handleCreatePhonebookContact = async () => {
+    if (!props.options?.routes?.create_phonebook_contact) {
+        return;
+    }
+
+    isCreatingPhonebookContact.value = true;
+
+    try {
+        const response = await axios.post(props.options.routes.create_phonebook_contact);
+
+        form$.value?.update({
+            phonebook_contact_uuid: response.data.contact_uuid,
+        });
+
+        emit('success', 'success', response.data.messages);
+        emit('refresh-data');
+    } catch (error) {
+        emit('error', error);
+    } finally {
+        isCreatingPhonebookContact.value = false;
+    }
+};
 
 const voicemailFileOptions = [
     { value: 'attach', label: 'Attach recording' },

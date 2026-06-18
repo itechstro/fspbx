@@ -122,6 +122,7 @@ class ExtensionsController extends Controller
                     'create_contact_center_user' => (Module::has('ContactCenter') && Module::collections()->has('ContactCenter') && Route::has('contact-center.user.store')) ? route('contact-center.user.store') : null,
                     'export' => route('extensions.export'),
                     'duplicate' => route('extensions.duplicate'),
+                    'bulk_create_contacts' => route('phonebook-contacts.bulk-from-extensions'),
                 ]
             ]
         );
@@ -820,6 +821,9 @@ class ExtensionsController extends Controller
             'get_routing_options' => route('routing.options'),
             'device_bulk_unassign' => route('devices.bulk.unassign'),
             'update_password_route' => route('extensions.password.update'),
+            'create_phonebook_contact' => $itemUuid
+                ? route('phonebook-contacts.from-extension', ['extension' => $itemUuid])
+                : null,
         ]);
 
 
@@ -848,8 +852,10 @@ class ExtensionsController extends Controller
             'voicemail_copies' => $voicemailDestinations ?? [],
             'all_voicemails' => $allVoicemails ?? null,
             'all_devices' => $allDevices ?? null,
-            'permissions' => $permissions,
             'routes'      => $routes,
+            'permissions' => array_merge($permissions, [
+                'contact_add' => userCheckPermission('contact_add'),
+            ]),
             'phone_numbers' => $phone_numbers ?? null,
             'mobile_app' => [
                 'org_id' => $mobileAppOrgId ?? null,
@@ -2400,6 +2406,7 @@ public function store(StoreExtensionRequest $request)
         $permissions['extension_import'] = userCheckPermission('extension_import');
 
         $permissions['is_superadmin'] = isSuperAdmin();
+        $permissions['contact_add'] = userCheckPermission('contact_add');
 
         return $permissions;
     }

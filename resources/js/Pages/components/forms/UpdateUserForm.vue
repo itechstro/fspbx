@@ -96,6 +96,7 @@
                                                     'accounts',
                                                     'extension_uuid',
                                                     'phonebook_contact_uuid',
+                                                    'create_phonebook_contact',
                                                     'container_3',
                                                     'reset',
                                                     'submit',
@@ -203,6 +204,13 @@
                                                             wrapper: 6,
                                                         },
                                                     }" />
+
+                                                <ButtonElement name="create_phonebook_contact" button-label="Create contact"
+                                                    :secondary="true" align="left"
+                                                    @click="handleCreatePhonebookContact"
+                                                    :loading="isCreatingPhonebookContact"
+                                                    description="Create a phonebook contact from this user's name, email, and assigned extension, then link it here."
+                                                    :conditions="[() => options.permissions?.contact_add && !options?.item?.phonebook_contact_uuid && options.routes?.create_phonebook_contact]" />
 
                                                 <TagsElement name="groups" :search="true" :items="options.groups"
                                                     label="Roles" input-type="search" autocomplete="off"
@@ -367,6 +375,30 @@ const confirmDeleteAction = ref(null);
 const locations = ref([])
 const isLocationsLoading = ref(false)
 const isPasswordResetLoading = ref(false)
+const isCreatingPhonebookContact = ref(false)
+
+const handleCreatePhonebookContact = async () => {
+    if (!props.options?.routes?.create_phonebook_contact) {
+        return;
+    }
+
+    isCreatingPhonebookContact.value = true;
+
+    try {
+        const response = await axios.post(props.options.routes.create_phonebook_contact);
+
+        form$.value?.update({
+            phonebook_contact_uuid: response.data.contact_uuid,
+        });
+
+        emit('success', 'success', response.data.messages);
+        emit('refresh-data');
+    } catch (error) {
+        emit('error', error);
+    } finally {
+        isCreatingPhonebookContact.value = false;
+    }
+};
 
 const handleCopyToClipboard = (text) => {
     navigator.clipboard.writeText(text).then(() => {

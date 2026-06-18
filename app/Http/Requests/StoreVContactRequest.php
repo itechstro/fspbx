@@ -49,7 +49,7 @@ class StoreVContactRequest extends FormRequest
     protected function coreRules(): array
     {
         return [
-            'contact_type' => ['nullable', 'string', 'max:255'],
+            'contact_type' => ['nullable', 'string', Rule::in(['individual', 'user', 'organization'])],
             'contact_organization' => ['nullable', 'string', 'max:255'],
             'contact_name_given' => ['nullable', 'string', 'max:255'],
             'contact_name_family' => ['nullable', 'string', 'max:255'],

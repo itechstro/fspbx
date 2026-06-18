@@ -566,7 +566,7 @@ const contactTypeItems = computed(() => {
         return Object.fromEntries(types.map((type) => [type.value, type.label]));
     }
 
-    return { individual: "Individual", organization: "Organization" };
+    return { individual: "Individual", user: "User", organization: "Organization" };
 });
 
 const profileTabElements = [

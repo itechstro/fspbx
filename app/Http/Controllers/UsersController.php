@@ -122,8 +122,11 @@ class UsersController extends Controller
                     'item_options' => route('users.item.options'),
                     'bulk_delete' => route('users.bulk.delete'),
                     'select_all' => route('users.select.all'),
+                    'bulk_create_contacts' => route('phonebook-contacts.bulk-from-users'),
                 ],
-                'permissions' => $this->getUserPermissions(),
+                'permissions' => array_merge($this->getUserPermissions(), [
+                    'contact_add' => userCheckPermission('contact_add'),
+                ]),
             ]
         );
     }
@@ -341,11 +344,16 @@ class UsersController extends Controller
             'create_token' => route('tokens.store'),
             'token_bulk_delete' => route('tokens.bulk.delete'),
             'locations' => route('locations.index'),
+            'create_phonebook_contact' => $itemUuid
+                ? route('phonebook-contacts.from-user', ['user' => $itemUuid])
+                : null,
         ];
 
         return response()->json([
             'item'        => $userDto,
-            'permissions' => $permissions,
+            'permissions' => array_merge($permissions, [
+                'contact_add' => userCheckPermission('contact_add'),
+            ]),
             'routes'      => $routes,
             'timezones' => getGroupedTimezones(),
             'groups' => $groups,
