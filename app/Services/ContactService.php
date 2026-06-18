@@ -40,7 +40,7 @@ class ContactService
 
     public function save(array $validated, ?VContact $contact = null): VContact
     {
-        return DB::transaction(function () use ($validated, $contact) {
+        $contact = DB::transaction(function () use ($validated, $contact) {
             $contact ??= new VContact();
             $isNew = ! $contact->exists;
             $domainUuid = session('domain_uuid');
@@ -84,7 +84,7 @@ class ContactService
                 $this->contactCallingCardService->sync($contact, $validated);
             }
 
-            $fresh = $contact->fresh([
+            return $contact->fresh([
                 'phones',
                 'emails',
                 'addresses',
@@ -96,11 +96,15 @@ class ContactService
                 'contactUsers.user',
                 'contactGroups.group',
             ]);
-
-            $this->contactUserLinkService->syncCloudPlayForContact($fresh);
-
-            return $fresh;
         });
+
+        try {
+            $this->contactUserLinkService->syncCloudPlayForContact($contact);
+        } catch (\Throwable $e) {
+            logger('CloudPLAY contact sync failed after save: ' . $e->getMessage());
+        }
+
+        return $contact;
     }
 
     public function delete(VContact $contact): void

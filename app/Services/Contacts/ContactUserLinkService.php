@@ -273,7 +273,7 @@ class ContactUserLinkService
 
     public function syncCloudPlayForContact(VContact $contact): void
     {
-        if (get_mobile_app_provider() !== 'cloudplay') {
+        if (! cloudplay_phonebook_sync_enabled($contact->domain_uuid)) {
             return;
         }
 
@@ -327,7 +327,7 @@ class ContactUserLinkService
 
     public function syncCloudPlayAfterUserExtensionChange(User $user, ?string $previousExtensionUuid = null): void
     {
-        if (get_mobile_app_provider() !== 'cloudplay') {
+        if (! cloudplay_phonebook_sync_enabled($user->domain_uuid)) {
             return;
         }
 
@@ -397,7 +397,7 @@ class ContactUserLinkService
         ?string $domainUuid = null,
         ?string $previousExtensionUuid = null,
     ): void {
-        if (get_mobile_app_provider() !== 'cloudplay') {
+        if (! cloudplay_phonebook_sync_enabled($domainUuid)) {
             return;
         }
 
@@ -441,7 +441,7 @@ class ContactUserLinkService
 
     public function releaseExtensionContactPhones(Extensions $extension): void
     {
-        if (get_mobile_app_provider() !== 'cloudplay') {
+        if (! cloudplay_phonebook_sync_enabled($extension->domain_uuid)) {
             return;
         }
 
@@ -460,7 +460,7 @@ class ContactUserLinkService
 
     public function syncCloudPlayForExtension(Extensions $extension): void
     {
-        if (get_mobile_app_provider() !== 'cloudplay') {
+        if (! cloudplay_phonebook_sync_enabled($extension->domain_uuid)) {
             return;
         }
 
@@ -766,7 +766,7 @@ class ContactUserLinkService
             ->where('contact_uuid', $contact->contact_uuid)
             ->delete();
 
-        if (get_mobile_app_provider() !== 'cloudplay') {
+        if (! cloudplay_phonebook_sync_enabled($contact->domain_uuid)) {
             return;
         }
 
@@ -885,38 +885,38 @@ class ContactUserLinkService
         Collection|array $contactUuids,
         Collection|array $extensionUuids,
     ): void {
-        if (get_mobile_app_provider() !== 'cloudplay') {
+        if (! cloudplay_phonebook_sync_enabled($domainUuid)) {
             return;
         }
 
-        app(CloudPlayApiService::class)->clearEnterpriseDirectoryCache();
-
-        foreach (collect($extensionUuids)->unique()->filter() as $extensionUuid) {
-            $extension = Extensions::query()
-                ->where('domain_uuid', $domainUuid)
-                ->whereKey($extensionUuid)
-                ->first();
-
-            if ($extension) {
-                $this->syncCloudPlayForExtension($extension);
-            }
-        }
-
-        foreach (collect($contactUuids)->unique()->filter() as $contactUuid) {
-            $contact = VContact::query()
-                ->where('domain_uuid', $domainUuid)
-                ->whereKey($contactUuid)
-                ->first();
-
-            if ($contact) {
-                $this->syncCloudPlayForContact($contact);
-            }
-        }
-
         try {
+            app(CloudPlayApiService::class)->clearEnterpriseDirectoryCache();
+
+            foreach (collect($extensionUuids)->unique()->filter() as $extensionUuid) {
+                $extension = Extensions::query()
+                    ->where('domain_uuid', $domainUuid)
+                    ->whereKey($extensionUuid)
+                    ->first();
+
+                if ($extension) {
+                    $this->syncCloudPlayForExtension($extension);
+                }
+            }
+
+            foreach (collect($contactUuids)->unique()->filter() as $contactUuid) {
+                $contact = VContact::query()
+                    ->where('domain_uuid', $domainUuid)
+                    ->whereKey($contactUuid)
+                    ->first();
+
+                if ($contact) {
+                    $this->syncCloudPlayForContact($contact);
+                }
+            }
+
             app(CloudPlayEnterpriseDirectorySync::class)->removeDuplicateEnterpriseEntries($domainUuid);
         } catch (\Throwable $e) {
-            logger('CloudPLAY enterprise phonebook duplicate cleanup failed: ' . $e->getMessage());
+            logger('CloudPLAY enterprise phonebook link sync failed: ' . $e->getMessage());
         }
     }
 

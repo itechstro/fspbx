@@ -934,7 +934,29 @@ if (!function_exists('get_domain_setting')) {
 if (!function_exists('get_mobile_app_provider')) {
     function get_mobile_app_provider(): string
     {
-        return 'cloudplay';
+        $value = DefaultSettings::where('default_setting_category', 'mobile_apps')
+            ->where('default_setting_subcategory', 'mobile_app_provider')
+            ->where('default_setting_enabled', 'true')
+            ->value('default_setting_value');
+
+        return in_array($value, ['cloudplay', 'ringotel'], true) ? $value : '';
+    }
+}
+
+if (!function_exists('cloudplay_phonebook_sync_enabled')) {
+    function cloudplay_phonebook_sync_enabled(?string $domainUuid = null): bool
+    {
+        if (get_mobile_app_provider() !== 'cloudplay') {
+            return false;
+        }
+
+        $domainUuid ??= session('domain_uuid');
+
+        if (! $domainUuid) {
+            return false;
+        }
+
+        return app(\App\Services\CloudPlayApiService::class)->isConfiguredForDomain($domainUuid);
     }
 }
 

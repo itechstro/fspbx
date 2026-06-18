@@ -74,7 +74,7 @@ class CloudPlayEnterpriseDirectorySync
 
     public function syncForExtension(Extensions $extension, ?bool $active = null): void
     {
-        if (get_mobile_app_provider() !== 'cloudplay') {
+        if (! cloudplay_phonebook_sync_enabled($extension->domain_uuid)) {
             return;
         }
 
@@ -94,7 +94,7 @@ class CloudPlayEnterpriseDirectorySync
 
     public function syncPhonebookOnlyExtension(Extensions $extension): bool
     {
-        if (get_mobile_app_provider() !== 'cloudplay') {
+        if (! cloudplay_phonebook_sync_enabled($extension->domain_uuid)) {
             return false;
         }
 
@@ -148,7 +148,7 @@ class CloudPlayEnterpriseDirectorySync
 
     public function removePhonebookOnlyEnterpriseEntry(Extensions $extension): void
     {
-        if (get_mobile_app_provider() !== 'cloudplay') {
+        if (! cloudplay_phonebook_sync_enabled($extension->domain_uuid)) {
             return;
         }
 
@@ -158,10 +158,16 @@ class CloudPlayEnterpriseDirectorySync
             return;
         }
 
-        $edIds = $this->cloudPlay->findEnterpriseDirectoryIdsByExtension(
-            $extension->domain_uuid,
-            (string) $extension->extension,
-        );
+        try {
+            $edIds = $this->cloudPlay->findEnterpriseDirectoryIdsByExtension(
+                $extension->domain_uuid,
+                (string) $extension->extension,
+            );
+        } catch (\Throwable $e) {
+            logger('CloudPLAY enterprise phonebook extension lookup failed: ' . $e->getMessage());
+
+            return;
+        }
 
         if ((int) ($extension->cloudplay_ed_id ?? 0) > 0) {
             $edIds[] = (int) $extension->cloudplay_ed_id;
@@ -202,7 +208,7 @@ class CloudPlayEnterpriseDirectorySync
 
     public function syncPhonebookOnlyContact(VContact $contact): bool
     {
-        if (get_mobile_app_provider() !== 'cloudplay') {
+        if (! cloudplay_phonebook_sync_enabled($contact->domain_uuid)) {
             return false;
         }
 
@@ -315,7 +321,7 @@ class CloudPlayEnterpriseDirectorySync
 
     public function removePhonebookOnlyContactEntry(VContact $contact): void
     {
-        if (get_mobile_app_provider() !== 'cloudplay') {
+        if (! cloudplay_phonebook_sync_enabled($contact->domain_uuid)) {
             return;
         }
 

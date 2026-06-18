@@ -110,6 +110,13 @@ class CloudPlayApiService implements MobileAppProviderInterface
         ];
     }
 
+    public function isConfiguredForDomain(string $domainUuid): bool
+    {
+        $credentials = $this->getCustomerCredentials($domainUuid);
+
+        return $credentials['username'] !== '' && $credentials['password'] !== '';
+    }
+
     public function getCustomerId(string $domainUuid): ?string
     {
         return DomainSettings::where('domain_uuid', $domainUuid)
