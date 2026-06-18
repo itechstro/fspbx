@@ -1,14 +1,14 @@
 @php
-    use App\Services\Provisioning\IbratroModelProfiles;
+    use App\Services\Provisioning\IntradeModelProfiles;
 
     $settings = is_array($settings ?? null) ? $settings : [];
     $line = is_array($line ?? null) ? $line : [];
     $profile = (string) ($modelProfile ?? '');
-    $resolve = static fn (string $key, string $default = '') => IbratroModelProfiles::resolve($profile, $settings, $key, $default);
+    $resolve = static fn (string $key, string $default = '') => IntradeModelProfiles::resolve($profile, $settings, $key, $default);
 
     $enabled = ! empty($line['password']);
     $transport = (string) ($line['transport_code'] ?? '0');
-    $ringtoneKey = 'ibratro_ringtone_line' . $index;
+    $ringtoneKey = 'intrade_ringtone_line' . $index;
     $ringtone = trim((string) ($settings[$ringtoneKey] ?? ''));
     $defaultRingtone = $resolve('default_line_ringtone', 'Default');
     $userIsPhone = $resolve('user_is_phone_line1_only', '1') === '1'

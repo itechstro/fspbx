@@ -1830,8 +1830,8 @@ if (!function_exists('buildDestinationAction')) {
                 };
             }
 
-            // Fanvil
-            if ($v === 'fanvil') {
+            // Fanvil / Intrade
+            if ($v === 'fanvil' || $v === 'intrade' || $v === 'ibratro') {
                 return match ($t) {
                     'line' => '1',
                     'speed_dial' => 'f',

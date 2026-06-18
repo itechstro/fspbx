@@ -6,21 +6,21 @@ use App\Models\Devices;
 
 class FanvilTemplateVarBuilder
 {
-  private const SUPPORTED_VENDORS = ['fanvil', 'ibratro'];
+  private const SUPPORTED_VENDORS = ['fanvil', 'intrade', 'ibratro'];
 
   public static function enrich(array $vars, Devices $device): array
   {
-    $vendor = strtolower((string) ($device->device_vendor ?? ''));
+    $vendor = self::normalizeVendor(strtolower((string) ($device->device_vendor ?? '')));
     if (! in_array($vendor, self::SUPPORTED_VENDORS, true)) {
       return $vars;
     }
 
-    $settings = $vars['settings'] ?? [];
+    $settings = self::normalizeIntradeSettings($vars['settings'] ?? []);
     $lines = self::buildAccountLines($vars['lines'] ?? [], $vendor);
     $keys = self::buildLegacyKeys($device, $vars, $vendor);
 
-    if ($vendor === 'ibratro') {
-      return self::enrichIbratro($vars, $settings, $lines, $keys, $device);
+    if ($vendor === 'intrade') {
+      return self::enrichIntrade($vars, $settings, $lines, $keys, $device);
     }
 
     $provisionUrl = self::resolveProvisionUrl($settings, (string) ($vars['domain_name'] ?? ''), $vendor);
@@ -52,16 +52,16 @@ class FanvilTemplateVarBuilder
     return self::appendLineAliases($enriched, $lines);
   }
 
-  private static function enrichIbratro(array $vars, array $settings, array $lines, array $keys, Devices $device): array
+  private static function enrichIntrade(array $vars, array $settings, array $lines, array $keys, Devices $device): array
   {
-    $profile = IbratroModelProfiles::profileForTemplate(
+    $profile = IntradeModelProfiles::profileForTemplate(
       (string) ($device->device_template ?? $vars['template'] ?? ''),
     );
-    $settings = IbratroModelProfiles::mergeProfileDefaults($profile, $settings);
+    $settings = IntradeModelProfiles::mergeProfileDefaults($profile, $settings);
 
-    $provisionUrl = self::resolveProvisionUrl($settings, (string) ($vars['domain_name'] ?? ''), 'ibratro');
+    $provisionUrl = self::resolveProvisionUrl($settings, (string) ($vars['domain_name'] ?? ''), 'intrade');
     $mac = strtolower(preg_replace('/[^a-fA-F0-9]/', '', (string) ($vars['mac'] ?? '')) ?: '');
-    $directoryUrls = self::buildIbratroDirectoryUrls($provisionUrl, $mac, $settings);
+    $directoryUrls = self::buildIntradeDirectoryUrls($provisionUrl, $mac, $settings);
     foreach ($directoryUrls as $key => $url) {
       $settings[$key] = $url;
     }
@@ -75,7 +75,7 @@ class FanvilTemplateVarBuilder
       'sip_port' => $lines[1]['sip_port'] ?? ($settings['sip_port'] ?? '5060'),
       'dns_server_primary' => $settings['dns_server_primary'] ?? '8.8.8.8',
       'dns_server_secondary' => $settings['dns_server_secondary'] ?? '208.67.222.222',
-      'ibratro_provision_url' => $provisionUrl,
+      'intrade_provision_url' => $provisionUrl,
     ], $directoryUrls);
 
     $enriched['settings'] = $settings;
@@ -89,15 +89,15 @@ class FanvilTemplateVarBuilder
     }
 
     $globalDefaults = [
-      'ibratro_greeting' => 'InTrade',
-      'ibratro_country_toneset' => '13',
-      'ibratro_video_codec' => 'H264',
-      'ibratro_directory_contacts' => 'users',
+      'intrade_greeting' => 'InTrade',
+      'intrade_country_toneset' => '13',
+      'intrade_video_codec' => 'H264',
+      'intrade_directory_contacts' => 'users',
     ];
 
-    if (($settings['ibratro_enable_stun'] ?? '1') !== '0') {
-      $globalDefaults['ibratro_stun_server'] = 'stun.l.google.com';
-      $globalDefaults['ibratro_stun_port'] = '19302';
+    if (($settings['intrade_enable_stun'] ?? '1') !== '0') {
+      $globalDefaults['intrade_stun_server'] = 'stun.l.google.com';
+      $globalDefaults['intrade_stun_port'] = '19302';
     }
 
     foreach ($globalDefaults as $key => $default) {
@@ -113,23 +113,48 @@ class FanvilTemplateVarBuilder
     }
     $enriched['settings'] = $settings;
 
-    if (empty($enriched['ibratro_provision_url'])) {
-      $enriched['ibratro_provision_url'] = $provisionUrl;
+    if (empty($enriched['intrade_provision_url'])) {
+      $enriched['intrade_provision_url'] = $provisionUrl;
     }
 
     return self::appendLineAliases($enriched, $lines);
   }
 
+  private static function normalizeVendor(string $vendor): string
+  {
+    return $vendor === 'ibratro' ? 'intrade' : $vendor;
+  }
+
+  /**
+   * @param  array<string, mixed>  $settings
+   * @return array<string, mixed>
+   */
+  private static function normalizeIntradeSettings(array $settings): array
+  {
+    foreach ($settings as $key => $value) {
+      if (! str_starts_with((string) $key, 'ibratro_')) {
+        continue;
+      }
+
+      $newKey = 'intrade_' . substr((string) $key, 8);
+      if (! array_key_exists($newKey, $settings)) {
+        $settings[$newKey] = $value;
+      }
+    }
+
+    return $settings;
+  }
+
   /**
    * @return array<string, string>
    */
-  private static function buildIbratroDirectoryUrls(string $provisionUrl, string $mac, array $settings): array
+  private static function buildIntradeDirectoryUrls(string $provisionUrl, string $mac, array $settings): array
   {
     $urls = [];
 
     for ($slot = 1; $slot <= 5; $slot++) {
-      $urlKey = $slot === 1 ? 'ibratro_directory_url' : 'ibratro_directory_url_' . $slot;
-      $contactsKey = $slot === 1 ? 'ibratro_directory_contacts' : 'ibratro_directory_contacts_' . $slot;
+      $urlKey = $slot === 1 ? 'intrade_directory_url' : 'intrade_directory_url_' . $slot;
+      $contactsKey = $slot === 1 ? 'intrade_directory_contacts' : 'intrade_directory_contacts_' . $slot;
       $customUrl = trim((string) ($settings[$urlKey] ?? ''));
 
       if ($customUrl !== '') {
@@ -371,7 +396,7 @@ class FanvilTemplateVarBuilder
   {
     $transport = strtolower(trim($transport));
 
-    if ($vendor === 'ibratro') {
+    if ($vendor === 'intrade' || $vendor === 'ibratro') {
       return match ($transport) {
         'tcp' => '1',
         'tls' => '3',
@@ -390,10 +415,14 @@ class FanvilTemplateVarBuilder
 
   private static function resolveProvisionUrl(array $settings, string $domainName, string $vendor = 'fanvil'): string
   {
-    $urlKey = $vendor === 'ibratro' ? 'ibratro_provision_url' : 'fanvil_provision_url';
+    $urlKey = in_array($vendor, ['intrade', 'ibratro'], true) ? 'intrade_provision_url' : 'fanvil_provision_url';
 
     if (! empty($settings[$urlKey])) {
       return (string) $settings[$urlKey];
+    }
+
+    if ($vendor === 'intrade' && ! empty($settings['ibratro_provision_url'])) {
+      return (string) $settings['ibratro_provision_url'];
     }
 
     $base = rtrim((string) ($settings['provision_base_url'] ?? ''), '/');

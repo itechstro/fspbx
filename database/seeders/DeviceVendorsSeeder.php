@@ -32,9 +32,9 @@ class DeviceVendorsSeeder extends Seeder
                 'description' => '',
             ],
             [
-                'name'        => 'ibratro',
+                'name'        => 'intrade',
                 'enabled'     => 'true',
-                'description' => 'Ibratro Intrade phones (Fanvil OEM)',
+                'description' => 'Intrade phones (Fanvil OEM)',
             ],
             // Add more vendors here as needed
         ];

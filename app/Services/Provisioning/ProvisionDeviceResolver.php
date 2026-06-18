@@ -47,7 +47,7 @@ class ProvisionDeviceResolver
             return self::normalizeMac(substr($userAgent, -13));
         }
 
-        if (str_starts_with($userAgent, 'Fanvil') || str_starts_with($userAgent, 'Ibratro')) {
+        if (str_starts_with($userAgent, 'Fanvil') || str_starts_with($userAgent, 'Ibratro') || str_starts_with($userAgent, 'Intrade')) {
             return self::normalizeMac(substr($userAgent, -13));
         }
 

@@ -1,9 +1,9 @@
 @php
-    use App\Services\Provisioning\IbratroModelProfiles;
+    use App\Services\Provisioning\IntradeModelProfiles;
 
     $settings = is_array($settings ?? null) ? $settings : [];
     $profile = (string) ($modelProfile ?? '');
-    $resolve = static fn (string $key, string $default = '') => IbratroModelProfiles::resolve($profile, $settings, $key, $default);
+    $resolve = static fn (string $key, string $default = '') => IntradeModelProfiles::resolve($profile, $settings, $key, $default);
 
     $useMacHeaders = array_key_exists('macHeaders', get_defined_vars())
         ? (bool) $macHeaders
@@ -76,7 +76,7 @@
         <StrictUAMatch>{{ $resolve('strict_ua_match', '1') }}</StrictUAMatch>
         <NotifyReboot>{{ $resolve('notify_reboot', '1') }}</NotifyReboot>
 @for ($n = 1; $n <= (int) ($maxLines ?? 12); $n++)
-@include('provisioning.ibratro.partials.sip-line', [
+@include('provisioning.intrade.partials.sip-line', [
     'index' => $n,
     'line' => $account[$n] ?? [],
     'settings' => $settings,
@@ -280,28 +280,28 @@
 @endif
         </softkey>
 @endif
-@include('provisioning.ibratro.partials.xml-contacts', [
+@include('provisioning.intrade.partials.xml-contacts', [
     'settings' => $settings,
     'domain_name' => $domain_name ?? '',
     'http_auth_username' => $http_auth_username ?? '',
     'http_auth_password' => $http_auth_password ?? '',
 ])
     </phone>
-@include('provisioning.ibratro.partials.dss-keys', [
+@include('provisioning.intrade.partials.dss-keys', [
     'keys' => $keys ?? [],
     'keyLayout' => $keyLayout ?? 'advanced',
     'funcKeyPages' => $funcKeyPages ?? 4,
     'keysPerPage' => $keysPerPage ?? 29,
     'sideKeyPages' => $sideKeyPages ?? $resolve('side_key_pages', '1'),
     'dssLongPressAction' => $resolvedDssLongPress,
-    'ibratro_auto_blf_list' => $resolve('auto_blf_list', '1'),
-    'ibratro_dss_timeout_to_home' => $resolve('dss_timeout_to_home', ''),
+    'intrade_auto_blf_list' => $resolve('auto_blf_list', '1'),
+    'intrade_dss_timeout_to_home' => $resolve('dss_timeout_to_home', ''),
 ])
     <ap>
         <DefaultUsername>{{ $http_auth_username ?? '' }}</DefaultUsername>
         <DefaultPassword>{{ $http_auth_password ?? '' }}</DefaultPassword>
         <DownloadCommonConf>{{ $resolve('download_common_conf', '1') }}</DownloadCommonConf>
-        <FlashServerIP>{{ $ibratro_provision_url ?: ('https://' . ($domain_name ?? '') . '/prov') }}</FlashServerIP>
+        <FlashServerIP>{{ $intrade_provision_url ?: ('https://' . ($domain_name ?? '') . '/prov') }}</FlashServerIP>
         <FlashProtocol>{{ $resolve('flash_protocol', '2') }}</FlashProtocol>
         <FlashMode>{{ $resolve('flash_mode', '0') }}</FlashMode>
         <FlashInterval>{{ $resolve('flash_interval', '1') }}</FlashInterval>

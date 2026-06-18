@@ -1,10 +1,10 @@
-{{-- version: 2.3.1 --}}
+{{-- version: 2.4.0 --}}
 
 @switch($flavor)
 
 @case('mac.cfg')
-@include('provisioning.ibratro.mac-cfg', [
-    'modelLabel' => 'InTrade Entry',
+@include('provisioning.intrade.mac-cfg', [
+    'modelLabel' => 'Entry',
     'modelProfile' => 'entry',
     'maxLines' => 6,
     'videoEnabled' => false,

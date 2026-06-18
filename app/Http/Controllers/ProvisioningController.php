@@ -267,7 +267,7 @@ class ProvisioningController extends Controller
 
         $view = match (true) {
             in_array($vendor, ['snom'], true) => 'provisioning.directory.snom',
-            in_array($vendor, ['fanvil', 'ibratro'], true) => 'provisioning.directory.fanvil',
+            in_array($vendor, ['fanvil', 'intrade', 'ibratro'], true) => 'provisioning.directory.fanvil',
             default => 'provisioning.directory.yealink',
         };
 
