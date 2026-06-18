@@ -10,6 +10,7 @@ use App\Models\MenuItem;
 use App\Models\MenuItemGroup;
 use App\Models\MenuLanguage;
 use App\Models\Permissions;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -22,6 +23,12 @@ class Update241
     public function apply(): bool
     {
         try {
+            Artisan::call('migrate', [
+                '--path' => 'database/migrations/2026_06_15_000001_create_scheduled_announcements_tables.php',
+                '--force' => true,
+            ]);
+            echo trim(Artisan::output()) . "\n";
+
             $this->ensurePermissions();
             $this->ensureScheduledJobSettings();
             $this->ensureApplicationMenuItem();
