@@ -1,18 +1,10 @@
 -- Set the API endpoint URL and Bearer token from the argv values
 
-local billing_emergency = require "billing_emergency"
-
 domain_uuid = session:getVariable("domain_uuid");
-destination_number = session:getVariable("destination_number");
 is_internal_call = session:getVariable("from_user_exists");
 
 if not domain_uuid then
     freeswitch.consoleLog("error", "[check-suspension] Missing domain_uuid argument")
-    return
-end
-
-if billing_emergency.is_emergency_destination(domain_uuid, destination_number) then
-    freeswitch.consoleLog("info", "[check-suspension] Emergency destination allowed: " .. tostring(destination_number))
     return
 end
 
