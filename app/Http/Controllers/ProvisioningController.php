@@ -1239,7 +1239,18 @@ class ProvisioningController extends Controller
                     if ($lineObj) {
                         $value = $lineObj->auth_id ?? $value;
 
-                        if (empty($label) && !($vendor === 'yealink' && $this->isSharedLineValue($lineObj->shared_line ?? null))) {
+                        if (in_array($vendor, ['fanvil', 'intrade', 'ibratro'], true)) {
+                            $displayName = trim((string) ($lineObj->display_name ?? ''));
+                            $authId = trim((string) ($lineObj->auth_id ?? ''));
+                            $stored = trim((string) ($label ?? ''));
+                            $isCustom = $stored !== ''
+                                && $stored !== $authId
+                                && ($displayName === '' || $stored !== $displayName);
+
+                            if (! $isCustom) {
+                                $label = $displayName !== '' ? $displayName : ($lineObj->auth_id ?? null);
+                            }
+                        } elseif (empty($label) && !($vendor === 'yealink' && $this->isSharedLineValue($lineObj->shared_line ?? null))) {
                             $label = $lineObj->display_name ?? $lineObj->auth_id ?? null;
                         }
                     }
@@ -1684,10 +1695,19 @@ class ProvisioningController extends Controller
                 $lineObj = collect($lines)->firstWhere('line_number', $line);
 
                 if ($lineObj) {
-                    $hasExplicitLabel = trim((string) ($label ?? '')) !== '';
+                    $displayName = trim((string) ($lineObj->display_name ?? ''));
+                    $authId = trim((string) ($lineObj->auth_id ?? ''));
+                    $stored = trim((string) ($label ?? ''));
+                    $isCustom = $stored !== ''
+                        && $stored !== $authId
+                        && ($displayName === '' || $stored !== $displayName);
 
-                    if (!($device->device_vendor === 'yealink' && $this->isSharedLineValue($lineObj->shared_line ?? null) && ! $hasExplicitLabel)) {
-                        $label = $hasExplicitLabel ? $label : ($lineObj->display_name ?? $lineObj->auth_id ?? null);
+                    if (in_array($device->device_vendor, ['fanvil', 'intrade', 'ibratro'], true)) {
+                        $label = $isCustom
+                            ? $label
+                            : ($displayName !== '' ? $displayName : ($lineObj->auth_id ?? null));
+                    } elseif (!($device->device_vendor === 'yealink' && $this->isSharedLineValue($lineObj->shared_line ?? null) && ! $isCustom)) {
+                        $label = $isCustom ? $label : ($lineObj->display_name ?? $lineObj->auth_id ?? null);
                     } else {
                         $label = null;
                     }

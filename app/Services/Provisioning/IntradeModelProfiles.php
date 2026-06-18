@@ -38,6 +38,10 @@ class IntradeModelProfiles
             return 'entry';
         }
 
+        if (preg_match('/\b(entry|standard|advanced|video)\b/', $template, $matches) === 1) {
+            return $matches[1];
+        }
+
         return '';
     }
 

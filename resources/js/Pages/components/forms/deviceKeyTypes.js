@@ -98,7 +98,20 @@ export function keyLabelDisabledConditions(listName, vendor) {
 export function normalizeKeyForSubmit(key, keyTypesWithSelect = KEY_TYPES_WITH_VALUE_SELECT) {
     const keyType = key?.key_type ?? ''
     const fixedValue = fixedKeyValue(keyType)
-    const keyLabel = resolvedKeyLabel(key)
+    let keyLabel = resolvedKeyLabel(key)
+
+    if (keyType === 'line') {
+        const generated = key?._generated_label != null
+            ? String(key._generated_label).trim()
+            : ''
+        const explicit = key?.key_label != null
+            ? String(key.key_label).trim()
+            : ''
+
+        if (explicit === '' || (generated !== '' && explicit === generated)) {
+            keyLabel = null
+        }
+    }
 
     if (fixedValue) {
         return {

@@ -209,21 +209,46 @@ class IntradeKeyXml
     /**
      * @param  array<int, array<string, mixed>>  $lineKeys
      * @param  array<int, array<string, mixed>>  $lines
+     * @param  array<int, bool>  $protectedIndexes  Side-key indexes with user-defined labels to keep
      * @return array<int, array<string, mixed>>
      */
-    public static function applyProfileSideDefaults(string $profile, array $lineKeys, array $lines = []): array
-    {
+    public static function applyProfileSideDefaults(
+        string $profile,
+        array $lineKeys,
+        array $lines = [],
+        array $protectedIndexes = []
+    ): array {
         $plan = self::sideKeyDefaultPlan($profile);
         if ($plan === null) {
             return $lineKeys;
         }
 
         foreach ($plan['sip_slots'] as $lineNumber => $index) {
-            if (isset($lineKeys[$index])) {
+            $sipLine = $lineNumber + 1;
+            $defaultRow = self::defaultSipSideKey($index, $sipLine, $lines);
+
+            if (! isset($lineKeys[$index])) {
+                $lineKeys[$index] = $defaultRow;
                 continue;
             }
 
-            $lineKeys[$index] = self::defaultSipSideKey($index, $lineNumber + 1, $lines);
+            if (! empty($protectedIndexes[$index])) {
+                continue;
+            }
+
+            $row = $lineKeys[$index];
+            $type = (string) ($row['device_key_type'] ?? '');
+            if ($type !== '1') {
+                continue;
+            }
+
+            $rowLine = (int) ($row['device_key_line'] ?? 0);
+            if ($rowLine !== 0 && $rowLine !== $sipLine) {
+                continue;
+            }
+
+            $lineKeys[$index]['device_key_line'] = $sipLine;
+            $lineKeys[$index]['device_key_label'] = $defaultRow['device_key_label'];
         }
 
         $mwiIndex = $plan['mwi_index'];
@@ -239,6 +264,23 @@ class IntradeKeyXml
         ksort($lineKeys, SORT_NUMERIC);
 
         return $lineKeys;
+    }
+
+    /**
+     * Label for a SIP line side key from the current line account data.
+     *
+     * @param  array<string, mixed>  $line
+     */
+    public static function lineSideKeyLabel(array $line): string
+    {
+        $displayName = trim((string) ($line['display_name'] ?? ''));
+        if ($displayName !== '') {
+            return $displayName;
+        }
+
+        $authId = trim((string) ($line['auth_id'] ?? $line['user_id'] ?? ''));
+
+        return $authId;
     }
 
     /**
@@ -258,7 +300,7 @@ class IntradeKeyXml
     private static function defaultSipSideKey(int $index, int $lineNumber, array $lines): array
     {
         $line = $lines[$lineNumber] ?? [];
-        $label = (string) ($line['display_name'] ?? $line['auth_id'] ?? $line['user_id'] ?? '');
+        $label = self::lineSideKeyLabel($line);
 
         return self::legacyRow($index, '1', '', $lineNumber, $label);
     }

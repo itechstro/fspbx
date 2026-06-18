@@ -54,9 +54,7 @@ class FanvilTemplateVarBuilder
 
   private static function enrichIntrade(array $vars, array $settings, array $lines, array $keys, Devices $device): array
   {
-    $profile = IntradeModelProfiles::profileForTemplate(
-      (string) ($device->device_template ?? $vars['template'] ?? ''),
-    );
+    $profile = self::resolveIntradeProfile($device, $vars);
     $settings = IntradeModelProfiles::mergeProfileDefaults($profile, $settings);
 
     $provisionUrl = self::resolveProvisionUrl($settings, (string) ($vars['domain_name'] ?? ''), 'intrade');
@@ -67,7 +65,13 @@ class FanvilTemplateVarBuilder
     }
 
     if ($profile !== '') {
-      $keys['line'] = IntradeKeyXml::applyProfileSideDefaults($profile, $keys['line'] ?? [], $lines);
+      $protectedIndexes = self::intradeProtectedSideKeyIndexes($vars);
+      $keys['line'] = IntradeKeyXml::applyProfileSideDefaults(
+        $profile,
+        $keys['line'] ?? [],
+        $lines,
+        $protectedIndexes,
+      );
     }
 
     $enriched = array_merge($vars, [
@@ -127,6 +131,90 @@ class FanvilTemplateVarBuilder
   private static function normalizeVendor(string $vendor): string
   {
     return $vendor === 'ibratro' ? 'intrade' : $vendor;
+  }
+
+  private static function resolveIntradeProfile(Devices $device, array $vars): string
+  {
+    $candidates = [
+      (string) ($device->device_template ?? ''),
+      (string) ($vars['template'] ?? ''),
+      (string) ($device->device_model ?? ''),
+      (string) ($device->device_description ?? ''),
+    ];
+
+    if (! empty($device->device_template_uuid)) {
+      $template = $device->relationLoaded('template')
+        ? $device->template
+        : $device->template()->first(['vendor', 'name']);
+
+      if ($template) {
+        $candidates[] = (string) $template->name;
+        $candidates[] = strtolower((string) $template->vendor) . '/' . (string) $template->name;
+      }
+    }
+
+    foreach ($candidates as $candidate) {
+      $profile = IntradeModelProfiles::profileForTemplate($candidate);
+      if ($profile !== '') {
+        return $profile;
+      }
+    }
+
+    return '';
+  }
+
+  /**
+   * @param  array<string, mixed>  $vars
+   * @return array<int, bool>
+   */
+  private static function intradeProtectedSideKeyIndexes(array $vars): array
+  {
+    $protected = [];
+    $mainKeys = $vars['keys_by_area']['main'] ?? [];
+    $lines = $vars['lines'] ?? [];
+
+    if (! is_array($mainKeys)) {
+      return $protected;
+    }
+
+    foreach ($mainKeys as $id => $key) {
+      if (! is_array($key)) {
+        continue;
+      }
+
+      if (($key['source'] ?? '') !== 'device') {
+        continue;
+      }
+
+      if (strtolower((string) ($key['type'] ?? '')) !== 'line') {
+        continue;
+      }
+
+      $label = trim((string) ($key['label'] ?? ''));
+      if ($label === '') {
+        continue;
+      }
+
+      $index = (int) ($key['id'] ?? $id);
+      if ($index <= 0) {
+        continue;
+      }
+
+      $lineNumber = (int) ($key['value'] ?? $key['line'] ?? 0);
+      if ($lineNumber <= 0) {
+        $lineNumber = $index;
+      }
+
+      $line = is_array($lines[$lineNumber] ?? null) ? $lines[$lineNumber] : [];
+      $displayName = trim((string) ($line['display_name'] ?? ''));
+      $authId = trim((string) ($line['auth_id'] ?? $line['user_id'] ?? ''));
+
+      if ($label !== $displayName && $label !== $authId) {
+        $protected[$index] = true;
+      }
+    }
+
+    return $protected;
   }
 
   /**
@@ -380,10 +468,15 @@ class FanvilTemplateVarBuilder
 
       if ($label === null || trim((string) $label) === '') {
         if (isset($lines[$acct])) {
-          $label = $lines[$acct]['display_name']
-            ?? $lines[$acct]['auth_id']
-            ?? $lines[$acct]['user_id']
-            ?? null;
+          $label = IntradeKeyXml::lineSideKeyLabel($lines[$acct]);
+        }
+      } elseif (in_array($vendor, ['fanvil', 'intrade', 'ibratro'], true) && isset($lines[$acct])) {
+        $displayName = trim((string) ($lines[$acct]['display_name'] ?? ''));
+        $authId = trim((string) ($lines[$acct]['auth_id'] ?? $lines[$acct]['user_id'] ?? ''));
+        $stored = trim((string) $label);
+
+        if ($stored === $authId || ($displayName !== '' && $stored === $displayName)) {
+          $label = IntradeKeyXml::lineSideKeyLabel($lines[$acct]);
         }
       }
 

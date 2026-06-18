@@ -1607,8 +1607,8 @@ const updateLabel = (newValue, oldValue, el$, index, listName = 'device_keys') =
             : ''
 
         label = displayName !== '' ? displayName : (Number.isFinite(lineNum) ? `Line ${lineNum}` : null)
-        generatedLabelEl.update(null)
-        keyLabelEl.update(label)
+        generatedLabelEl.update(label)
+        keyLabelEl.update(null)
 
         return
     }
