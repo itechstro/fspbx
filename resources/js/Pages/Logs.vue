@@ -60,7 +60,13 @@
                     <StaticElement name="locations_title" tag="h4" content="FreeSWITCH" />
                 </Vueform>
 
-                <FreeSwitchLogs :trigger="freeswitchLogsTrigger" :routes="routes" />
+                <FreeSwitchLogs
+                    :trigger="freeswitchLogsTrigger"
+                    :routes="routes"
+                    :permissions="permissions"
+                    @success="showSuccessNotification"
+                    @error="showErrorNotification"
+                />
             </section>
 
         </template>
@@ -158,6 +164,7 @@ const testEmailErrors = ref({})
 const testEmailForm = reactive({
     email: '',
 })
+const testEmailRefreshTimers = []
 
 
 const pages = [
@@ -199,9 +206,11 @@ onMounted(() => {
         initialMenuOption.value = navigation.value.some((item) => item.key === requestedOption)
             ? requestedOption
             : fallbackOption
-
-        handleUpdateSelectedMenuOption(initialMenuOption.value)
     }
+})
+
+onUnmounted(() => {
+    testEmailRefreshTimers.forEach((timer) => clearTimeout(timer))
 })
 
 
@@ -214,6 +223,18 @@ const hideNotification = () => {
     notificationShow.value = false;
     notificationType.value = null;
     notificationMessages.value = null;
+}
+
+const showSuccessNotification = (messages) => {
+    notificationType.value = 'success'
+    notificationMessages.value = messages
+    notificationShow.value = true
+}
+
+const showErrorNotification = (messages) => {
+    notificationType.value = 'error'
+    notificationMessages.value = messages
+    notificationShow.value = true
 }
 
 const openTestEmailModal = () => {
@@ -242,6 +263,7 @@ const sendTestEmail = () => {
         notificationMessages.value = response.data.messages
         notificationShow.value = true
         emailsTrigger.value = !emailsTrigger.value
+        scheduleTestEmailRefreshes(response.data.log_uuid)
     }).catch((error) => {
         testEmailErrors.value = error.response?.data?.errors ?? {}
         notificationType.value = 'error'
@@ -252,6 +274,26 @@ const sendTestEmail = () => {
     }).finally(() => {
         testEmailLoading.value = false
     })
+}
+
+const scheduleTestEmailRefreshes = (logUuid = null) => {
+    ;[15000, 60000].forEach((delay) => {
+        testEmailRefreshTimers.push(setTimeout(() => {
+            refreshTestEmailLog(logUuid)
+        }, delay))
+    })
+}
+
+const refreshTestEmailLog = (logUuid = null) => {
+    if (!logUuid || !props.routes.email_delivery_details) {
+        emailsTrigger.value = !emailsTrigger.value
+        return
+    }
+
+    axios.get(props.routes.email_delivery_details.replace('__UUID__', logUuid))
+        .finally(() => {
+            emailsTrigger.value = !emailsTrigger.value
+        })
 }
 
 

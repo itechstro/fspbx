@@ -1618,7 +1618,7 @@
 		<!-- # System Ringtone -->
 		<!-- # String -->
 		<!-- # Mandatory -->
-		<item name="audio.tone.systemRing">f1=440,f2=480,c=200/400;</item>
+		<item name="audio.tone.systemRing">f1=540,f2=516,c=70/16-55/16-70/300;</item>
 
 		<!-- # Dial Tone -->
 		<!-- # String -->

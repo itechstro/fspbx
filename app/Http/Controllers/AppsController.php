@@ -860,9 +860,7 @@ class AppsController extends Controller
                     $user['password_url'] = $includePasswordUrl;
                 }
                 if ($extension->email && (int) request('status') === 1) {
-                    SendAppCredentials::dispatch(
-                        $this->prepareMobileAppCredentialsEmail($user, $extension, $currentDomain, 1)
-                    )->onQueue('emails');
+                    $this->dispatchAppCredentials($user, $extension, $currentDomain, 1);
                 }
             }
 
@@ -1019,9 +1017,7 @@ class AppsController extends Controller
                     $user['password_url'] = $includePasswordUrl;
                 }
                 if ($email) {
-                    SendAppCredentials::dispatch(
-                        $this->prepareMobileAppCredentialsEmail($user, $extension, $currentDomain, 1)
-                    )->onQueue('emails');
+                    $this->dispatchAppCredentials($user, $extension, $currentDomain, 1);
                 }
             }
 
@@ -1236,9 +1232,7 @@ class AppsController extends Controller
                             $user['password_url'] = route('appsGetPasswordByToken', $passwordToken);
                         }
 
-                        SendAppCredentials::dispatch(
-                            $this->prepareMobileAppCredentialsEmail($user, $extension, session('domain_uuid'), 1)
-                        )->onQueue('emails');
+                        $this->dispatchAppCredentials($user, $extension, session('domain_uuid'), 1);
                     }
 
                     $processed++;
@@ -1330,9 +1324,7 @@ class AppsController extends Controller
                             $user['password_url'] = route('appsGetPasswordByToken', $passwordToken);
                         }
 
-                        SendAppCredentials::dispatch(
-                            $this->prepareMobileAppCredentialsEmail($user, $extension, session('domain_uuid'), 1)
-                        )->onQueue('emails');
+                        $this->dispatchAppCredentials($user, $extension, session('domain_uuid'), 1);
                     }
 
                     $processed++;
@@ -1449,9 +1441,7 @@ class AppsController extends Controller
                     $user['password_url'] = $includePasswordUrl;
                 }
                 if ($extension->email) {
-                    SendAppCredentials::dispatch(
-                        $this->prepareMobileAppCredentialsEmail($user, $extension, $currentDomain, 1)
-                    )->onQueue('emails');
+                    $this->dispatchAppCredentials($user, $extension, $currentDomain, 1);
                 }
             }
 
@@ -1638,6 +1628,7 @@ class AppsController extends Controller
 
         return $regions;
     }
+
 
     public function getProvider()
     {
@@ -2192,5 +2183,12 @@ class AppsController extends Controller
         $qrcode = QrCode::format('png')->size(180)->margin(1)->generate($payload);
 
         return base64_encode($qrcode);
+    }
+
+    protected function dispatchAppCredentials(array $user, Extensions $extension, ?string $domainUuid = null, int $status = 1): void
+    {
+        SendAppCredentials::dispatch(
+            $this->prepareMobileAppCredentialsEmail($user, $extension, $domainUuid, $status)
+        )->onQueue('emails');
     }
 }
