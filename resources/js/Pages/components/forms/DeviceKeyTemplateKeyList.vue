@@ -35,7 +35,7 @@
                 <TextElement name="key_label" label="Label"
                     :columns="{ default: { container: 10 }, sm: { container: 3 } }"
                     :placeholder="formData?.[name]?.[index]?._generated_label ?? 'Enter Value'"
-                    :floating="false" :disabled="[[name + '.*.key_type', ['', 'line']]]" />
+                    :floating="false" :disabled="keyLabelDisabled" />
             </ObjectElement>
         </template>
     </ListElement>
@@ -50,6 +50,7 @@ const props = defineProps({
     keyTypes: Array,
     keyTypesWithSelect: Array,
     keyTypesWithValueText: Array,
+    keyLabelDisabled: Array,
     formData: Object,
     getNextKeyNumber: Function,
     getKeyValueSelectItems: Function,

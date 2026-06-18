@@ -1715,12 +1715,16 @@ class ProvisioningController extends Controller
 
             case 'voice_mail':
                 $value = 'F_MWI';
-                $label = $label ?: 'Voice Mail';
+                if ($label === null || trim((string) $label) === '') {
+                    $label = 'Voice Mail';
+                }
                 break;
 
             case 'headset':
                 $value = 'F_HEADSET';
-                $label = $label ?: 'Headset';
+                if ($label === null || trim((string) $label) === '') {
+                    $label = 'Headset';
+                }
                 break;
         }
 

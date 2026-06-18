@@ -378,11 +378,13 @@ class FanvilTemplateVarBuilder
         $acct = 1;
       }
 
-      if (($label === null || $label === '') && isset($lines[$acct])) {
-        $label = $lines[$acct]['display_name']
-          ?? $lines[$acct]['auth_id']
-          ?? $lines[$acct]['user_id']
-          ?? null;
+      if ($label === null || trim((string) $label) === '') {
+        if (isset($lines[$acct])) {
+          $label = $lines[$acct]['display_name']
+            ?? $lines[$acct]['auth_id']
+            ?? $lines[$acct]['user_id']
+            ?? null;
+        }
       }
 
       $lineNumber = $acct;
@@ -395,10 +397,14 @@ class FanvilTemplateVarBuilder
       $label = $label ?: 'Voicemail';
     } elseif ($logicalType === 'voice_mail') {
       $value = 'F_MWI';
-      $label = $label ?: 'Voice Mail';
+      if ($label === null || trim((string) $label) === '') {
+        $label = 'Voice Mail';
+      }
     } elseif ($logicalType === 'headset') {
       $value = 'F_HEADSET';
-      $label = $label ?: 'Headset';
+      if ($label === null || trim((string) $label) === '') {
+        $label = 'Headset';
+      }
     } elseif ($logicalType === 'park') {
       $value = (string) ($value ?? '');
       if ($value !== '' && ctype_digit($value)) {

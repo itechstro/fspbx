@@ -73,15 +73,38 @@ export function defaultKeyLabel(keyType) {
     return null
 }
 
+export function resolvedKeyLabel(key) {
+    const explicit = key?.key_label
+    if (explicit != null && String(explicit).trim() !== '') {
+        return String(explicit).trim()
+    }
+
+    const generated = key?._generated_label
+    if (generated != null && String(generated).trim() !== '') {
+        return String(generated).trim()
+    }
+
+    return explicit ?? null
+}
+
+export function keyLabelDisabledConditions(listName, vendor) {
+    if (supportsIntradeFanvilKeys(vendor)) {
+        return [[`${listName}.*.key_type`, '']]
+    }
+
+    return [[`${listName}.*.key_type`, ['', 'line']]]
+}
+
 export function normalizeKeyForSubmit(key, keyTypesWithSelect = KEY_TYPES_WITH_VALUE_SELECT) {
     const keyType = key?.key_type ?? ''
     const fixedValue = fixedKeyValue(keyType)
+    const keyLabel = resolvedKeyLabel(key)
 
     if (fixedValue) {
         return {
             ...key,
             key_value: fixedValue,
-            key_label: key?.key_label || defaultKeyLabel(keyType),
+            key_label: keyLabel || defaultKeyLabel(keyType),
         }
     }
 
@@ -92,6 +115,7 @@ export function normalizeKeyForSubmit(key, keyTypesWithSelect = KEY_TYPES_WITH_V
         key_value: usesSelect
             ? (key?.key_value_select ?? key?.key_value ?? null)
             : (key?.key_value_text ?? key?.key_value ?? null),
+        key_label: keyLabel,
     }
 }
 

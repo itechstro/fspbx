@@ -504,9 +504,7 @@
                                                                     container: 3,
                                                                 },
                                                             }" :placeholder="form$?.data?.device_keys?.[index]?._generated_label ?? 'Enter Value'"
-                                                                :floating="false" :disabled="[
-                                                                    ['device_keys.*.key_type', ['', 'line']]
-                                                                ]" />
+                                                                :floating="false" :disabled="keyLabelDisabledConditions('device_keys', selectedDeviceVendor())" />
 
                                                             <StaticElement label="&nbsp;" name="key_advanced" :columns="{
 
@@ -632,9 +630,7 @@
                                                                     container: 3,
                                                                 },
                                                             }" :placeholder="form$?.data?.multi_purpose_keys?.[index]?._generated_label ?? 'Enter Value'"
-                                                                :floating="false" :disabled="[
-                                                                    ['multi_purpose_keys.*.key_type', ['', 'line']]
-                                                                ]" />
+                                                                :floating="false" :disabled="keyLabelDisabledConditions('multi_purpose_keys', selectedDeviceVendor())" />
 
                                                             <StaticElement label="&nbsp;" name="key_advanced" :columns="{
 
@@ -685,6 +681,7 @@ import {
     getKeyTypes,
     KEY_TYPES_WITH_VALUE_TEXT,
     KEY_TYPES_WITH_VALUE_SELECT,
+    keyLabelDisabledConditions,
     normalizeKeyForSubmit as normalizeDeviceKeyForSubmit,
 } from "./deviceKeyTypes.js"
 
@@ -905,11 +902,22 @@ const updateLabel = (newValue, oldValue, el$, index, listName = 'device_keys') =
 
         label = nameOnlyFromOption(selected)
 
-        // Clear the actual input value
-        keyLabelEl.update(null)
+        generatedLabelEl.update(null)
+        keyLabelEl.update(label)
 
-        // Save the placeholder text to the hidden element
-        generatedLabelEl.update(label)
+        return
+    }
+
+    if (keyType === 'line') {
+        const form$ = el$?.form$
+        const lineNum = parseInt(newValue, 10)
+        const displayName = Number.isFinite(lineNum) && lineNum > 0
+            ? (form$?.el$(`device_lines.${lineNum - 1}.display_name`)?.value ?? '')
+            : ''
+
+        label = displayName !== '' ? displayName : (Number.isFinite(lineNum) ? `Line ${lineNum}` : null)
+        generatedLabelEl.update(null)
+        keyLabelEl.update(label)
 
         return
     }

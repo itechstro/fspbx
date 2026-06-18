@@ -128,6 +128,7 @@
                                                 <DeviceKeyTemplateKeyList name="keys" area="main" :key-types="keyTypes"
                                                     :key-types-with-select="keyTypesWithSelect"
                                                     :key-types-with-value-text="keyTypesWithValueText"
+                                                    :key-label-disabled="keyLabelDisabled('keys', 'intrade')"
                                                     :form-data="form$?.data" :get-next-key-number="getNextKeyNumber"
                                                     :get-key-value-select-items="getKeyValueSelectItems"
                                                     :update-label="updateLabel" />
@@ -140,6 +141,7 @@
                                                     :key-types="keyTypes"
                                                     :key-types-with-select="keyTypesWithSelect"
                                                     :key-types-with-value-text="keyTypesWithValueText"
+                                                    :key-label-disabled="keyLabelDisabled('multi_purpose_keys', 'intrade')"
                                                     :form-data="form$?.data"
                                                     :get-next-key-number="getNextKeyNumber"
                                                     :get-key-value-select-items="getKeyValueSelectItems"
@@ -153,6 +155,7 @@
                                                     :key-types="keyTypes"
                                                     :key-types-with-select="keyTypesWithSelect"
                                                     :key-types-with-value-text="keyTypesWithValueText"
+                                                    :key-label-disabled="keyLabelDisabled('expansion_keys', 'intrade')"
                                                     :form-data="form$?.data"
                                                     :get-next-key-number="getNextKeyNumber"
                                                     :get-key-value-select-items="getKeyValueSelectItems"
@@ -186,6 +189,7 @@ import {
     getKeyTypes,
     KEY_TYPES_WITH_VALUE_TEXT,
     KEY_TYPES_WITH_VALUE_SELECT,
+    keyLabelDisabledConditions,
     normalizeKeyForSubmit as normalizeDeviceKeyForSubmit,
 } from "./deviceKeyTypes.js";
 
@@ -215,6 +219,7 @@ const handleCopyToClipboard = (text) => {
 const keyTypes = getKeyTypes("intrade");
 const keyTypesWithSelect = KEY_TYPES_WITH_VALUE_SELECT;
 const keyTypesWithValueText = KEY_TYPES_WITH_VALUE_TEXT;
+const keyLabelDisabled = keyLabelDisabledConditions;
 
 const defaultValues = computed(() => ({
     name: props.options?.item?.name ?? null,
@@ -361,10 +366,20 @@ const updateLabel = (newValue, oldValue, el$, index, listName) => {
         const selected = (keyValueOptionsByIndex[cacheKey] ?? [])
             .find((option) => String(option.extension) === String(newValue));
         label = nameOnlyFromOption(selected);
+        row._generated_label.update(null);
+        row.key_label.update(label);
+        return;
+    }
+
+    if (keyType === "line") {
+        label = `Line ${newValue}`;
+        row._generated_label.update(null);
+        row.key_label.update(label);
+        return;
     }
 
     row._generated_label.update(label);
-    row.key_label.update(keyType === "blf" || keyType === "speed_dial" ? null : label);
+    row.key_label.update(label);
 };
 
 const submitForm = async (FormData, form) => {
