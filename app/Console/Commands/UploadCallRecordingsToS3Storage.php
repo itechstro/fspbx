@@ -173,15 +173,12 @@ class UploadCallRecordingsToS3Storage extends Command
                         'record_name' => $objectKey
                     ]);
 
-                // Cleanup local files
+                // Cleanup local files after verified upload.
                 if ($mp3File !== $recordingFile && file_exists($mp3File)) {
                     unlink($mp3File);
                 }
 
-                if (
-                    strtolower(pathinfo($recordingFile, PATHINFO_EXTENSION)) === 'wav'
-                    && file_exists($recordingFile)
-                ) {
+                if (file_exists($recordingFile)) {
                     unlink($recordingFile);
                 }
 
