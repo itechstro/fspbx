@@ -110,27 +110,33 @@ class CloudPlayEnterpriseDirectorySync
             return false;
         }
 
-        $resolvedEdId = $this->cloudPlay->resolveEnterpriseDirectoryId(
-            $extension->domain_uuid,
-            (string) $extension->extension,
-            (int) $extension->cloudplay_ed_id,
-        );
+        try {
+            $resolvedEdId = $this->cloudPlay->resolveEnterpriseDirectoryId(
+                $extension->domain_uuid,
+                (string) $extension->extension,
+                (int) $extension->cloudplay_ed_id,
+            );
 
-        if ($resolvedEdId === 0 && ! empty($extension->cloudplay_ed_id)) {
-            $extension->cloudplay_ed_id = null;
-            $extension->save();
+            if ($resolvedEdId === 0 && ! empty($extension->cloudplay_ed_id)) {
+                $extension->cloudplay_ed_id = null;
+                $extension->save();
+            }
+
+            $edId = $this->cloudPlay->syncEnterpriseDirectory($extension->domain_uuid, [
+                'ed_id' => $resolvedEdId,
+                'name' => $extension->effective_caller_id_name,
+                'email' => app(ContactUserLinkService::class)->resolveEmailForExtension($extension),
+                'extension' => $extension->extension,
+                'caller_id_number' => $extension->effective_caller_id_number,
+                'business_phone' => $this->cloudPlay->resolveExtensionBusinessPhoneNumber($extension),
+                'mobile' => $this->cloudPlay->resolveExtensionMobileNumber($extension),
+                'active' => true,
+            ]);
+        } catch (\Throwable $e) {
+            logger('CloudPLAY enterprise phonebook extension sync failed: ' . $e->getMessage());
+
+            return false;
         }
-
-        $edId = $this->cloudPlay->syncEnterpriseDirectory($extension->domain_uuid, [
-            'ed_id' => $resolvedEdId,
-            'name' => $extension->effective_caller_id_name,
-            'email' => app(ContactUserLinkService::class)->resolveEmailForExtension($extension),
-            'extension' => $extension->extension,
-            'caller_id_number' => $extension->effective_caller_id_number,
-            'business_phone' => $this->cloudPlay->resolveExtensionBusinessPhoneNumber($extension),
-            'mobile' => $this->cloudPlay->resolveExtensionMobileNumber($extension),
-            'active' => true,
-        ]);
 
         if ($edId > 0) {
             $extension->cloudplay_ed_id = $edId;

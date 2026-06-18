@@ -913,7 +913,11 @@ class ContactUserLinkService
             }
         }
 
-        app(CloudPlayEnterpriseDirectorySync::class)->removeDuplicateEnterpriseEntries($domainUuid);
+        try {
+            app(CloudPlayEnterpriseDirectorySync::class)->removeDuplicateEnterpriseEntries($domainUuid);
+        } catch (\Throwable $e) {
+            logger('CloudPLAY enterprise phonebook duplicate cleanup failed: ' . $e->getMessage());
+        }
     }
 
     private function isPrimaryFlag(mixed $value): bool
