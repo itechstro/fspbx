@@ -52,6 +52,7 @@ use App\Http\Controllers\MessageController;
 use App\Http\Controllers\MessageMediaController;
 use App\Http\Controllers\MessageSettingsController;
 use App\Http\Controllers\MusicOnHoldController;
+use App\Http\Controllers\PhoneFirmwareController;
 use App\Http\Controllers\PhoneNumbersController;
 use App\Http\Controllers\PolycomLogController;
 use App\Http\Controllers\PolycomProvisioningFileController;
@@ -244,6 +245,10 @@ Route::group(['middleware' => 'auth'], function () {
     Route::get('music-on-hold/{music_on_hold}/files/{file}', [MusicOnHoldController::class, 'download'])
         ->where('file', '[^/]+')
         ->name('music-on-hold.files.download');
+
+    // Phone Firmware
+    Route::get('phone-firmware', [PhoneFirmwareController::class, 'index'])->name('phone-firmware.index');
+    Route::get('phone-firmware/download', [PhoneFirmwareController::class, 'download'])->name('phone-firmware.download');
 
     // Modules
     Route::get('modules', [SwitchModuleController::class, 'index'])->name('modules.index');

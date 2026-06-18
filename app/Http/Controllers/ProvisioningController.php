@@ -1399,8 +1399,15 @@ class ProvisioningController extends Controller
 
             $processed = $this->postProcessEffectiveKeys($device, array_values($map), $settings);
 
-            // Translate to vendor-specific output only after all logical processing is done
-            $maps[$area] = $this->translateEffectiveKeysForVendor($device, $processed);
+            $keyed = [];
+            foreach ($processed as $key) {
+                $id = (int) ($key['id'] ?? 0);
+                if ($id > 0) {
+                    $keyed[$id] = $key;
+                }
+            }
+
+            $maps[$area] = $this->translateEffectiveKeysForVendor($device, $keyed);
         }
         provisioning_debug('ProvisioningController: finished effective device keys', [
             'device_uuid' => (string) $device->device_uuid,
@@ -1554,6 +1561,13 @@ class ProvisioningController extends Controller
             return ['expansion', $category];
         }
 
+        if (
+            in_array($vendor, ['fanvil', 'intrade', 'ibratro'], true)
+            && in_array($category, ['memory', 'programmable'], true)
+        ) {
+            return ['multi_purpose', $category];
+        }
+
         return ['main', $category ?: null];
     }
 
@@ -1589,7 +1603,10 @@ class ProvisioningController extends Controller
         }
 
         foreach ($keys as $i => &$k) {
-            $k['id'] = $i + 1;
+            $existingId = (int) ($k['id'] ?? 0);
+            if ($existingId <= 0) {
+                $k['id'] = $i + 1;
+            }
         }
         unset($k);
 
@@ -1694,6 +1711,16 @@ class ProvisioningController extends Controller
             case 'check_voicemail':
                 $vm = (string) ($nk->key_value ?? '');
                 $value = ($vm !== '') ? ('vm' . $vm) : null;
+                break;
+
+            case 'voice_mail':
+                $value = 'F_MWI';
+                $label = $label ?: 'Voice Mail';
+                break;
+
+            case 'headset':
+                $value = 'F_HEADSET';
+                $label = $label ?: 'Headset';
                 break;
         }
 

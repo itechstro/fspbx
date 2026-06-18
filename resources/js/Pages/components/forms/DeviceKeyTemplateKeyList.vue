@@ -15,7 +15,7 @@
                 <SelectElement name="key_type" label="Type" :items="keyTypes" :search="true"
                     label-prop="name" :native="false" input-type="search" autocomplete="off"
                     :columns="{ sm: { container: 3 } }" placeholder="Choose Function" :floating="false"
-                    @change="(newValue, oldValue, el$) => handleTypeChange(oldValue, el$, index)" />
+                    @change="(newValue, oldValue, el$) => handleTypeChange(newValue, oldValue, el$, index)" />
 
                 <SelectElement name="key_value_select" label="Value" label-prop="name" value-prop="extension"
                     :search="true" :native="false" :submit="false" allow-absent
@@ -24,11 +24,11 @@
                     :columns="{ sm: { container: 4 } }" placeholder="Choose Ext/Number" :floating="false"
                     :items="(query, input) => getKeyValueSelectItems(query, input, index, name)"
                     @change="(newValue, oldValue, el$) => updateLabel(newValue, oldValue, el$, index, name)"
-                    :conditions="[[name + '.*.key_type', ['line', 'check_voicemail', 'blf', 'speed_dial', 'park']]]" />
+                    :conditions="[[name + '.*.key_type', keyTypesWithSelect]]" />
 
                 <TextElement name="key_value_text" label="Value" :columns="{ sm: { container: 4 } }"
                     placeholder="Enter Value" :floating="false" :disabled="[[name + '.*.key_type', '']]"
-                    :conditions="[[name + '.*.key_type', '!=', ['line', 'check_voicemail', 'blf', 'speed_dial', 'park']]]" />
+                    :conditions="[[name + '.*.key_type', '!=', keyTypesWithValueText]]" />
 
                 <HiddenElement name="key_value" :meta="true" :default="null" />
 
@@ -42,23 +42,28 @@
 </template>
 
 <script setup>
+import { applyFixedKeyTypeDefaults } from "./deviceKeyTypes.js";
+
 const props = defineProps({
     name: String,
     area: String,
     keyTypes: Array,
+    keyTypesWithSelect: Array,
+    keyTypesWithValueText: Array,
     formData: Object,
     getNextKeyNumber: Function,
     getKeyValueSelectItems: Function,
     updateLabel: Function,
 });
 
-const handleTypeChange = (oldValue, el$, index) => {
-    const keyValueSelect = el$.form$.el$(props.name + "." + index + ".key_value_select");
+const handleTypeChange = (newValue, oldValue, el$, index) => {
+    const keyValueSelect = el$.form$.el$(`${props.name}.${index}.key_value_select`);
 
     if (oldValue !== null && oldValue !== undefined) {
         keyValueSelect.clear();
     }
 
     keyValueSelect.updateItems();
+    applyFixedKeyTypeDefaults(newValue, el$, props.name, index);
 };
 </script>

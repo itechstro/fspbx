@@ -332,6 +332,8 @@ class IntradeModelProfiles
             'intrade_lldp_tx_enable' => '1',
             'intrade_lldp_learn' => '1',
             'intrade_cdp_enable' => '1',
+            'intrade_flash_protocol' => '5',
+            'intrade_flash_mode' => '1',
             'intrade_dss_long_press_action' => '3',
             'intrade_dss_timeout_to_home' => '90',
             'intrade_bluetooth_ring_mode' => '1',

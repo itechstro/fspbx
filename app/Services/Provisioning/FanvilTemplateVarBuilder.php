@@ -66,6 +66,10 @@ class FanvilTemplateVarBuilder
       $settings[$key] = $url;
     }
 
+    if ($profile !== '') {
+      $keys['line'] = IntradeKeyXml::applyProfileSideDefaults($profile, $keys['line'] ?? [], $lines);
+    }
+
     $enriched = array_merge($vars, [
       'modelProfile' => $profile,
       'account' => $lines,
@@ -295,7 +299,38 @@ class FanvilTemplateVarBuilder
           continue;
         }
 
-        $row = self::mapKeyToLegacyRow($key, $category, $sequence++, $vendor, $lines);
+        $rawType = strtolower(trim((string) ($key['type'] ?? '')));
+        $keyId = (int) ($key['id'] ?? 0);
+        if ($keyId <= 0) {
+          $keyId = $sequence++;
+        } else {
+          $sequence = max($sequence, $keyId + 1);
+        }
+
+        if ($rawType === '') {
+          $source = (string) ($key['source'] ?? '');
+          if (! in_array($source, ['key_template', 'profile', 'device'], true)) {
+            continue;
+          }
+
+          $categories[$category][$keyId] = [
+            'device_key_id' => $keyId,
+            'device_key_category' => $category,
+            'device_key_vendor' => $vendor,
+            'device_key_type' => '3',
+            'device_key_subtype' => '',
+            'device_key_line' => 0,
+            'device_key_value' => '',
+            'device_key_extension' => '',
+            'device_key_protected' => '',
+            'device_key_label' => '',
+            'device_key_icon' => '',
+          ];
+
+          continue;
+        }
+
+        $row = self::mapKeyToLegacyRow($key, $category, $keyId, $vendor, $lines);
         if ($row === null) {
           continue;
         }
@@ -324,14 +359,21 @@ class FanvilTemplateVarBuilder
         $lineNumber = 1;
       }
     } elseif (isset($key['line']) && $key['line'] !== null && $key['line'] !== '') {
-      $lineNumber = max(1, (int) $key['line'] + 1);
+      if (in_array($vendor, ['fanvil', 'intrade', 'ibratro'], true)) {
+        $lineNumber = max(1, (int) $key['line']);
+      } else {
+        $lineNumber = max(1, (int) $key['line'] + 1);
+      }
     }
 
     $value = $key['value'] ?? null;
     $label = $key['label'] ?? null;
 
     if ($logicalType === 'line') {
-      $acct = (int) ($value ?? $lineNumber);
+      $acct = $lineNumber;
+      if ($acct <= 0) {
+        $acct = (int) ($value ?? 1);
+      }
       if ($acct <= 0) {
         $acct = 1;
       }
@@ -351,6 +393,12 @@ class FanvilTemplateVarBuilder
         $value = 'vm' . $value;
       }
       $label = $label ?: 'Voicemail';
+    } elseif ($logicalType === 'voice_mail') {
+      $value = 'F_MWI';
+      $label = $label ?: 'Voice Mail';
+    } elseif ($logicalType === 'headset') {
+      $value = 'F_HEADSET';
+      $label = $label ?: 'Headset';
     } elseif ($logicalType === 'park') {
       $value = (string) ($value ?? '');
       if ($value !== '' && ctype_digit($value)) {
@@ -388,6 +436,10 @@ class FanvilTemplateVarBuilder
       'bc' => 'blf',
       'c' => 'park',
       'dtmf' => 'dtmf',
+      'mwi' => 'voice_mail',
+      'voice_mail' => 'voice_mail',
+      'voicemail' => 'voice_mail',
+      'headset' => 'headset',
       default => $type,
     };
   }

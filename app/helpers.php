@@ -1838,6 +1838,8 @@ if (!function_exists('buildDestinationAction')) {
                     'dtmf' => 'dtmf',
                     'park' => 'c',
                     'blf', 'check_voicemail' => 'bc',
+                    'voice_mail' => 'mwi',
+                    'headset' => 'headset',
                     '' => '3',
                     default => $t,
                 };
@@ -1995,7 +1997,7 @@ if (!function_exists('buildDestinationAction')) {
                 $acct = (int)($nk['key_value'] ?? 1);
                 if ($acct <= 0) $acct = 1;
 
-                // $row['device_key_line'] = $acct;
+                $row['device_key_line'] = $acct;
                 $row['device_key_value'] = '';
 
                 // If the label is currently empty, look inside $device_lines

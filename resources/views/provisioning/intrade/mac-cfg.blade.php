@@ -292,6 +292,7 @@
     'keyLayout' => $keyLayout ?? 'advanced',
     'funcKeyPages' => $funcKeyPages ?? 4,
     'keysPerPage' => $keysPerPage ?? 29,
+    'sideKeysPerPage' => $sideKeysPerPage ?? ($keysPerPage ?? 29),
     'sideKeyPages' => $sideKeyPages ?? $resolve('side_key_pages', '1'),
     'dssLongPressAction' => $resolvedDssLongPress,
     'intrade_auto_blf_list' => $resolve('auto_blf_list', '1'),
@@ -301,18 +302,13 @@
         <DefaultUsername>{{ $http_auth_username ?? '' }}</DefaultUsername>
         <DefaultPassword>{{ $http_auth_password ?? '' }}</DefaultPassword>
         <DownloadCommonConf>{{ $resolve('download_common_conf', '1') }}</DownloadCommonConf>
+        <SaveProvisionInfo>1</SaveProvisionInfo>
         <FlashServerIP>{{ $intrade_provision_url ?: ('https://' . ($domain_name ?? '') . '/prov') }}</FlashServerIP>
         <FlashProtocol>{{ $resolve('flash_protocol', '2') }}</FlashProtocol>
         <FlashMode>{{ $resolve('flash_mode', '0') }}</FlashMode>
         <FlashInterval>{{ $resolve('flash_interval', '1') }}</FlashInterval>
 @if ($resolve('firmware_config', '') !== '')
         <FirmwareConfig>{{ $resolve('firmware_config') }}</FirmwareConfig>
-@endif
-@if ($resolve('enable_auto_upgrade', '0') === '1')
-        <EnableAutoUpgrade>1</EnableAutoUpgrade>
-        <UpgradeServer1>{{ $resolve('firmware_upgrade_server_1', '') }}</UpgradeServer1>
-        <UpgradeServer2>{{ $resolve('firmware_upgrade_server_2', '') }}</UpgradeServer2>
-        <UpgradeInterval>{{ $resolve('firmware_upgrade_interval', '24') }}</UpgradeInterval>
 @endif
         <pnp>
             <PNPEnable>{{ $resolve('pnp_enable', '1') }}</PNPEnable>
@@ -326,6 +322,12 @@
         <DHCPRenewUpgrade>{{ $resolve('dhcp_renew_upgrade') }}</DHCPRenewUpgrade>
 @endif
     </ap>
+    <fwCheck>
+        <EnableAutoUpgrade>{{ $resolve('enable_auto_upgrade', '0') }}</EnableAutoUpgrade>
+        <UpgradeServer1>{{ $resolve('firmware_upgrade_server_1', '') }}</UpgradeServer1>
+        <UpgradeServer2>{{ $resolve('firmware_upgrade_server_2', '') }}</UpgradeServer2>
+        <AutoUpgradeInterval>{{ $resolve('firmware_upgrade_interval', '24') }}</AutoUpgradeInterval>
+    </fwCheck>
     <qos>
         <EnableVLAN>{{ $resolve('enable_vlan', '0') }}</EnableVLAN>
 @if ($resolve('enable_vlan', '0') === '1')

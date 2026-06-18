@@ -126,6 +126,8 @@
 
                                                 <StaticElement name="main_header" tag="h4" content="Function Keys" />
                                                 <DeviceKeyTemplateKeyList name="keys" area="main" :key-types="keyTypes"
+                                                    :key-types-with-select="keyTypesWithSelect"
+                                                    :key-types-with-value-text="keyTypesWithValueText"
                                                     :form-data="form$?.data" :get-next-key-number="getNextKeyNumber"
                                                     :get-key-value-select-items="getKeyValueSelectItems"
                                                     :update-label="updateLabel" />
@@ -135,7 +137,10 @@
 
                                                 <StaticElement name="multi_header" tag="h4" content="Multi Purpose Keys" />
                                                 <DeviceKeyTemplateKeyList name="multi_purpose_keys" area="multi_purpose"
-                                                    :key-types="keyTypes" :form-data="form$?.data"
+                                                    :key-types="keyTypes"
+                                                    :key-types-with-select="keyTypesWithSelect"
+                                                    :key-types-with-value-text="keyTypesWithValueText"
+                                                    :form-data="form$?.data"
                                                     :get-next-key-number="getNextKeyNumber"
                                                     :get-key-value-select-items="getKeyValueSelectItems"
                                                     :update-label="updateLabel" />
@@ -145,7 +150,10 @@
 
                                                 <StaticElement name="expansion_header" tag="h4" content="Expansion Keys" />
                                                 <DeviceKeyTemplateKeyList name="expansion_keys" area="expansion"
-                                                    :key-types="keyTypes" :form-data="form$?.data"
+                                                    :key-types="keyTypes"
+                                                    :key-types-with-select="keyTypesWithSelect"
+                                                    :key-types-with-value-text="keyTypesWithValueText"
+                                                    :form-data="form$?.data"
                                                     :get-next-key-number="getNextKeyNumber"
                                                     :get-key-value-select-items="getKeyValueSelectItems"
                                                     :update-label="updateLabel" />
@@ -171,6 +179,15 @@ import { Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot } fro
 import { XMarkIcon } from "@heroicons/vue/24/solid";
 import { ClipboardDocumentIcon } from "@heroicons/vue/24/outline";
 import DeviceKeyTemplateKeyList from "./DeviceKeyTemplateKeyList.vue";
+import {
+    applyFixedKeyTypeDefaults,
+    defaultKeyLabel,
+    fixedKeyValue,
+    getKeyTypes,
+    KEY_TYPES_WITH_VALUE_TEXT,
+    KEY_TYPES_WITH_VALUE_SELECT,
+    normalizeKeyForSubmit as normalizeDeviceKeyForSubmit,
+} from "./deviceKeyTypes.js";
 
 const props = defineProps({
     show: Boolean,
@@ -195,17 +212,9 @@ const handleCopyToClipboard = (text) => {
     });
 };
 
-const keyTypes = [
-    { value: "", name: "N/A" },
-    { value: "line", name: "Line" },
-    { value: "blf", name: "BLF" },
-    { value: "speed_dial", name: "Speed Dial" },
-    { value: "check_voicemail", name: "Check Voicemail" },
-    { value: "park", name: "Park & Retrieve" },
-    { value: "dtmf", name: "DTMF" },
-];
-
-const keyTypesWithSelect = ["line", "check_voicemail", "blf", "speed_dial", "park"];
+const keyTypes = getKeyTypes("intrade");
+const keyTypesWithSelect = KEY_TYPES_WITH_VALUE_SELECT;
+const keyTypesWithValueText = KEY_TYPES_WITH_VALUE_TEXT;
 
 const defaultValues = computed(() => ({
     name: props.options?.item?.name ?? null,
@@ -245,6 +254,14 @@ const normalizeKeysForForm = (keys = []) => {
             key_value_text: null,
             _generated_label: label ?? null,
         };
+
+        if (keyType === "voice_mail" || keyType === "headset") {
+            return {
+                ...row,
+                key_label: key?.key_label || defaultKeyLabel(keyType),
+                key_value: fixedKeyValue(keyType),
+            };
+        }
 
         if (!keyType || keyValue == null || keyValue === "") return row;
 
@@ -368,17 +385,7 @@ const submitForm = async (FormData, form) => {
     return await form.$vueform.services.axios.put(props.options.routes.update_route, data);
 };
 
-const normalizeKeyForSubmit = (key) => {
-    const keyType = key?.key_type ?? "";
-    const usesSelect = keyTypesWithSelect.includes(keyType);
-
-    return {
-        ...key,
-        key_value: usesSelect
-            ? (key?.key_value_select ?? key?.key_value ?? null)
-            : (key?.key_value_text ?? key?.key_value ?? null),
-    };
-};
+const normalizeKeyForSubmit = (key) => normalizeDeviceKeyForSubmit(key, keyTypesWithSelect);
 
 function clearErrorsRecursive(el$) {
     el$.messageBag?.clear();

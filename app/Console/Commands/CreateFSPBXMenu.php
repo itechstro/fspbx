@@ -91,7 +91,8 @@ class CreateFSPBXMenu extends Command
                 'link' => null,
                 'groups' => ['superadmin', 'admin'],
                 'subcategories' => [
-                    ['title' => 'Devices', 'link' => '/devices','groups' => ['superadmin', 'admin']],
+            ['title' => 'Devices', 'link' => '/devices','groups' => ['superadmin', 'admin']],
+                    ['title' => 'Phone Firmware', 'link' => '/phone-firmware', 'groups' => ['superadmin', 'admin']],
                     ['title' => 'Extensions', 'link' => '/extensions', 'groups' => ['superadmin', 'admin']],
                     ['title' => 'Gateways', 'link' => '/gateways', 'groups' => ['superadmin']],
                     ['title' => 'Users', 'link' => '/users', 'groups' => ['superadmin', 'admin']],

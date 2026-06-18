@@ -61,6 +61,7 @@
                                     domain_uuid: options.item?.domain_uuid,
                                     device_lines: options.lines,
                                     device_description: options.item?.device_description ?? null,
+                                    multi_purpose_keys: [],
                                 }">
 
                                 <template #empty>
@@ -100,6 +101,15 @@
                                                     'keys_container2',
                                                     'submit_keys',
                                                 ]" />
+
+                                                <FormTab name="multi_purpose_keys" label="Multi Purpose Keys" :elements="[
+                                                    'multi_purpose_keys_container',
+                                                    'multi_purpose_keys_title',
+                                                    'multi_purpose_keys',
+                                                    'multi_purpose_keys_container2',
+                                                    'multi_purpose_keys_submit_keys',
+                                                ]"
+                                                    :conditions="[() => supportsMultiPurposeKeys(selectedDeviceVendor())]" />
 
                                             </FormTabs>
                                         </div>
@@ -414,6 +424,8 @@
                                                         <ObjectElement :name="index"
                                                             :key="form$?.data?.device_keys?.[index]?.key_uuid">
 
+                                                            <HiddenElement name="key_area" :meta="true" default="main" />
+
                                                             <HiddenElement name="key_uuid" :meta="true"
                                                                 :default="Math.random().toString(36).slice(2)" />
                                                             <HiddenElement name="_generated_label" :meta="true"
@@ -427,7 +439,7 @@
                                                                 sm: {
                                                                     container: 1,
                                                                 },
-                                                            }" :default="nextKeyNumber" />
+                                                            }" :default="getNextKeyNumber('device_keys')" />
 
                                                             <SelectElement name="key_type" label="Type"
                                                                 :items="keyTypes" :search="true" label-prop="name"
@@ -449,6 +461,8 @@
 
                                                                     key_value_select.updateItems()
 
+                                                                    applyFixedKeyTypeDefaults(newValue, el$, 'device_keys', index)
+
                                                                 }" />
 
                                                             <SelectElement name="key_value_select" label="Value"
@@ -462,10 +476,10 @@
                                                                         container: 4,
                                                                     },
                                                                 }" placeholder="Choose Ext/Number" :floating="false"
-                                                                :items="(query, input) => getKeyValueSelectItems(query, input, index)"
-                                                                @change="(newValue, oldValue, el$) => updateLabel(newValue, oldValue, el$, index)"
+                                                                :items="(query, input) => getKeyValueSelectItems(query, input, index, 'device_keys')"
+                                                                @change="(newValue, oldValue, el$) => updateLabel(newValue, oldValue, el$, index, 'device_keys')"
                                                                 :conditions="[
-                                                                    ['device_keys.*.key_type', ['line', 'check_voicemail', 'blf', 'speed_dial', 'park']]
+                                                                    ['device_keys.*.key_type', keyTypesWithSelect]
                                                                 ]" />
 
                                                             <TextElement name="key_value_text" label="Value" :columns="{
@@ -475,7 +489,7 @@
                                                             }" placeholder="Enter Value" :floating="false" :disabled="[
                                                                 ['device_keys.*.key_type', '']
                                                             ]" :conditions="[
-                                                                ['device_keys.*.key_type', '!=', ['line', 'check_voicemail', 'blf', 'speed_dial', 'park']]
+                                                                ['device_keys.*.key_type', '!=', keyTypesWithValueText]
                                                             ]" />
 
                                                             <HiddenElement name="key_value" :meta="true"
@@ -524,6 +538,124 @@
                                                 <ButtonElement name="submit_keys" button-label="Save" :submits="true"
                                                     align="right" />
 
+                                                <!-- Multi Purpose Keys -->
+                                                <StaticElement name="multi_purpose_keys_title" tag="h4"
+                                                    content="Multi Purpose Keys"
+                                                    description="Assign screen function keys for this device. On Intrade and Fanvil phones, use this tab for DSS function keys (page keys). Use the Function Keys tab for side keys." />
+
+                                                <GroupElement name="multi_purpose_keys_container" />
+                                                <ListElement name="multi_purpose_keys" :sort="true" size="sm"
+                                                    :controls="{ add: options.permissions.device_key_create, remove: options.permissions.device_key_destroy, sort: options.permissions.device_key_up }"
+                                                    :add-classes="{ ListElement: { listItem: 'bg-white p-4 mb-4 rounded-lg shadow-md' } }">
+                                                    <template #default="{ index }">
+                                                        <ObjectElement :name="index"
+                                                            :key="form$?.data?.multi_purpose_keys?.[index]?.key_uuid">
+
+                                                            <HiddenElement name="key_area" :meta="true"
+                                                                default="multi_purpose" />
+
+                                                            <HiddenElement name="key_uuid" :meta="true"
+                                                                :default="Math.random().toString(36).slice(2)" />
+                                                            <HiddenElement name="_generated_label" :meta="true"
+                                                                :default="null" />
+
+                                                            <TextElement name="key_index" label="Key" :rules="[
+                                                                'nullable',
+                                                                'numeric',
+                                                            ]" autocomplete="off" :columns="{
+
+                                                                sm: {
+                                                                    container: 1,
+                                                                },
+                                                            }" :default="getNextKeyNumber('multi_purpose_keys')" />
+
+                                                            <SelectElement name="key_type" label="Type"
+                                                                :items="keyTypes" :search="true" label-prop="name"
+                                                                :native="false" input-type="search" autocomplete="off"
+                                                                :columns="{
+
+                                                                    sm: {
+                                                                        container: 3,
+                                                                    },
+                                                                }" placeholder="Choose Function" :floating="false"
+                                                                @change="(newValue, oldValue, el$) => {
+
+                                                                    let key_value_select = el$.form$.el$('multi_purpose_keys.' + index + '.key_value_select')
+
+                                                                    if (oldValue !== null && oldValue !== undefined) {
+                                                                        key_value_select.clear();
+                                                                    }
+
+                                                                    key_value_select.updateItems()
+
+                                                                    applyFixedKeyTypeDefaults(newValue, el$, 'multi_purpose_keys', index)
+
+                                                                }" />
+
+                                                            <SelectElement name="key_value_select" label="Value"
+                                                                label-prop="name" value-prop="extension" :search="true"
+                                                                :native="false" :submit="false"
+                                                                :create="['blf', 'speed_dial', 'park']
+                                                                    .includes(form$?.data?.multi_purpose_keys?.[index]?.key_type)"
+                                                                :append-new-option="false" input-type="search"
+                                                                autocomplete="off" :columns="{
+
+                                                                    sm: {
+                                                                        container: 4,
+                                                                    },
+                                                                }" placeholder="Choose Ext/Number" :floating="false"
+                                                                :items="(query, input) => getKeyValueSelectItems(query, input, index, 'multi_purpose_keys')"
+                                                                @change="(newValue, oldValue, el$) => updateLabel(newValue, oldValue, el$, index, 'multi_purpose_keys')"
+                                                                :conditions="[
+                                                                    ['multi_purpose_keys.*.key_type', keyTypesWithSelect]
+                                                                ]" />
+
+                                                            <TextElement name="key_value_text" label="Value" :columns="{
+                                                                sm: {
+                                                                    container: 4,
+                                                                },
+                                                            }" placeholder="Enter Value" :floating="false" :disabled="[
+                                                                ['multi_purpose_keys.*.key_type', '']
+                                                            ]" :conditions="[
+                                                                ['multi_purpose_keys.*.key_type', '!=', keyTypesWithValueText]
+                                                            ]" />
+
+                                                            <HiddenElement name="key_value" :meta="true"
+                                                                :default="null" />
+
+                                                            <TextElement name="key_label" label="Label" :columns="{
+
+                                                                default: {
+                                                                    container: 10,
+                                                                },
+                                                                sm: {
+                                                                    container: 3,
+                                                                },
+                                                            }" :placeholder="form$?.data?.multi_purpose_keys?.[index]?._generated_label ?? 'Enter Value'"
+                                                                :floating="false" :disabled="[
+                                                                    ['multi_purpose_keys.*.key_type', ['', 'line']]
+                                                                ]" />
+
+                                                            <StaticElement label="&nbsp;" name="key_advanced" :columns="{
+
+                                                                default: {
+                                                                    container: 1,
+                                                                },
+                                                                sm: {
+                                                                    container: 1,
+                                                                },
+                                                            }"
+                                                                :conditions="[() => options?.permissions?.device_key_advanced]" />
+
+                                                        </ObjectElement>
+                                                    </template>
+                                                </ListElement>
+
+                                                <GroupElement name="multi_purpose_keys_container2" />
+
+                                                <ButtonElement name="multi_purpose_keys_submit_keys" button-label="Save"
+                                                    :submits="true" align="right" />
+
                                             </FormElements>
                                         </div>
                                     </div>
@@ -548,6 +680,13 @@ import { XMarkIcon } from "@heroicons/vue/24/solid";
 import { Cog8ToothIcon } from "@heroicons/vue/24/outline";
 import FormChildModal from "../FormChildModal.vue"
 import DeviceLinePasswordElement from "./DeviceLinePasswordElement.vue"
+import {
+    applyFixedKeyTypeDefaults,
+    getKeyTypes,
+    KEY_TYPES_WITH_VALUE_TEXT,
+    KEY_TYPES_WITH_VALUE_SELECT,
+    normalizeKeyForSubmit as normalizeDeviceKeyForSubmit,
+} from "./deviceKeyTypes.js"
 
 
 const props = defineProps({
@@ -556,6 +695,30 @@ const props = defineProps({
     header: String,
     loading: Boolean,
 });
+
+const MULTI_PURPOSE_KEY_VENDORS = ['grandstream', 'fanvil', 'intrade', 'ibratro']
+
+function supportsMultiPurposeKeys(vendor) {
+    return MULTI_PURPOSE_KEY_VENDORS.includes(String(vendor || '').toLowerCase())
+}
+
+function selectedDeviceVendor() {
+    const fromItem = props.options?.item?.device_vendor
+    if (fromItem) {
+        return fromItem
+    }
+
+    const templateValue = form$?.value?.el$('device_template')?.value
+    if (!templateValue) {
+        return ''
+    }
+
+    const templates = props.options?.templates ?? []
+    const match = templates.find((template) => String(template.value) === String(templateValue))
+    const label = match?.name ?? String(templateValue)
+
+    return label.split('/')[0]?.toLowerCase() ?? ''
+}
 
 const form$ = ref(null)
 
@@ -634,32 +797,28 @@ const nextLineNumber = computed(() => {
     return maxLine + 1
 })
 
-const nextKeyNumber = computed(() => {
-    const deviceKeys = form$?.value?.el$('device_keys')
-    const children = deviceKeys?.children$Array ?? []
-    const maxLine = children.reduce((max, child) => {
+const getNextKeyNumber = (listName = 'device_keys') => {
+    const list = form$?.value?.el$(listName)
+    const children = list?.children$Array ?? []
+    const maxKey = children.reduce((max, child) => {
         const n = parseInt(child?.value?.key_index, 10)
         return Number.isFinite(n) && n > max ? n : max
     }, 0)
-    return maxLine + 1
-})
 
-const keyTypes = [
-    { value: '', name: 'N/A' },
-    { value: 'line', name: 'Line' },
-    { value: 'blf', name: 'BLF' },
-    { value: 'speed_dial', name: 'Speed Dial' },
-    { value: 'check_voicemail', name: 'Check Voicemail' },
-    { value: 'park', name: 'Park & Retrieve' },
-    { value: 'dtmf', name: 'DTMF' },
-]
+    return maxKey + 1
+}
 
-const keyTypesWithSelect = ['line', 'check_voicemail', 'blf', 'speed_dial', 'park']
+const getKeyCacheKey = (listName, index) => `${listName}.${index}`
 
-const getKeyValueSelectItems = async (query, input, index) => {
+const keyTypes = computed(() => getKeyTypes(selectedDeviceVendor()))
+const keyTypesWithSelect = KEY_TYPES_WITH_VALUE_SELECT
+const keyTypesWithValueText = KEY_TYPES_WITH_VALUE_TEXT
+
+const getKeyValueSelectItems = async (query, input, index, listName = 'device_keys') => {
     const form$ = input.$parent.el$.form$
-    const keyTypeEl = form$.el$('device_keys.' + index + '.key_type')
+    const keyTypeEl = form$.el$(`${listName}.${index}.key_type`)
     const keyType = keyTypeEl?.value
+    const cacheKey = getKeyCacheKey(listName, index)
 
     // line => Line 1..N based on device_lines count
     if (keyType === 'line') {
@@ -683,7 +842,7 @@ const getKeyValueSelectItems = async (query, input, index) => {
                 props.options.routes.get_routing_options,
                 { category: 'voicemails' }
             )
-            keyValueOptionsByIndex[index] = response.data.options ?? []
+            keyValueOptionsByIndex[cacheKey] = response.data.options ?? []
             return response.data.options ?? []
         } catch (error) {
             emit('error', error)
@@ -698,7 +857,7 @@ const getKeyValueSelectItems = async (query, input, index) => {
                 props.options.routes.get_routing_options,
                 { category: 'extensions' }
             )
-            keyValueOptionsByIndex[index] = response.data.options ?? []
+            keyValueOptionsByIndex[cacheKey] = response.data.options ?? []
             return response.data.options ?? []
         } catch (error) {
             emit('error', error)
@@ -721,16 +880,14 @@ const getKeyValueSelectItems = async (query, input, index) => {
     return []
 }
 
-const updateLabel = (newValue, oldValue, el$, index) => {
-    // Update key_value field
-    el$?.form$?.el$('device_keys').children$[index].children$['key_value'].update(newValue)
+const updateLabel = (newValue, oldValue, el$, index, listName = 'device_keys') => {
+    el$?.form$?.el$(listName).children$[index].children$['key_value'].update(newValue)
 
-    const keyLabelEl = el$?.form$?.el$('device_keys').children$[index].children$['key_label']
+    const keyLabelEl = el$?.form$?.el$(listName).children$[index].children$['key_label']
+    const generatedLabelEl = el$?.form$?.el$(listName).children$[index].children$['_generated_label']
+    const cacheKey = getKeyCacheKey(listName, index)
 
-    // Get the Hidden Element instance
-    const generatedLabelEl = el$?.form$?.el$('device_keys').children$[index].children$['_generated_label']
-
-    const keyType = el$?.form$.el$('device_keys.' + index + '.key_type')?.value
+    const keyType = el$?.form$.el$(`${listName}.${index}.key_type`)?.value
     let label = null
 
     if (keyType === 'park') {
@@ -738,12 +895,12 @@ const updateLabel = (newValue, oldValue, el$, index) => {
     }
 
     if (keyType === 'check_voicemail') {
-        const selected = (keyValueOptionsByIndex[index] ?? []).find(o => String(o.extension) === String(newValue))
+        const selected = (keyValueOptionsByIndex[cacheKey] ?? []).find(o => String(o.extension) === String(newValue))
         label = selected?.extension ? `VM ${selected.extension}` : null
     }
 
     if (keyType === 'blf' || keyType === 'speed_dial') {
-        const selected = (keyValueOptionsByIndex[index] ?? [])
+        const selected = (keyValueOptionsByIndex[cacheKey] ?? [])
             .find(o => String(o.extension) === String(newValue))
 
         label = nameOnlyFromOption(selected)
@@ -763,30 +920,25 @@ const updateLabel = (newValue, oldValue, el$, index) => {
 }
 
 const submitForm = async (FormData, form$) => {
-    // Using form$.requestData will EXCLUDE conditional elements and it 
-    // will submit the form as Content-Type: application/json . 
-    const requestData = form$.requestData
-    requestData.device_keys = (requestData.device_keys ?? []).map(normalizeKeyForSubmit)
-    // console.log(requestData);
+    const data = form$.data
 
-    // Using form$.data will INCLUDE conditional elements and it
-    // will submit the form as "Content-Type: application/json".
-    // const data = form$.data
+    data.device_keys = [
+        ...(data.device_keys ?? []).map(k => ({
+            ...k,
+            key_area: k.key_area ?? 'main',
+        })),
+        ...(data.multi_purpose_keys ?? []).map(k => ({
+            ...k,
+            key_area: k.key_area ?? 'multi_purpose',
+        })),
+    ].map((key) => normalizeDeviceKeyForSubmit(key, keyTypesWithSelect))
 
-    return await form$.$vueform.services.axios.post(props.options.routes.store_route, requestData)
+    delete data.multi_purpose_keys
+
+    return await form$.$vueform.services.axios.post(props.options.routes.store_route, data)
 };
 
-const normalizeKeyForSubmit = (key) => {
-    const keyType = key?.key_type ?? ''
-    const usesSelect = keyTypesWithSelect.includes(keyType)
-
-    return {
-        ...key,
-        key_value: usesSelect
-            ? (key?.key_value_select ?? key?.key_value ?? null)
-            : (key?.key_value_text ?? key?.key_value ?? null),
-    }
-}
+const normalizeKeyForSubmit = (key) => normalizeDeviceKeyForSubmit(key, keyTypesWithSelect)
 
 
 function clearErrorsRecursive(el$) {

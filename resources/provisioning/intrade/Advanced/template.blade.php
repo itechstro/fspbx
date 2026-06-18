@@ -1,4 +1,4 @@
-{{-- version: 2.4.0 --}}
+{{-- version: 2.4.5 --}}
 
 @switch($flavor)
 
@@ -11,6 +11,7 @@
     'keyLayout' => 'advanced',
     'funcKeyPages' => 4,
     'keysPerPage' => 29,
+    'sideKeysPerPage' => 11,
 ])
 @break
 

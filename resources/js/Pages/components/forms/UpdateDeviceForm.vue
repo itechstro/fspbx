@@ -133,7 +133,7 @@
                                                     'multi_purpose_keys_submit_keys',
 
                                                 ]"
-                                                    :conditions="[() => options?.item?.device_vendor == 'grandstream']" />
+                                                    :conditions="[() => supportsMultiPurposeKeys(options?.item?.device_vendor)]" />
 
                                                 <FormTab name="expansion_keys" label="Expansion Keys" :elements="[
                                                     'expansion_keys_container',
@@ -564,6 +564,8 @@
 
                                                                     key_value_select.updateItems()
 
+                                                                    applyFixedKeyTypeDefaults(newValue, el$, 'device_keys', index)
+
                                                                 }" />
 
                                                             <SelectElement name="key_value_select" label="Value"
@@ -580,7 +582,7 @@
                                                                 :items="(query, input) => getKeyValueSelectItems(query, input, index)"
                                                                 @change="(newValue, oldValue, el$) => updateLabel(newValue, oldValue, el$, index)"
                                                                 :conditions="[
-                                                                    ['device_keys.*.key_type', ['line', 'check_voicemail', 'blf', 'speed_dial', 'park']]
+                                                                    ['device_keys.*.key_type', keyTypesWithSelect]
                                                                 ]" />
 
                                                             <TextElement name="key_value_text" label="Value" :columns="{
@@ -590,7 +592,7 @@
                                                             }" placeholder="Enter Value" :floating="false" :disabled="[
                                                                 ['device_keys.*.key_type', '']
                                                             ]" :conditions="[
-                                                                ['device_keys.*.key_type', '!=', ['line', 'check_voicemail', 'blf', 'speed_dial', 'park']]
+                                                                ['device_keys.*.key_type', '!=', keyTypesWithValueText]
                                                             ]" />
 
                                                             <HiddenElement name="key_value" :meta="true"
@@ -686,6 +688,8 @@
 
                                                                     key_value_select.updateItems()
 
+                                                                    applyFixedKeyTypeDefaults(newValue, el$, 'device_keys', index)
+
                                                                 }" />
 
                                                             <SelectElement name="key_value_select" label="Value"
@@ -702,7 +706,7 @@
                                                                 :items="(query, input) => getKeyValueSelectItems(query, input, index)"
                                                                 @change="(newValue, oldValue, el$) => updateLabel(newValue, oldValue, el$, index)"
                                                                 :conditions="[
-                                                                    ['device_keys.*.key_type', ['line', 'check_voicemail', 'blf', 'speed_dial', 'park']]
+                                                                    ['device_keys.*.key_type', keyTypesWithSelect]
                                                                 ]" />
 
                                                             <TextElement name="key_value_text" label="Value" :columns="{
@@ -712,7 +716,7 @@
                                                             }" placeholder="Enter Value" :floating="false" :disabled="[
                                                                 ['device_keys.*.key_type', '']
                                                             ]" :conditions="[
-                                                                ['device_keys.*.key_type', '!=', ['line', 'check_voicemail', 'blf', 'speed_dial', 'park']]
+                                                                ['device_keys.*.key_type', '!=', keyTypesWithValueText]
                                                             ]" />
 
                                                             <HiddenElement name="key_value" :meta="true"
@@ -764,7 +768,7 @@
                                                 <!-- Multi Purpose Keys -->
                                                 <StaticElement name="multi_purpose_keys_title" tag="h4"
                                                     content="Multi Purpose Keys"
-                                                    description="Assign multi purpose keys to this device. Make sure your device supports this feature." />
+                                                    description="Assign screen function keys for this device. On Intrade and Fanvil phones, use this tab for DSS function keys (page keys). Use the Function Keys tab for side keys." />
 
                                                 <GroupElement name="multi_purpose_keys_container" />
                                                 <ListElement name="multi_purpose_keys" :sort="true" size="sm"
@@ -812,6 +816,8 @@
 
                                                                     key_value_select.updateItems()
 
+                                                                    applyFixedKeyTypeDefaults(newValue, el$, 'multi_purpose_keys', index)
+
                                                                 }" />
 
                                                             <SelectElement name="key_value_select" label="Value"
@@ -829,7 +835,7 @@
                                                                 :items="(query, input) => getKeyValueSelectItems(query, input, index, 'multi_purpose_keys')"
                                                                 @change="(newValue, oldValue, el$) => updateLabel(newValue, oldValue, el$, index, 'multi_purpose_keys')"
                                                                 :conditions="[
-                                                                    ['multi_purpose_keys.*.key_type', ['line', 'check_voicemail', 'blf', 'speed_dial', 'park']]
+                                                                    ['multi_purpose_keys.*.key_type', keyTypesWithSelect]
                                                                 ]" />
 
                                                             <TextElement name="key_value_text" label="Value" :columns="{
@@ -839,7 +845,7 @@
                                                             }" placeholder="Enter Value" :floating="false" :disabled="[
                                                                 ['multi_purpose_keys.*.key_type', '']
                                                             ]" :conditions="[
-                                                                ['multi_purpose_keys.*.key_type', '!=', ['line', 'check_voicemail', 'blf', 'speed_dial', 'park']]
+                                                                ['multi_purpose_keys.*.key_type', '!=', keyTypesWithValueText]
                                                             ]" />
 
                                                             <HiddenElement name="key_value" :meta="true"
@@ -939,6 +945,8 @@
 
                                                                     key_value_select.updateItems()
 
+                                                                    applyFixedKeyTypeDefaults(newValue, el$, 'expansion_keys', index)
+
                                                                 }" />
 
                                                             <SelectElement name="key_value_select" label="Value"
@@ -956,7 +964,7 @@
                                                                 :items="(query, input) => getKeyValueSelectItems(query, input, index, 'expansion_keys')"
                                                                 @change="(newValue, oldValue, el$) => updateLabel(newValue, oldValue, el$, index, 'expansion_keys')"
                                                                 :conditions="[
-                                                                    ['expansion_keys.*.key_type', ['line', 'check_voicemail', 'blf', 'speed_dial', 'park']]
+                                                                    ['expansion_keys.*.key_type', keyTypesWithSelect]
                                                                 ]" />
 
                                                             <TextElement name="key_value_text" label="Value" :columns="{
@@ -966,7 +974,7 @@
                                                             }" placeholder="Enter Value" :floating="false" :disabled="[
                                                                 ['expansion_keys.*.key_type', '']
                                                             ]" :conditions="[
-                                                                ['expansion_keys.*.key_type', '!=', ['line', 'check_voicemail', 'blf', 'speed_dial', 'park']]
+                                                                ['expansion_keys.*.key_type', '!=', keyTypesWithValueText]
                                                             ]" />
 
                                                             <HiddenElement name="key_value" :meta="true"
@@ -1342,6 +1350,15 @@ import { Cog8ToothIcon, DocumentDuplicateIcon } from "@heroicons/vue/24/outline"
 import Badge from "@generalComponents/Badge.vue";
 import { XCircleIcon } from '@heroicons/vue/20/solid'
 import { ClipboardDocumentIcon } from "@heroicons/vue/24/outline";
+import {
+    applyFixedKeyTypeDefaults,
+    defaultKeyLabel,
+    fixedKeyValue,
+    getKeyTypes,
+    KEY_TYPES_WITH_VALUE_TEXT,
+    KEY_TYPES_WITH_VALUE_SELECT,
+    normalizeKeyForSubmit as normalizeDeviceKeyForSubmit,
+} from "./deviceKeyTypes.js";
 
 
 const props = defineProps({
@@ -1350,6 +1367,12 @@ const props = defineProps({
     header: String,
     loading: Boolean,
 });
+
+const MULTI_PURPOSE_KEY_VENDORS = ['grandstream', 'fanvil', 'intrade', 'ibratro']
+
+function supportsMultiPurposeKeys(vendor) {
+    return MULTI_PURPOSE_KEY_VENDORS.includes(String(vendor || '').toLowerCase())
+}
 
 const form$ = ref(null)
 const advModalIndex = ref(null)
@@ -1446,17 +1469,9 @@ const filterKeysByArea = (keys = [], area = 'main') => {
     })
 }
 
-const keyTypes = [
-    { value: '', name: 'N/A' },
-    { value: 'line', name: 'Line' },
-    { value: 'blf', name: 'BLF' },
-    { value: 'speed_dial', name: 'Speed Dial' },
-    { value: 'check_voicemail', name: 'Check Voicemail' },
-    { value: 'park', name: 'Park & Retrieve' },
-    { value: 'dtmf', name: 'DTMF' },
-]
-
-const keyTypesWithSelect = ['line', 'check_voicemail', 'blf', 'speed_dial', 'park']
+const keyTypes = computed(() => getKeyTypes(props.options?.item?.device_vendor))
+const keyTypesWithSelect = KEY_TYPES_WITH_VALUE_SELECT
+const keyTypesWithValueText = KEY_TYPES_WITH_VALUE_TEXT
 
 const handleTabSelected = (activeTab, previousTab) => {
     if (activeTab.name == 'cloud_provisioning') {
@@ -1737,6 +1752,14 @@ const normalizeDeviceKeysForForm = (keys = []) => {
             key_value_text: null,
         }
 
+        if (key_type === 'voice_mail' || key_type === 'headset') {
+            return {
+                ...row,
+                key_label: k?.key_label || defaultKeyLabel(key_type),
+                key_value: fixedKeyValue(key_type),
+            }
+        }
+
         if (!key_type || key_value == null || key_value === '') return row
 
         if (keyTypesWithSelect.includes(key_type)) {
@@ -1774,7 +1797,7 @@ const submitForm = async (FormData, form$) => {
             ...k,
             key_area: k.key_area ?? 'expansion',
         })),
-    ].map(normalizeKeyForSubmit)
+    ].map((key) => normalizeDeviceKeyForSubmit(key, keyTypesWithSelect))
 
     delete data.multi_purpose_keys
     delete data.expansion_keys
@@ -1782,17 +1805,7 @@ const submitForm = async (FormData, form$) => {
     return await form$.$vueform.services.axios.put(props.options.routes.update_route, data)
 };
 
-const normalizeKeyForSubmit = (key) => {
-    const keyType = key?.key_type ?? ''
-    const usesSelect = keyTypesWithSelect.includes(keyType)
-
-    return {
-        ...key,
-        key_value: usesSelect
-            ? (key?.key_value_select ?? key?.key_value ?? null)
-            : (key?.key_value_text ?? key?.key_value ?? null),
-    }
-}
+const normalizeKeyForSubmit = (key) => normalizeDeviceKeyForSubmit(key, keyTypesWithSelect)
 
 const openSaveTemplateModal = () => {
     templateName.value = ''

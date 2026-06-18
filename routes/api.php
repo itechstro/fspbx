@@ -62,6 +62,7 @@ use App\Http\Controllers\MusicOnHoldController;
 use App\Http\Controllers\BasicDialerController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\PaymentGatewayController;
+use App\Http\Controllers\PhoneFirmwareController;
 use App\Http\Controllers\PhoneNumbersController;
 use App\Http\Controllers\ProvisioningController;
 use App\Http\Controllers\RegistrationsController;
@@ -203,6 +204,13 @@ Route::group(['middleware' => ['auth:sanctum', 'api.cookie.auth']], function () 
     Route::post('ring-groups/{ring_group}/get-greeting', [RingGroupsController::class, 'getGreeting'])->name('ring-groups.getGreeting');
     Route::post('ring-groups/{ring_group}/upload-greeting', [RingGroupsController::class, 'uploadGreeting'])->name('ring-groups.uploadGreeting');
     Route::post('ring-groups/{ring_group}/delete-greeting', [RingGroupsController::class, 'deleteGreeting'])->name('ring-groups.deleteGreeting');
+
+    // Phone Firmware
+    Route::get('phone-firmware/data', [PhoneFirmwareController::class, 'getData'])->name('phone-firmware.data');
+    Route::post('phone-firmware/upload', [PhoneFirmwareController::class, 'upload'])->name('phone-firmware.upload');
+    Route::post('phone-firmware/mkdir', [PhoneFirmwareController::class, 'mkdir'])->name('phone-firmware.mkdir');
+    Route::post('phone-firmware/apply-provision', [PhoneFirmwareController::class, 'applyProvision'])->name('phone-firmware.apply-provision');
+    Route::post('phone-firmware/delete', [PhoneFirmwareController::class, 'destroy'])->name('phone-firmware.delete');
 
     // Recordings Manager
     Route::get('recordings-manager/data', [RecordingsManagerController::class, 'getData'])->name('recordings-manager.data');
