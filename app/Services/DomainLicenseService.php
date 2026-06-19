@@ -338,6 +338,7 @@ class DomainLicenseService
             'override_enabled' => $override
                 ? filter_var($override->domain_setting_enabled, FILTER_VALIDATE_BOOLEAN)
                 : null,
+            'inherited_from_default' => ! $override && filter_var($default?->default_setting_enabled, FILTER_VALIDATE_BOOLEAN),
             'effective_limit' => $effectiveLimit,
             'unlimited' => $effectiveLimit === null,
             'usage' => round($usageDisplay, 4),

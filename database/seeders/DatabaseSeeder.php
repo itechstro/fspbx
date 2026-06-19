@@ -1478,7 +1478,7 @@ class DatabaseSeeder extends Seeder
                 'default_setting_name'          => 'numeric',
                 'default_setting_value'         => '3',
                 'default_setting_enabled'       => false,
-                'default_setting_description'   => "",
+                'default_setting_description'   => 'Activated mobile app users per tenant. Disabled = unlimited. Deactivated and phonebook-only users do not count.',
             ],
             [
                 'default_setting_category'      => 'limit',

@@ -2,6 +2,9 @@
 
 namespace App\Traits;
 
+use App\Services\DomainLimitsService;
+use App\Services\DomainUsageService;
+
 trait ChecksLimits
 {
     /**
@@ -48,8 +51,17 @@ trait ChecksLimits
         $errorText = get_domain_setting($errorSettingKey, $domain)
             ?? "You have reached the maximum number of {$friendly} allowed ({$limit}).";
 
-        // Count resources in this domain
-        $count = $modelClass::where($column, $domain)->count();
+        $domainLimitsService = app(DomainLimitsService::class);
+        if ($domainLimitsService->metric($resourceKey)) {
+            $count = $domainLimitsService->resolveUsage(
+                $resourceKey,
+                $domain,
+                null,
+                app(DomainUsageService::class),
+            );
+        } else {
+            $count = $modelClass::where($column, $domain)->count();
+        }
 
         // Check limit reached
         if ($count >= $limit) {

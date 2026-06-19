@@ -1362,6 +1362,10 @@ class AppsController extends Controller
         try {
             $currentDomain = session('domain_uuid');
 
+            if ($resp = $this->enforceLimit('mobile_app_users', MobileAppUsers::class, 'domain_uuid')) {
+                return $resp;
+            }
+
             $extension = QueryBuilder::for(Extensions::class)
                 ->select([
                     'extension_uuid',

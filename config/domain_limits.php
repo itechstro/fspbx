@@ -74,6 +74,7 @@ return [
             'unit' => 'users',
             'usage_type' => 'count',
             'model' => \App\Models\MobileAppUsers::class,
+            'count_scope' => 'countsTowardLimit',
         ],
         'ai_transcription_minutes' => [
             'group' => 'AI services (monthly)',

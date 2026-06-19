@@ -26,4 +26,9 @@ class MobileAppUsers extends Model
         return $this->belongsTo(Extensions::class, 'extension_uuid', 'extension_uuid');
     }
 
+    public function scopeCountsTowardLimit($query)
+    {
+        return $query->where('status', 1);
+    }
+
 }

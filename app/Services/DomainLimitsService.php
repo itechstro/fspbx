@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\DefaultSettings;
+use Illuminate\Support\Str;
 
 class DomainLimitsService
 {
@@ -69,9 +70,17 @@ class DomainLimitsService
                 return 0.0;
             }
 
-            return (float) $model::query()
-                ->where('domain_uuid', $domainUuid)
-                ->count();
+            $query = $model::query()->where('domain_uuid', $domainUuid);
+
+            $scope = (string) ($meta['count_scope'] ?? '');
+            if ($scope !== '') {
+                $scopeMethod = 'scope' . Str::studly($scope);
+                if (method_exists($model, $scopeMethod)) {
+                    $query->{$scope}();
+                }
+            }
+
+            return (float) $query->count();
         }
 
         if (($meta['usage_type'] ?? '') === 'ledger') {
