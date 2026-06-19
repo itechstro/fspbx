@@ -743,7 +743,7 @@ class AppsController extends Controller
                 ? $provider->getConnections($org_id)
                 : collect();
 
-            return response()->json([
+            $response = [
                 'mobile_app' => $mobile_app,
                 'org_id' => $org_id,
                 'connections' => $connections,
@@ -752,7 +752,65 @@ class AppsController extends Controller
                 'supports_contact_only' => $provider->supportsContactOnlyUsers(),
                 'cloudplay_profile_id' => $profileId,
                 'cloudplay_profile_name' => $profileName,
-            ]);
+                'cloudplay_qr_format' => $provider->getProviderKey() === 'cloudplay'
+                    ? app(CloudPlayApiService::class)->getQrFormat()
+                    : null,
+                'cloudplay_supports_scloc_qr' => $provider->getProviderKey() === 'cloudplay'
+                    ? app(CloudPlayApiService::class)->supportsSclocQr()
+                    : false,
+            ];
+
+            if (
+                $provider->getProviderKey() === 'cloudplay'
+                && $mobile_app
+                && (int) $mobile_app->status === 1
+                && !empty($mobile_app->user_id)
+            ) {
+                $extension = Extensions::query()
+                    ->select('extension_uuid', 'domain_uuid', 'extension', 'password')
+                    ->whereKey(request('extension_uuid'))
+                    ->first();
+
+                if ($extension) {
+                    $storedMobileApp = MobileAppUsers::query()
+                        ->where('extension_uuid', $extension->extension_uuid)
+                        ->first();
+
+                    $hidePassInEmail = get_domain_setting('dont_send_user_credentials');
+                    if ($hidePassInEmail === null) {
+                        $hidePassInEmail = 'false';
+                    }
+
+                    $credentials = app(CloudPlayApiService::class)->buildMobileAppCredentialsForDisplay(
+                        $extension->domain_uuid,
+                        (int) $mobile_app->user_id,
+                        (string) $extension->extension,
+                        $storedMobileApp?->readAppPassword(),
+                    );
+
+                    if ($storedMobileApp && !empty($credentials['password'])) {
+                        $storedMobileApp->storeAppPassword($credentials['password']);
+                        $storedMobileApp->save();
+                    }
+
+                    if ($hidePassInEmail !== 'false') {
+                        $credentials['password'] = null;
+                    }
+
+                    $response['mobile_app_credentials'] = $credentials;
+                    $response['mobile_app_qrcode'] = $this->buildMobileAppQrCode(
+                        $provider,
+                        $credentials,
+                        $hidePassInEmail,
+                        1,
+                    );
+                    $response['mobile_app_qr_error'] = $response['mobile_app_qrcode'] === null
+                        ? $this->resolveMobileAppQrError($provider, $credentials, $hidePassInEmail, 1)
+                        : null;
+                }
+            }
+
+            return response()->json($response);
         } catch (\Throwable $e) {
             logger('ExtensionsController@getMobileAppOptions error: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
             return response()->json([
@@ -882,6 +940,7 @@ class AppsController extends Controller
             $appUser->conn_id = $this->mobileAppConnIdForStorage(request('connection'), $provider);
             $appUser->user_id = $user['id'];
             $appUser->status = $user['status'];
+            $appUser->storeAppPassword($user['password'] ?? null);
             app(CloudPlayEnterpriseDirectorySync::class)->adoptExtensionEdId($extension, $appUser);
             $appUser->save();
 
@@ -890,6 +949,9 @@ class AppsController extends Controller
             }
 
             $qrcode = $this->buildMobileAppQrCode($provider, $user, $hidePassInEmail, (int) request('status'));
+            $qrError = $qrcode === null
+                ? $this->resolveMobileAppQrError($provider, $user, $hidePassInEmail, (int) request('status'))
+                : null;
 
             if ($hidePassInEmail != 'false') {
                 $user['password_url'] = $passwordUrlShow == 'true' ? route('appsGetPasswordByToken', $passwordToken) : null;
@@ -899,6 +961,7 @@ class AppsController extends Controller
             return response()->json([
                 'user' => $user,
                 'qrcode' => $qrcode,
+                'qr_error' => $qrError,
                 'messages' => ['success' => ['Mobile app has been enabled']]
             ]);
         } catch (\Throwable $e) {
@@ -971,6 +1034,7 @@ class AppsController extends Controller
                     'extension_uuid',
                     'domain_uuid',
                     'extension',
+                    'password',
                     'effective_caller_id_name',
                 ])
                 ->with([
@@ -1008,6 +1072,12 @@ class AppsController extends Controller
 
             $user = $provider->resetPassword($params);
 
+            $storedMobileApp = MobileAppUsers::where('extension_uuid', $extension->extension_uuid)->first();
+            if ($storedMobileApp) {
+                $storedMobileApp->storeAppPassword($user['password'] ?? null);
+                $storedMobileApp->save();
+            }
+
             // If success and user is activated send user email with credentials
             if ($user) {
                 $email = $extension->email;
@@ -1035,6 +1105,9 @@ class AppsController extends Controller
             }
 
             $qrcode = $this->buildMobileAppQrCode($provider, $user, $hidePassInEmail, 1);
+            $qrError = $qrcode === null
+                ? $this->resolveMobileAppQrError($provider, $user, $hidePassInEmail, 1)
+                : null;
 
             if ($hidePassInEmail != 'false') {
                 $user['password'] = null;
@@ -1043,6 +1116,7 @@ class AppsController extends Controller
             return response()->json([
                 'user' => $user,
                 'qrcode' => $qrcode,
+                'qr_error' => $qrError,
                 'messages' => ['success' => ['Mobile app credentials have been reset']]
             ]);
         } catch (\Throwable $e) {
@@ -1167,6 +1241,7 @@ class AppsController extends Controller
                     $appUser->conn_id = $this->mobileAppConnIdForStorage($data['connection'] ?? null, $provider);
                     $appUser->user_id = $user['id'];
                     $appUser->status = $user['status'];
+                    $appUser->storeAppPassword($user['password'] ?? null);
                     $appUser->save();
 
                     $processed++;
@@ -1203,24 +1278,44 @@ class AppsController extends Controller
                         $appUser->conn_id = $this->mobileAppConnIdForStorage($data['connection'] ?? null, $provider);
                         $appUser->user_id = $user['id'];
                         $appUser->status = $user['status'];
+                        $appUser->storeAppPassword($user['password'] ?? null);
                         app(CloudPlayEnterpriseDirectorySync::class)->adoptExtensionEdId($extension, $appUser);
                         $appUser->save();
                         app(CloudPlayEnterpriseDirectorySync::class)->sync($provider, $extension, $appUser, true);
                     } elseif ((int) $mobileApp->status !== 1) {
-                        $user = $provider->updateUser([
-                            'user_id' => $mobileApp->user_id,
-                            'org_id' => $mobileApp->org_id,
-                            'conn_id' => $mobileApp->conn_id,
-                            'domain_uuid' => session('domain_uuid'),
-                            'status' => 1,
-                            'no_email' => true,
-                            'name' => $extension->effective_caller_id_name,
-                            'email' => $extension->email ?: '',
-                            'ext' => $extension->extension,
-                            'username' => $extension->extension,
-                            'authname' => $extension->extension,
-                            'password' => $extension->password,
-                        ]);
+                        if ($provider->getProviderKey() === 'cloudplay' && empty($mobileApp->readAppPassword())) {
+                            $user = $provider->resetPassword([
+                                'user_id' => $mobileApp->user_id,
+                                'org_id' => $mobileApp->org_id,
+                                'conn_id' => $mobileApp->conn_id,
+                                'domain_uuid' => session('domain_uuid'),
+                                'name' => $extension->effective_caller_id_name,
+                                'email' => $extension->email ?: '',
+                                'ext' => $extension->extension,
+                                'username' => $extension->extension,
+                                'authname' => $extension->extension,
+                                'password' => $extension->password,
+                            ]);
+                            $mobileApp->storeAppPassword($user['password'] ?? null);
+                        } else {
+                            $user = $provider->updateUser([
+                                'user_id' => $mobileApp->user_id,
+                                'org_id' => $mobileApp->org_id,
+                                'conn_id' => $mobileApp->conn_id,
+                                'domain_uuid' => session('domain_uuid'),
+                                'status' => 1,
+                                'no_email' => true,
+                                'name' => $extension->effective_caller_id_name,
+                                'email' => $extension->email ?: '',
+                                'ext' => $extension->extension,
+                                'username' => $extension->extension,
+                                'authname' => $extension->extension,
+                                'password' => $extension->password,
+                                'stored_app_password' => $mobileApp->readAppPassword(),
+                                'update_sip_configurations' => true,
+                            ]);
+                            $mobileApp->storeAppPassword($user['password'] ?? $mobileApp->readAppPassword());
+                        }
 
                         app(CloudPlayEnterpriseDirectorySync::class)->adoptExtensionEdId($extension, $mobileApp);
                         $mobileApp->status = 1;
@@ -1437,11 +1532,14 @@ class AppsController extends Controller
                 'username'  => $extension->extension,
                 'authname'  => $extension->extension,
                 'password'  => $extension->password,
+                'stored_app_password' => $extension->mobile_app->readAppPassword(),
+                'update_sip_configurations' => true,
             ];
 
             $user = $provider->updateUser($params);
 
             app(CloudPlayEnterpriseDirectorySync::class)->adoptExtensionEdId($extension, $extension->mobile_app);
+            $extension->mobile_app->storeAppPassword($user['password'] ?? null);
             $extension->mobile_app->status = 1;
             $extension->mobile_app->save();
             app(CloudPlayEnterpriseDirectorySync::class)->sync($provider, $extension, $extension->mobile_app, true);
@@ -1474,6 +1572,9 @@ class AppsController extends Controller
             }
 
             $qrcode = $this->buildMobileAppQrCode($provider, $user, $hidePassInEmail, 1);
+            $qrError = $qrcode === null
+                ? $this->resolveMobileAppQrError($provider, $user, $hidePassInEmail, 1)
+                : null;
 
             if ($hidePassInEmail != 'false') {
                 $user['password_url'] = $passwordUrlShow == 'true' ? route('appsGetPasswordByToken', $passwordToken) : null;
@@ -1483,6 +1584,7 @@ class AppsController extends Controller
             return response()->json([
                 'user' => $user,
                 'qrcode' => $qrcode,
+                'qr_error' => $qrError,
                 'messages' => ['success' => ['Mobile app has been activated']]
             ], 200);
         } catch (\Exception $e) {
@@ -2177,7 +2279,10 @@ class AppsController extends Controller
     protected function resolveMobileAppQrPayload(array $user, ?string $domainUuid = null): string
     {
         if (get_mobile_app_provider() === 'cloudplay') {
-            return app(CloudPlayApiService::class)->buildMobileAppQrPayload($user);
+            return app(CloudPlayApiService::class)->buildMobileAppQrPayload(
+                $user,
+                $domainUuid ?? $user['domain_uuid'] ?? session('domain_uuid'),
+            );
         }
 
         return json_encode([
@@ -2187,13 +2292,29 @@ class AppsController extends Controller
         ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     }
 
+    protected function resolveMobileAppQrError($provider, array $user, $hidePassInEmail, int $status): ?string
+    {
+        if ($hidePassInEmail != 'false' || $status != 1) {
+            return null;
+        }
+
+        if ($provider->getProviderKey() === 'cloudplay') {
+            return app(CloudPlayApiService::class)->describeEmptyQrPayload();
+        }
+
+        return 'Could not build QR code.';
+    }
+
     protected function buildMobileAppQrCode($provider, array $user, $hidePassInEmail, int $status): ?string
     {
         if ($hidePassInEmail != 'false' || $status != 1) {
             return null;
         }
 
-        $payload = $this->resolveMobileAppQrPayload($user);
+        $payload = $this->resolveMobileAppQrPayload(
+            $user,
+            $user['domain_uuid'] ?? session('domain_uuid'),
+        );
         if ($payload === '') {
             return null;
         }

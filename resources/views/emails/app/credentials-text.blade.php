@@ -13,7 +13,7 @@ PBX Extension: {{ $attributes['extension'] ?? ''}}
 Use these credentials to log in:
 
 Domain: {{ $attributes['domain'] ?? ''}}
-Username: {{ $attributes['username'] ?? ''}}
+Username: {{ $attributes['login_username'] ?? $attributes['username'] ?? ''}}
 @if(!empty($attributes['password_url']))
 Password: {{ $attributes['password_url'] }}
 @elseif(!empty($attributes['password']))

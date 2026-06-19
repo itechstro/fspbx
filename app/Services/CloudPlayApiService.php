@@ -366,6 +366,148 @@ class CloudPlayApiService implements MobileAppProviderInterface
         return $stringValue !== '' ? $stringValue : $fallback;
     }
 
+    protected function resolveMobileAppProtocolForPlatform(string $domainUuid, string $platform): string
+    {
+        $setting = strtolower(trim((string) (get_domain_setting('mobile_app_conn_protocol', $domainUuid) ?: '')));
+
+        if (in_array($setting, ['sips', 'tls'], true)) {
+            return 'tls';
+        }
+
+        if (in_array($setting, ['sip-tcp', 'tcp'], true)) {
+            return 'tcp';
+        }
+
+        if ($setting === 'wss' || $setting === 'ws') {
+            return 'wss';
+        }
+
+        // CloudPLAY portal QR codes and CPT profiles default to UDP on all platforms.
+        return 'udp';
+    }
+
+    protected function resolveMobileAppSipPort(string $protocol, string $domainUuid): string
+    {
+        $configuredPort = trim((string) (get_domain_setting('line_sip_port', $domainUuid) ?: ''));
+
+        return match ($protocol) {
+            'tls' => ($configuredPort !== '' && $configuredPort !== '5060') ? $configuredPort : '5061',
+            'tcp', 'udp' => $configuredPort !== '' ? $configuredPort : '5060',
+            'wss' => '7443',
+            default => $configuredPort !== '' ? $configuredPort : '5060',
+        };
+    }
+
+    protected function syncUserSipConfigurations(string $domainUuid, int $userId, array $params, bool $sendPush = true): void
+    {
+        if ($userId <= 0) {
+            return;
+        }
+
+        $params = $this->enrichMobileAppParams($params, $domainUuid);
+        $token = $this->getCustomerToken($domainUuid);
+        $configurations = $this->buildSipConfigurations($params);
+        $push = $sendPush ? 'true' : 'false';
+        $callerId = (string) ($configurations['sip_configurations']['sip_callerid'] ?? '');
+        $desktop = $configurations['sip_configurations'];
+
+        // CloudPLAY only persists mobile SIP passwords from flat *_ios / *_android payloads.
+        // Do not push the nested Sip block: CloudPLAY stores an empty desktop password there
+        // and mobile clients can read it after portal QR login.
+        foreach ([
+            $configurations['sip_configurations_ios'],
+            $configurations['sip_configurations_android'],
+        ] as $platformConfiguration) {
+            $this->request('post', '/customer/user/update-configurations', [
+                'user_id' => $userId,
+                'configurations' => array_merge($platformConfiguration, array_filter([
+                    'sip_callerid' => $callerId,
+                ])),
+                'send_push_notification' => $push,
+            ], $token);
+        }
+
+        $this->request('post', '/customer/user/update-configurations', [
+            'user_id' => $userId,
+            'configurations' => array_filter([
+                'sip_callerid' => $callerId,
+                'sip_auth_sipServer' => $desktop['sip_auth_sipServer'] ?? null,
+                'sip_auth_sipProtocol' => $desktop['sip_auth_sipProtocol'] ?? null,
+                'sip_auth_sipPort' => $desktop['sip_auth_sipPort'] ?? null,
+                'sip_auth_username' => $desktop['sip_auth_username'] ?? null,
+                'sip_authid' => $desktop['sip_authid'] ?? null,
+                'sip_extension' => $desktop['sip_extension'] ?? null,
+            ], static fn ($value) => $value !== null && $value !== ''),
+            'send_push_notification' => $push,
+        ], $token);
+    }
+
+    public function enrichMobileAppParams(array $params, ?string $domainUuid = null): array
+    {
+        $domainUuid = $domainUuid ?? $params['domain_uuid'] ?? session('domain_uuid');
+        $extensionNumber = (string) ($params['ext'] ?? $params['username'] ?? '');
+
+        if ($extensionNumber === '' || $domainUuid === '') {
+            return $params;
+        }
+
+        $extension = Extensions::query()
+            ->where('domain_uuid', $domainUuid)
+            ->where('extension', $extensionNumber)
+            ->first();
+
+        if (!$extension instanceof Extensions) {
+            return $params;
+        }
+
+        if (trim((string) ($params['name'] ?? '')) === '') {
+            $params['name'] = (string) ($extension->effective_caller_id_name ?: $extension->extension);
+        }
+
+        if (trim((string) ($params['password'] ?? '')) === '') {
+            $params['password'] = (string) $extension->password;
+        }
+
+        if (trim((string) ($params['email'] ?? '')) === '' && !empty($extension->email)) {
+            $params['email'] = (string) $extension->email;
+        }
+
+        $params['ext'] = (string) $extension->extension;
+        $params['authname'] = (string) ($params['authname'] ?? $extension->extension);
+
+        if (trim((string) ($params['sip_server'] ?? '')) === '') {
+            $params['sip_server'] = (string) (Domain::whereKey($domainUuid)->value('domain_name') ?? '');
+        }
+
+        return $params;
+    }
+
+    public function buildMobileAppSipSummary(string $domainUuid, array $params): array
+    {
+        $params = $this->enrichMobileAppParams($params, $domainUuid);
+        $configurations = $this->buildSipConfigurations($params);
+        $ios = $configurations['sip_configurations_ios'];
+
+        return [
+            'username' => (string) ($ios['sip_auth_username_ios'] ?? ''),
+            'server' => (string) ($ios['sip_auth_sipServer_ios'] ?? ''),
+            'port' => (string) ($ios['sip_auth_sipPort_ios'] ?? ''),
+            'protocol' => strtoupper((string) ($ios['sip_auth_sipProtocol_ios'] ?? 'UDP')),
+        ];
+    }
+
+    protected function resolveMobileAppAccountName(string $domainUuid, array $params): string
+    {
+        $params = $this->enrichMobileAppParams($params, $domainUuid);
+        $name = trim((string) ($params['name'] ?? ''));
+
+        if ($name !== '') {
+            return $name;
+        }
+
+        return (string) ($params['ext'] ?? $params['username'] ?? '');
+    }
+
     public function buildMobileAppUsername(string $domainUuid, string $extension): string
     {
         return $this->getMobileAppUsernamePrefix($domainUuid) . $extension;
@@ -436,6 +578,7 @@ class CloudPlayApiService implements MobileAppProviderInterface
     protected function buildSipConfigurations(array $params): array
     {
         $domainUuid = $params['domain_uuid'] ?? session('domain_uuid');
+        $params = $this->enrichMobileAppParams($params, $domainUuid);
         $profileId = $params['profile_id'] ?? $this->getProfileId($domainUuid);
         $profileSip = [];
         $profileSipIos = [];
@@ -452,27 +595,44 @@ class CloudPlayApiService implements MobileAppProviderInterface
             }
         }
 
-        $protocolSetting = get_domain_setting('mobile_app_conn_protocol', $domainUuid) ?: 'udp';
         $proxy = get_domain_setting('mobile_app_proxy', $domainUuid) ?: '';
-        $port = get_domain_setting('line_sip_port', $domainUuid) ?: '5060';
-        $sipServer = $params['sip_server'] ?? Domain::whereKey($domainUuid)->value('domain_name') ?? session('domain_name');
+        $connection = $this->resolveMobileAppConnectionSettings($domainUuid, $params, $profileSip);
+        $sipServer = $connection['host'];
         $authUsername = (string) ($params['authname'] ?? $params['username']);
-        $authPassword = (string) ($params['password'] ?? '');
+        $authPassword = $this->resolveExtensionSipPassword($params, $domainUuid);
+        $desktopProtocol = $connection['protocol'];
+        $iosProtocol = $this->cloudPlayProtocolOrDefault(
+            $profileSipIos['sip_auth_sipProtocol_ios'] ?? null,
+            $desktopProtocol,
+        );
+        $androidProtocol = $this->cloudPlayProtocolOrDefault(
+            $profileSipAndroid['sip_auth_sipProtocol_android'] ?? null,
+            $desktopProtocol,
+        );
+        $desktopPort = $connection['port'];
+        $iosPort = $this->profileStringValue(
+            $profileSipIos['sip_auth_sipPort_ios'] ?? null,
+            $this->resolveMobileAppSipPort($iosProtocol, $domainUuid),
+        );
+        $androidPort = $this->profileStringValue(
+            $profileSipAndroid['sip_auth_sipPort_android'] ?? null,
+            $this->resolveMobileAppSipPort($androidProtocol, $domainUuid),
+        );
 
         $sip = [
             'sip_auth_username' => $authUsername,
             'sip_auth_password' => $authPassword,
-            'sip_auth_sipServer' => $this->profileStringValue($profileSip['sip_auth_sipServer'] ?? null, (string) $sipServer),
-            'sip_auth_sipProtocol' => $this->cloudPlayProtocolOrDefault($profileSip['sip_auth_sipProtocol'] ?? null, $protocolSetting),
-            'sip_auth_sipPort' => $this->profileStringValue($profileSip['sip_auth_sipPort'] ?? null, (string) $port),
+            'sip_auth_sipServer' => $sipServer,
+            'sip_auth_sipProtocol' => $desktopProtocol,
+            'sip_auth_sipPort' => $this->profileStringValue($profileSip['sip_auth_sipPort'] ?? null, $desktopPort),
             'sip_auth_outboundProxyServer' => $this->profileStringValue($profileSip['sip_auth_outboundProxyServer'] ?? null, (string) $proxy),
             'sip_auth_outboundProxyPort' => $this->profileStringValue(
                 $profileSip['sip_auth_outboundProxyPort'] ?? null,
-                $proxy !== '' ? (string) $port : ''
+                $proxy !== '' ? $desktopPort : ''
             ),
             'forced_socket' => $this->profileStringValue($profileSip['forced_socket'] ?? null, ''),
             'sip_authid' => $authUsername,
-            'sip_callerid' => (string) ($params['name'] ?? $params['username']),
+            'sip_callerid' => $this->resolveMobileAppAccountName($domainUuid, $params),
             'sip_extension' => (string) ($params['ext'] ?? $params['username']),
             'sip_register_interval' => $this->profileStringValue($profileSip['sip_register_interval'] ?? null, '3600'),
             'sip_register_respectServerExpires' => $this->profileStringValue($profileSip['sip_register_respectServerExpires'] ?? null, 'TRUE'),
@@ -483,9 +643,9 @@ class CloudPlayApiService implements MobileAppProviderInterface
             'sip_configurations_ios' => [
                 'sip_auth_username_ios' => $authUsername,
                 'sip_auth_password_ios' => $authPassword,
-                'sip_auth_sipServer_ios' => $this->profileStringValue($profileSipIos['sip_auth_sipServer_ios'] ?? null, $sip['sip_auth_sipServer']),
-                'sip_auth_sipProtocol_ios' => $this->cloudPlayProtocolOrDefault($profileSipIos['sip_auth_sipProtocol_ios'] ?? null, 'tls'),
-                'sip_auth_sipPort_ios' => $this->profileStringValue($profileSipIos['sip_auth_sipPort_ios'] ?? null, $sip['sip_auth_sipPort']),
+                'sip_auth_sipServer_ios' => $sip['sip_auth_sipServer'],
+                'sip_auth_sipProtocol_ios' => $iosProtocol,
+                'sip_auth_sipPort_ios' => $this->profileStringValue($profileSipIos['sip_auth_sipPort_ios'] ?? null, $iosPort),
                 'sip_auth_outboundProxyServer_ios' => $this->profileStringValue($profileSipIos['sip_auth_outboundProxyServer_ios'] ?? null, $sip['sip_auth_outboundProxyServer']),
                 'sip_auth_outboundProxyPort_ios' => $this->profileStringValue($profileSipIos['sip_auth_outboundProxyPort_ios'] ?? null, $sip['sip_auth_outboundProxyPort']),
                 'sip_authid_ios' => $authUsername,
@@ -493,9 +653,9 @@ class CloudPlayApiService implements MobileAppProviderInterface
             'sip_configurations_android' => [
                 'sip_auth_username_android' => $authUsername,
                 'sip_auth_password_android' => $authPassword,
-                'sip_auth_sipServer_android' => $this->profileStringValue($profileSipAndroid['sip_auth_sipServer_android'] ?? null, $sip['sip_auth_sipServer']),
-                'sip_auth_sipProtocol_android' => $this->cloudPlayProtocolOrDefault($profileSipAndroid['sip_auth_sipProtocol_android'] ?? null, 'tcp'),
-                'sip_auth_sipPort_android' => $this->profileStringValue($profileSipAndroid['sip_auth_sipPort_android'] ?? null, $sip['sip_auth_sipPort']),
+                'sip_auth_sipServer_android' => $sip['sip_auth_sipServer'],
+                'sip_auth_sipProtocol_android' => $androidProtocol,
+                'sip_auth_sipPort_android' => $this->profileStringValue($profileSipAndroid['sip_auth_sipPort_android'] ?? null, $androidPort),
                 'sip_auth_outboundProxyServer_android' => $this->profileStringValue($profileSipAndroid['sip_auth_outboundProxyServer_android'] ?? null, $sip['sip_auth_outboundProxyServer']),
                 'sip_auth_outboundProxyPort_android' => $this->profileStringValue($profileSipAndroid['sip_auth_outboundProxyPort_android'] ?? null, $sip['sip_auth_outboundProxyPort']),
                 'sip_authid_android' => $authUsername,
@@ -503,34 +663,483 @@ class CloudPlayApiService implements MobileAppProviderInterface
         ];
     }
 
-    protected function generateAppPassword(): string
+    protected function resolveExtensionSipPassword(array $params, string $domainUuid): string
     {
-        return Str::password(12, letters: true, numbers: true, symbols: false);
+        $params = $this->enrichMobileAppParams($params, $domainUuid);
+        $password = trim((string) ($params['password'] ?? ''));
+
+        if ($password === '') {
+            throw new \Exception('Set an extension SIP password before enabling the mobile app.');
+        }
+
+        return $password;
     }
 
-    public function buildMobileAppQrPayload(array $user): string
+    public function syncMobileAppSipForExtension(Extensions $extension, bool $sendPush = true): void
     {
-        return json_encode([
-            'domain' => (string) ($user['domain'] ?? ''),
-            'username' => (string) ($user['username'] ?? ''),
-            'password' => (string) ($user['password'] ?? ''),
-        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        $extension->loadMissing('mobile_app');
+        $mobileApp = $extension->mobile_app;
+
+        if (!$mobileApp || (int) $mobileApp->status !== 1) {
+            return;
+        }
+
+        $userId = (int) $mobileApp->user_id;
+        if ($userId <= 0) {
+            return;
+        }
+
+        $this->syncUserSipConfigurations(
+            $extension->domain_uuid,
+            $userId,
+            [
+                'domain_uuid' => $extension->domain_uuid,
+                'ext' => (string) $extension->extension,
+                'username' => (string) $extension->extension,
+                'authname' => (string) $extension->extension,
+                'password' => (string) $extension->password,
+                'name' => (string) ($extension->effective_caller_id_name ?: $extension->extension),
+                'email' => (string) ($extension->email ?? ''),
+                'user_id' => $userId,
+                'send_push_notification' => $sendPush ? 'true' : 'false',
+            ],
+            $sendPush,
+        );
+    }
+
+    protected function generateAppPassword(): string
+    {
+        $alphabet = 'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$';
+        $password = '!';
+        for ($i = 0; $i < 11; $i++) {
+            $password .= $alphabet[random_int(0, strlen($alphabet) - 1)];
+        }
+
+        return str_shuffle($password);
+    }
+
+    public function resolveMobileAppLoginUsername(array $user): string
+    {
+        $username = trim((string) ($user['username'] ?? ''));
+        if ($username !== '') {
+            return $username;
+        }
+
+        return trim((string) ($user['unique_id'] ?? ''));
+    }
+
+    public function buildMobileAppManualLoginCsc(array $user, ?string $domainUuid = null): string
+    {
+        $loginUsername = $this->resolveMobileAppLoginUsername($user);
+        $password = (string) ($user['password'] ?? '');
+        $code = trim((string) ($user['qr_code'] ?? ''));
+
+        $domainUuid = $domainUuid ?? $user['domain_uuid'] ?? session('domain_uuid');
+        $userId = (int) ($user['id'] ?? 0);
+
+        if ($code === '' && $domainUuid && $userId > 0) {
+            try {
+                $code = trim((string) ($this->getQrCode($domainUuid, $userId) ?? ''));
+            } catch (\Throwable) {
+                // Manual CSC is optional when the portal token cannot be loaded.
+            }
+        }
+
+        if ($loginUsername === '' || $password === '' || $code === '') {
+            return '';
+        }
+
+        return sprintf(
+            'csc:%s:%s@%s',
+            rawurlencode($loginUsername),
+            rawurlencode($password),
+            $code,
+        );
+    }
+
+    public function findUserInList(string $domainUuid, int $userId): ?array
+    {
+        if ($userId <= 0) {
+            return null;
+        }
+
+        $token = $this->getCustomerToken($domainUuid);
+
+        for ($page = 1; $page <= 10; $page++) {
+            $response = $this->request('post', '/customer/user/list', [
+                'page_num' => $page,
+                'data_per_page' => 200,
+            ], $token);
+
+            $rows = $response['data'] ?? [];
+            if (!is_array($rows) || $rows === []) {
+                break;
+            }
+
+            foreach ($rows as $row) {
+                if ((int) ($row['usr_id'] ?? 0) === $userId) {
+                    return is_array($row) ? $row : null;
+                }
+            }
+
+            if (count($rows) < 200) {
+                break;
+            }
+        }
+
+        return null;
+    }
+
+    public function buildMobileAppCredentialsForDisplay(
+        string $domainUuid,
+        int $userId,
+        string $extension,
+        ?string $storedPassword = null,
+    ): array {
+        $cloudPlayUser = $this->findUserInList($domainUuid, $userId);
+        $params = [
+            'domain_uuid' => $domainUuid,
+            'ext' => $extension,
+            'user_id' => $userId,
+            'unique_id' => $cloudPlayUser['usr_unique_id'] ?? '',
+        ];
+
+        if ($storedPassword !== null && $storedPassword !== '') {
+            try {
+                return $this->syncStoredAppPasswordToCloudPlay(
+                    $domainUuid,
+                    $userId,
+                    $extension,
+                    $storedPassword,
+                    $cloudPlayUser,
+                );
+            } catch (\Throwable) {
+                // Fall back to the stored password when CloudPLAY cannot be synced right now.
+            }
+        }
+
+        $user = $this->normalizeUserResponse(
+            $cloudPlayUser ?? [
+                'usr_id' => $userId,
+                'usr_username' => $this->buildMobileAppUsername($domainUuid, $extension),
+            ],
+            $params,
+            $storedPassword,
+        );
+
+        if ($storedPassword !== null && $storedPassword !== '') {
+            $user['password'] = $storedPassword;
+        }
+
+        return $this->attachPortalQrCode($user, $domainUuid);
+    }
+
+    public function syncStoredAppPasswordToCloudPlay(
+        string $domainUuid,
+        int $userId,
+        string $extension,
+        string $storedPassword,
+        ?array $cloudPlayUser = null,
+    ): array {
+        if ($userId <= 0 || $storedPassword === '') {
+            throw new \InvalidArgumentException('CloudPLAY user ID and app password are required.');
+        }
+
+        $profileId = $this->getProfileId($domainUuid);
+        if (empty($profileId)) {
+            throw new \Exception('CloudPLAY profile is not configured for this domain.');
+        }
+
+        $cloudPlayUser ??= $this->findUserInList($domainUuid, $userId);
+        $token = $this->getCustomerToken($domainUuid);
+        $response = $this->request('post', '/customer/user/update', [
+            'user_id' => $userId,
+            'usr_password' => $storedPassword,
+            'usr_status' => 'Y',
+            'usr_email' => (string) ($cloudPlayUser['usr_email'] ?? ''),
+            'usr_country_phonecode' => '',
+            'usr_mobile_number' => '',
+            'usr_account_name' => (string) ($cloudPlayUser['usr_account_name'] ?? $extension),
+            'send_qr_code' => 'N',
+            'encrypt_password' => $this->cloudPlayEncryptAppPassword(),
+            'profile_id' => (int) $profileId,
+        ], $token);
+
+        $responseData = is_array($response['data'] ?? null) ? $response['data'] : [];
+        $params = [
+            'domain_uuid' => $domainUuid,
+            'ext' => $extension,
+            'user_id' => $userId,
+            'unique_id' => $cloudPlayUser['usr_unique_id'] ?? '',
+        ];
+
+        $user = $this->normalizeUserResponse(
+            array_merge($cloudPlayUser ?? ['usr_id' => $userId], $responseData),
+            $params,
+            $storedPassword,
+        );
+
+        return $this->attachPortalQrCode($user, $domainUuid);
+    }
+
+    protected function resolveMobileAppConnectionSettings(string $domainUuid, array $params = [], array $profileSip = []): array
+    {
+        $protocol = $this->resolveMobileAppProtocolForPlatform($domainUuid, 'desktop');
+        $host = $this->resolveMobileAppSipHost($domainUuid, $params, $profileSip);
+        $port = $this->resolveMobileAppSipPort($protocol, $domainUuid);
+
+        $protocol = $this->cloudPlayProtocolOrDefault($profileSip['sip_auth_sipProtocol'] ?? null, $protocol);
+        $port = $this->profileStringValue($profileSip['sip_auth_sipPort'] ?? null, $port);
+
+        return [
+            'host' => $host,
+            'port' => $port,
+            'protocol' => $protocol,
+        ];
+    }
+
+    protected function resolveMobileAppSipHost(string $domainUuid, array $params = [], array $profileSip = []): string
+    {
+        $host = (string) ($params['sip_server'] ?? '');
+        if ($host === '') {
+            $host = (string) (Domain::whereKey($domainUuid)->value('domain_name') ?? session('domain_name') ?? '');
+        }
+
+        if ($host === '') {
+            $host = $this->profileStringValue($profileSip['sip_auth_sipServer'] ?? null, '');
+        }
+
+        return $host;
+    }
+
+    public function enrichUserForQrPayload(array $user, ?string $domainUuid = null, ?Extensions $extension = null): array
+    {
+        $domainUuid = $domainUuid ?? $user['domain_uuid'] ?? session('domain_uuid');
+        $user = $this->enrichMobileAppParams(array_merge($user, [
+            'ext' => $user['extension'] ?? '',
+            'username' => $user['sip_username'] ?? $user['extension'] ?? '',
+            'password' => $user['sip_password'] ?? '',
+            'name' => $user['name'] ?? '',
+        ]), $domainUuid);
+
+        if ($extension instanceof Extensions) {
+            $user['extension'] = (string) $extension->extension;
+            $user['sip_username'] = (string) ($user['sip_username'] ?? $extension->extension);
+            if (trim((string) ($user['sip_password'] ?? '')) === '') {
+                $user['sip_password'] = (string) $extension->password;
+            }
+        }
+
+        return $user;
+    }
+
+    public function supportsSclocQr(): bool
+    {
+        return false;
+    }
+
+    public function buildMobileAppQrPayload(array $user, ?string $domainUuid = null): string
+    {
+        $domainUuid = $domainUuid ?? $user['domain_uuid'] ?? session('domain_uuid');
+        $user = $this->enrichUserForQrPayload($user, $domainUuid);
+
+        if ($this->getCloudPlayQrFormat() === 'scloc') {
+            if (!$this->supportsSclocQr()) {
+                return '';
+            }
+
+            return $this->buildMobileAppSclocQrPayload($user, $domainUuid);
+        }
+
+        $userId = (int) ($user['id'] ?? 0);
+        if ($userId > 0 && $domainUuid) {
+            try {
+                $qrToken = $this->getQrCode($domainUuid, $userId);
+                if (is_string($qrToken) && trim($qrToken) !== '') {
+                    return trim($qrToken);
+                }
+            } catch (\Throwable) {
+                // Fall through when the CloudPLAY portal token cannot be loaded.
+            }
+        }
+
+        return '';
+    }
+
+    public function buildMobileAppSclocQrPayload(array $user, ?string $domainUuid = null): string
+    {
+        $domainUuid = $domainUuid ?? $user['domain_uuid'] ?? session('domain_uuid');
+        $sipUsername = (string) ($user['sip_username'] ?? $user['extension'] ?? '');
+        $sipPassword = (string) ($user['sip_password'] ?? '');
+
+        if ($sipUsername === '' || $sipPassword === '' || !$domainUuid) {
+            return '';
+        }
+
+        $profileSip = [];
+        $profileId = $this->getProfileId($domainUuid);
+        if (!empty($profileId)) {
+            try {
+                $configurations = $this->getProfileConfigurations($domainUuid, (int) $profileId);
+                $profileSip = $configurations['Sip'] ?? [];
+            } catch (\Throwable) {
+                // Fall back to domain defaults when profile configuration cannot be loaded.
+            }
+        }
+
+        $connection = $this->resolveMobileAppConnectionSettings($domainUuid, $user, $profileSip);
+
+        return 'scloc:' . json_encode([
+            'sipaccounts' => [[
+                'sipusername' => $sipUsername,
+                'sippassword' => $sipPassword,
+                'authusername' => $sipUsername,
+                'domain' => $connection['host'],
+                'transport' => strtoupper($connection['protocol']),
+            ]],
+        ], JSON_UNESCAPED_SLASHES);
+    }
+
+    public function getQrFormat(): string
+    {
+        return $this->getCloudPlayQrFormat();
+    }
+
+    public function describeEmptyQrPayload(): string
+    {
+        if ($this->getCloudPlayQrFormat() === 'scloc') {
+            return 'CloudPLAY Softphone only supports portal QR tokens. Set CloudPLAY QR Format to portal, then reset credentials.';
+        }
+
+        return 'Could not load the CloudPLAY portal QR token. Reset credentials and try again.';
+    }
+
+    protected function attachPortalQrCode(array $user, string $domainUuid): array
+    {
+        $payload = $this->buildMobileAppQrPayload($user, $domainUuid);
+        if ($payload !== '') {
+            $user['qr_code'] = $payload;
+        }
+
+        $user['login_username'] = $this->resolveMobileAppLoginUsername($user);
+        $user['manual_login_csc'] = $this->buildMobileAppManualLoginCsc($user, $domainUuid);
+
+        return $user;
+    }
+
+    public function getCloudId(): string
+    {
+        $value = DefaultSettings::where([
+            ['default_setting_category', '=', 'mobile_apps'],
+            ['default_setting_subcategory', '=', 'cloudplay_cloud_id'],
+            ['default_setting_enabled', '=', 'true'],
+        ])->value('default_setting_value');
+
+        if (is_string($value) && trim($value) !== '') {
+            return trim($value);
+        }
+
+        return trim((string) config('cloudplay.cloud_id', ''));
+    }
+
+    protected function getCloudPlayQrFormat(): string
+    {
+        $value = DefaultSettings::where([
+            ['default_setting_category', '=', 'mobile_apps'],
+            ['default_setting_subcategory', '=', 'cloudplay_qr_format'],
+            ['default_setting_enabled', '=', 'true'],
+        ])->value('default_setting_value');
+
+        $value = strtolower(trim((string) $value));
+
+        return in_array($value, ['portal', 'token', 'scloc'], true) ? ($value === 'token' ? 'portal' : $value) : 'portal';
+    }
+
+    protected function isEncryptedAppPasswordHash(string $value): bool
+    {
+        return (bool) preg_match('/^[a-f0-9]{32}$/i', $value);
+    }
+
+    protected function resolvePlainAppPassword(array $data, array $params, ?string $plainPassword = null): string
+    {
+        if ($plainPassword !== null && $plainPassword !== '') {
+            return $plainPassword;
+        }
+
+        if (!empty($params['app_password'])) {
+            return (string) $params['app_password'];
+        }
+
+        if (!empty($params['stored_app_password'])) {
+            return (string) $params['stored_app_password'];
+        }
+
+        $fromApi = (string) ($data['usr_password'] ?? '');
+        if ($fromApi !== '' && !$this->isEncryptedAppPasswordHash($fromApi)) {
+            return $fromApi;
+        }
+
+        return '';
+    }
+
+    protected function cloudPlayEncryptAppPassword(): string
+    {
+        return 'TRUE';
+    }
+
+    public function shouldSendCloudPlayQrEmail(?string $domainUuid = null): bool
+    {
+        $value = get_domain_setting('cloudplay_send_qr_code', $domainUuid);
+
+        return in_array(strtolower(trim((string) ($value ?? 'false'))), ['true', '1', 'y', 'yes'], true);
+    }
+
+    protected function cloudPlaySendQrEmail(array $params): string
+    {
+        if (!empty($params['suppress_cloudplay_qr_email'])) {
+            return 'N';
+        }
+
+        if (array_key_exists('send_qr_code', $params) || array_key_exists('send_cloudplay_qr_email', $params)) {
+            $value = $params['send_qr_code'] ?? $params['send_cloudplay_qr_email'];
+
+            if (is_bool($value)) {
+                return $value ? 'Y' : 'N';
+            }
+
+            $value = strtoupper(trim((string) $value));
+
+            return in_array($value, ['Y', 'TRUE', '1'], true) ? 'Y' : 'N';
+        }
+
+        return $this->shouldSendCloudPlayQrEmail($params['domain_uuid'] ?? session('domain_uuid')) ? 'Y' : 'N';
     }
 
     protected function normalizeUserResponse(array $data, array $params, ?string $plainPassword = null): array
     {
         $domainUuid = $params['domain_uuid'] ?? session('domain_uuid');
-        $credentials = $this->getCustomerCredentials($domainUuid);
         $extension = (string) ($params['ext'] ?? $params['username'] ?? '');
+        $resolvedPassword = $this->resolvePlainAppPassword($data, $params, $plainPassword);
+
+        $uniqueId = (string) ($data['usr_unique_id'] ?? $params['unique_id'] ?? '');
+        $username = $data['usr_username'] ?? $this->buildMobileAppUsername($domainUuid, $extension);
 
         return [
             'id' => (string) ($data['usr_id'] ?? $params['user_id'] ?? ''),
-            'username' => $data['usr_username'] ?? $this->buildMobileAppUsername($domainUuid, $extension),
-            'password' => $plainPassword ?? ($data['usr_password'] ?? $params['app_password'] ?? ''),
-            'domain' => $credentials['username'],
+            'unique_id' => $uniqueId,
+            'username' => $username,
+            'login_username' => $username,
+            'password' => $resolvedPassword,
+            'sip_username' => (string) ($params['authname'] ?? $params['ext'] ?? $extension),
+            'sip_password' => (string) ($params['password'] ?? ''),
+            'domain' => $this->getCustomerCredentials($domainUuid)['username'],
+            'customer' => $this->getCustomerCredentials($domainUuid)['username'],
+            'cloud_id' => $this->getCloudId(),
             'status' => strtoupper((string) ($data['usr_status'] ?? 'Y')) === 'Y' ? 1 : -1,
             'email' => $data['usr_email'] ?? ($params['email'] ?? ''),
-            'name' => $params['name'] ?? '',
+            'name' => $this->resolveMobileAppAccountName($domainUuid, $params),
+            'account_name' => $this->resolveMobileAppAccountName($domainUuid, $params),
+            'sip' => $this->buildMobileAppSipSummary($domainUuid, $params),
             'extension' => $extension,
             'domain_uuid' => $domainUuid,
         ];
@@ -539,22 +1148,23 @@ class CloudPlayApiService implements MobileAppProviderInterface
     public function createUser(array $params): array
     {
         $domainUuid = $params['domain_uuid'] ?? session('domain_uuid');
+        $params = $this->enrichMobileAppParams($params, $domainUuid);
         $token = $this->getCustomerToken($domainUuid);
-        $appPassword = $params['app_password'] ?? $this->generateAppPassword();
         $profileId = $params['profile_id'] ?? $this->getProfileId($domainUuid);
         $extension = (string) ($params['ext'] ?? $params['username']);
         $mobileAppUsername = $this->buildMobileAppUsername($domainUuid, $extension);
+        $appPassword = $params['app_password'] ?? $this->generateAppPassword();
 
-        $payload = array_merge([
+        $payload = [
             'usr_username' => $mobileAppUsername,
             'usr_password' => $appPassword,
             'usr_email' => $params['email'] ?? '',
             'usr_country_phonecode' => $params['usr_country_phonecode'] ?? '',
             'usr_mobile_number' => $params['usr_mobile_number'] ?? '',
-            'usr_account_name' => $params['name'] ?? $extension,
-            'send_qr_code' => 'N',
-            'encrypt_password' => 'FALSE',
-        ], $this->buildSipConfigurations($params));
+            'usr_account_name' => $this->resolveMobileAppAccountName($domainUuid, $params),
+            'send_qr_code' => $this->cloudPlaySendQrEmail($params),
+            'encrypt_password' => $this->cloudPlayEncryptAppPassword(),
+        ];
 
         if (!empty($profileId)) {
             $payload['profile_id'] = (int) $profileId;
@@ -563,6 +1173,10 @@ class CloudPlayApiService implements MobileAppProviderInterface
         if (($params['status'] ?? 1) != 1) {
             throw new \Exception('CloudPLAY Softphone does not support contact-only mobile app users.');
         }
+
+        $this->resolveExtensionSipPassword($params, $domainUuid);
+
+        $payload = array_merge($payload, $this->buildSipConfigurations($params));
 
         try {
             $response = $this->request('post', '/customer/user/create', $payload, $token);
@@ -577,61 +1191,116 @@ class CloudPlayApiService implements MobileAppProviderInterface
             );
         }
 
-        return $this->normalizeUserResponse($response['data'] ?? [], $params, $appPassword);
+        $userId = (int) ($response['data']['usr_id'] ?? 0);
+        $user = $this->normalizeUserResponse(
+            $response['data'] ?? [],
+            array_merge($params, ['user_id' => $userId, 'app_password' => $appPassword]),
+            (string) $appPassword,
+        );
+
+        if ($userId > 0) {
+            $this->syncUserSipConfigurations(
+                $domainUuid,
+                $userId,
+                array_merge($params, ['user_id' => $userId]),
+                ($params['send_push_notification'] ?? 'true') !== 'false',
+            );
+            $user = $this->attachPortalQrCode($user, $domainUuid);
+        }
+
+        return $user;
     }
 
     public function updateUser(array $params): array
     {
         $domainUuid = $params['domain_uuid'] ?? session('domain_uuid');
+        $params = $this->enrichMobileAppParams($params, $domainUuid);
         $token = $this->getCustomerToken($domainUuid);
         $profileId = $params['profile_id'] ?? $this->getProfileId($domainUuid);
-
-        // CloudPLAY requires these fields to be present; empty strings keep existing values.
-        $payload = [
-            'user_id' => (int) $params['user_id'],
-            'usr_status' => (($params['status'] ?? 1) == 1) ? 'Y' : 'N',
-            'usr_password' => '',
-            'usr_email' => '',
-            'usr_country_phonecode' => '',
-            'usr_mobile_number' => '',
-            'usr_account_name' => $params['name'] ?? '',
-            'send_qr_code' => 'N',
-            'encrypt_password' => 'FALSE',
-        ];
+        $userId = (int) ($params['user_id'] ?? 0);
 
         if (empty($profileId)) {
             throw new \Exception('CloudPLAY profile is not configured for this domain.');
         }
 
-        $payload['profile_id'] = (int) $profileId;
+        $needsSipUpdate = !empty($params['password']) || !empty($params['update_sip_configurations']);
+        $needsUserUpdate = isset($params['status'])
+            || !empty($params['app_password'])
+            || (isset($params['email']) && $params['email'] !== '');
 
-        if (!empty($params['app_password'])) {
-            $payload['usr_password'] = $params['app_password'];
+        if ($needsSipUpdate && !$needsUserUpdate && $userId > 0) {
+            $this->syncUserSipConfigurations(
+                $domainUuid,
+                $userId,
+                $params,
+                ($params['send_push_notification'] ?? 'true') !== 'false',
+            );
         }
+
+        if (!$needsUserUpdate) {
+            $user = $this->normalizeUserResponse([
+                'usr_id' => $userId,
+                'usr_username' => $this->buildMobileAppUsername(
+                    $domainUuid,
+                    (string) ($params['ext'] ?? $params['username'] ?? '')
+                ),
+                'usr_status' => (($params['status'] ?? 1) == 1) ? 'Y' : 'N',
+                'usr_email' => $params['email'] ?? '',
+            ], $params, $params['app_password'] ?? $params['stored_app_password'] ?? null);
+
+            return $this->attachPortalQrCode($user, $domainUuid);
+        }
+
+        $appPassword = (string) ($params['app_password'] ?? '');
+        if ($appPassword === '' && !empty($params['stored_app_password'])) {
+            $appPassword = (string) $params['stored_app_password'];
+        }
+        if ($appPassword === '') {
+            throw new \Exception(
+                'CloudPLAY app password is missing for this user. Reset mobile app credentials, then try again.'
+            );
+        }
+
+        $payload = [
+            'user_id' => $userId,
+            'usr_status' => (($params['status'] ?? 1) == 1) ? 'Y' : 'N',
+            'usr_password' => $appPassword,
+            'usr_email' => '',
+            'usr_country_phonecode' => '',
+            'usr_mobile_number' => '',
+            'usr_account_name' => $this->resolveMobileAppAccountName($domainUuid, $params),
+            'send_qr_code' => $this->cloudPlaySendQrEmail($params),
+            'encrypt_password' => $this->cloudPlayEncryptAppPassword(),
+            'profile_id' => (int) $profileId,
+        ];
 
         if (isset($params['email']) && $params['email'] !== '') {
             $payload['usr_email'] = $params['email'];
         }
 
-        $this->request('post', '/customer/user/update', $payload, $token);
+        $response = $this->request('post', '/customer/user/update', $payload, $token);
+        $responseData = is_array($response['data'] ?? null) ? $response['data'] : [];
 
-        if (!empty($params['password']) || !empty($params['update_sip_configurations'])) {
-            $this->request('post', '/customer/user/update-configurations', [
-                'user_id' => (int) $params['user_id'],
-                'configurations' => $this->buildSipConfigurations($params)['sip_configurations'],
-                'send_push_notification' => $params['send_push_notification'] ?? 'false',
-            ], $token);
+        if ($needsSipUpdate && $userId > 0) {
+            $this->syncUserSipConfigurations(
+                $domainUuid,
+                $userId,
+                $params,
+                ($params['send_push_notification'] ?? 'true') !== 'false',
+            );
         }
 
-        return $this->normalizeUserResponse([
-            'usr_id' => $params['user_id'],
+        $user = $this->normalizeUserResponse(array_merge([
+            'usr_id' => $userId,
             'usr_username' => $this->buildMobileAppUsername(
                 $domainUuid,
                 (string) ($params['ext'] ?? $params['username'] ?? '')
             ),
             'usr_status' => (($params['status'] ?? 1) == 1) ? 'Y' : 'N',
             'usr_email' => $params['email'] ?? '',
-        ], $params, $payload['usr_password'] !== '' ? $payload['usr_password'] : null);
+        ], $responseData), $params, (string) ($appPassword));
+
+        return $this->attachPortalQrCode($user, $domainUuid);
     }
 
     public function deleteUser(array $params): mixed
@@ -650,9 +1319,10 @@ class CloudPlayApiService implements MobileAppProviderInterface
         $newPassword = $this->generateAppPassword();
 
         return $this->updateUser(array_merge($params, [
-            'password' => $newPassword,
             'app_password' => $newPassword,
             'status' => 1,
+            'update_sip_configurations' => true,
+            'send_push_notification' => 'true',
         ]));
     }
 
@@ -662,6 +1332,7 @@ class CloudPlayApiService implements MobileAppProviderInterface
         return $this->updateUser(array_merge($params, [
             'status' => -1,
             'app_password' => $this->generateAppPassword(),
+            'suppress_cloudplay_qr_email' => true,
         ]));
     }
 

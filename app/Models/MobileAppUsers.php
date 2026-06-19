@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Extensions;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Facades\Crypt;
 
 class MobileAppUsers extends Model
 {
@@ -37,6 +38,30 @@ class MobileAppUsers extends Model
             ->where('domain_uuid', $domainUuid)
             ->countsTowardLimit()
             ->count();
+    }
+
+    public function storeAppPassword(?string $plainPassword): void
+    {
+        if ($plainPassword === null || $plainPassword === '') {
+            $this->app_password = null;
+
+            return;
+        }
+
+        $this->app_password = Crypt::encryptString($plainPassword);
+    }
+
+    public function readAppPassword(): ?string
+    {
+        if (empty($this->app_password)) {
+            return null;
+        }
+
+        try {
+            return Crypt::decryptString($this->app_password);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
 }

@@ -27,6 +27,7 @@ use App\Data\ExtensionListData;
 use App\Jobs\UpdateAppSettings;
 use App\Jobs\SyncCloudPlayEnterpriseDirectory;
 use App\Models\VContact;
+use App\Services\CloudPlayApiService;
 use App\Services\Contacts\ContactUserLinkService;
 use App\Data\ExtensionDetailData;
 use App\Imports\ExtensionsImport;
@@ -1427,6 +1428,18 @@ public function store(StoreExtensionRequest $request)
                 $extension->refresh();
                 $extension->loadMissing('mobile_app');
                 $contactUserLinkService = app(ContactUserLinkService::class);
+
+                if (
+                    $extension->mobile_app
+                    && (int) $extension->mobile_app->status === 1
+                    && array_key_exists('password', $data)
+                ) {
+                    try {
+                        app(CloudPlayApiService::class)->syncMobileAppSipForExtension($extension);
+                    } catch (\Throwable $e) {
+                        logger('CloudPLAY SIP sync after extension update failed: ' . $e->getMessage());
+                    }
+                }
 
                 if ($phonebookContactChanged) {
                     $contactUserLinkService->syncPhonebookContactAssignmentForExtension(

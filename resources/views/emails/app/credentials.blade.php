@@ -123,7 +123,7 @@
           <td class="attributes_item"><strong>Domain:</strong> {{ $attributes['domain'] ?? ''}}</td>
         </tr>
         <tr>
-          <td class="attributes_item"><strong>Username:</strong> {{ $attributes['username'] ?? ''}}</td>
+          <td class="attributes_item"><strong>Username:</strong> {{ $attributes['login_username'] ?? $attributes['username'] ?? ''}}</td>
         </tr>
         @if(!empty($attributes['password_url']))
           <tr>

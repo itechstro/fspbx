@@ -1413,7 +1413,28 @@
                                                             <h3 class="text-lg font-semibold mb-4">Mobile App Details
                                                             </h3>
                                                             <ul class="mb-4 space-y-1 text-sm">
-                                                                <li
+                                                                <li v-if="mobileAppOptions?.provider === 'cloudplay'"
+                                                                    class="text-xs font-semibold uppercase tracking-wide text-gray-500 pt-1">
+                                                                    CloudPLAY app login
+                                                                </li>
+                                                                <li v-if="mobileAppOptions?.provider === 'cloudplay' && mobileApp.user.login_username"
+                                                                    class="flex flex-col sm:flex-row sm:items-center mt-1 gap-1 text-sm ">
+                                                                    <strong>Login username:</strong>
+                                                                    <span class="font-mono">{{ mobileApp.user.login_username }}</span>
+                                                                    <button type="button"
+                                                                        @click="handleCopyToClipboard(mobileApp.user.login_username)">
+                                                                        <ClipboardDocumentIcon
+                                                                            class="h-5 w-5 text-blue-500 hover:text-blue-900 cursor-pointer" />
+                                                                    </button>
+                                                                </li>
+
+                                                                <li v-if="mobileAppOptions?.provider === 'cloudplay' && mobileApp.user.unique_id"
+                                                                    class="flex flex-col sm:flex-row sm:items-center mt-1 gap-1 text-sm text-gray-500">
+                                                                    <strong>Internal ID:</strong>
+                                                                    <span class="font-mono text-xs">{{ mobileApp.user.unique_id }}</span>
+                                                                </li>
+
+                                                                <li v-if="mobileAppOptions?.provider !== 'cloudplay'"
                                                                     class="flex flex-col sm:flex-row sm:items-center mt-1 gap-1 text-sm ">
                                                                     <strong>Username:</strong> {{
                                                                         mobileApp.user.username }}
@@ -1424,7 +1445,13 @@
                                                                     </button>
                                                                 </li>
 
-                                                                <li
+                                                                <li v-if="mobileAppOptions?.provider === 'cloudplay' && mobileApp.user.customer"
+                                                                    class="flex flex-col sm:flex-row sm:items-center mt-1 gap-1 text-sm ">
+                                                                    <strong>Customer:</strong>
+                                                                    <span class="font-mono">{{ mobileApp.user.customer }}</span>
+                                                                </li>
+
+                                                                <li v-if="mobileAppOptions?.provider !== 'cloudplay'"
                                                                     class="flex flex-col sm:flex-row sm:items-center mt-1 gap-1 text-sm ">
                                                                     <strong>Domain:</strong> {{ mobileApp.user.domain }}
                                                                     <button type="button"
@@ -1433,10 +1460,23 @@
                                                                             class="h-5 w-5 text-blue-500 hover:text-blue-900 cursor-pointer" />
                                                                     </button>
                                                                 </li>
+                                                                <li v-if="mobileAppOptions?.provider === 'cloudplay' && mobileApp.user.account_name"
+                                                                    class="flex flex-col sm:flex-row sm:items-center mt-1 gap-1 text-sm ">
+                                                                    <strong>Display name:</strong> {{
+                                                                        mobileApp.user.account_name }}
+                                                                </li>
+                                                                <li v-if="mobileAppOptions?.provider === 'cloudplay' && mobileAppOptions?.cloudplay_qr_format === 'scloc'"
+                                                                    class="text-xs text-amber-600">
+                                                                    CloudPLAY Softphone does not support scloc QR codes. Set Default Settings → CloudPLAY QR Format to portal, then reset credentials.
+                                                                </li>
+                                                                <li v-else-if="mobileAppOptions?.provider === 'cloudplay'"
+                                                                    class="text-xs text-gray-500">
+                                                                    Scan the QR code to sign in. For manual login, use the login username and app password below. Reset credentials after FS PBX updates if manual login stops working. Force-quit the app before trying again.
+                                                                </li>
 
                                                                 <li
                                                                     class="flex flex-col sm:flex-row sm:items-center mt-1 gap-1 text-sm ">
-                                                                    <strong>Password:</strong>
+                                                                    <strong>{{ mobileAppOptions?.provider === 'cloudplay' ? 'App password:' : 'Password:' }}</strong>
                                                                     <span v-if="mobileApp.user.password"
                                                                         class="font-mono">{{
                                                                             mobileApp.user.password }}</span>
@@ -1452,7 +1492,42 @@
                                                                     <span
                                                                         v-if="!mobileApp.user.password && !mobileApp.user.password_url"
                                                                         class="font-mono">**********</span>
+                                                                    <span
+                                                                        v-if="mobileAppOptions?.provider === 'cloudplay' && !mobileApp.user.password && !mobileApp.user.password_url"
+                                                                        class="text-xs text-amber-600">
+                                                                        Reset credentials to generate a new app password.
+                                                                    </span>
                                                                 </li>
+
+                                                                <li v-if="mobileAppOptions?.provider === 'cloudplay' && mobileApp.user.manual_login_csc"
+                                                                    class="flex flex-col mt-1 gap-1 text-sm">
+                                                                    <strong>Manual login link:</strong>
+                                                                    <span class="font-mono text-xs break-all">{{ mobileApp.user.manual_login_csc }}</span>
+                                                                    <button type="button" class="self-start text-xs text-blue-600 hover:text-blue-900"
+                                                                        @click="handleCopyToClipboard(mobileApp.user.manual_login_csc)">
+                                                                        Copy manual login link
+                                                                    </button>
+                                                                </li>
+
+                                                                <template v-if="mobileAppOptions?.provider === 'cloudplay' && mobileApp.user.sip">
+                                                                    <li class="text-xs font-semibold uppercase tracking-wide text-gray-500 pt-3">
+                                                                        SIP registration
+                                                                    </li>
+                                                                    <li class="text-xs text-gray-500">
+                                                                        The app registers SIP separately using the extension account below, not the CloudPLAY app login above.
+                                                                    </li>
+                                                                    <li class="flex flex-col sm:flex-row sm:items-center mt-1 gap-1 text-sm">
+                                                                        <strong>SIP username:</strong>
+                                                                        <span class="font-mono">{{ mobileApp.user.sip.username }}</span>
+                                                                    </li>
+                                                                    <li class="flex flex-col sm:flex-row sm:items-center mt-1 gap-1 text-sm">
+                                                                        <strong>SIP server:</strong>
+                                                                        <span class="font-mono">{{ mobileApp.user.sip.server }}:{{ mobileApp.user.sip.port }} {{ mobileApp.user.sip.protocol }}</span>
+                                                                    </li>
+                                                                    <li class="text-xs text-gray-500">
+                                                                        SIP password is the extension SIP password from this extension record. It is pushed to CloudPLAY separately from the app login password above.
+                                                                    </li>
+                                                                </template>
 
                                                             </ul>
                                                         </div>
@@ -1461,9 +1536,11 @@
                                                             <h4 class="text-md font-semibold mb-2">QR Code</h4>
                                                             <img :src="`data:image/png;base64,${mobileApp.qrcode}`"
                                                                 alt="QR Code" class="w-30 h-30 border rounded" />
-                                                            <!-- <p class="text-xs text-gray-400 mt-1">Scan this code in the
-                                                                mobile app to sign in.</p> -->
                                                         </div>
+                                                        <p v-else-if="mobileApp.qr_error"
+                                                            class="text-xs text-amber-600 mt-2">
+                                                            {{ mobileApp.qr_error }}
+                                                        </p>
                                                     </div>
 
                                                 </StaticElement>
@@ -2282,6 +2359,14 @@ const getMobileAppOptions = async () => {
             mobileAppOptions.value = response.data;
             if (mobileAppOptions?.value?.requires_connection && mobileAppOptions?.value?.connections?.length) {
                 form$.value.el$('mobile_app_connection').update(mobileAppOptions.value.connections[0]?.id)
+            }
+
+            if (response.data.mobile_app_credentials) {
+                mobileApp.value = {
+                    user: response.data.mobile_app_credentials,
+                    qrcode: response.data.mobile_app_qrcode ?? null,
+                    qr_error: response.data.mobile_app_qr_error ?? null,
+                };
             }
 
         }).catch((error) => {
