@@ -12,6 +12,13 @@ class AssemblyAiService implements TranscriptionProviderInterface
 
     private const IAB_CATEGORY_LANGUAGES = ['de', 'en', 'es', 'fr', 'hi', 'it', 'nl', 'pt'];
 
+    private const ENGLISH_ONLY_FEATURES = [
+        'auto_chapters',
+        'auto_highlights',
+        'sentiment_analysis',
+        'entity_detection',
+    ];
+
     public function __construct(
         private array $conn,    // ['api_key','region'|'base_url','timeout']
         private array $options,  // provider config JSON already mapped to AAI options (raw)
@@ -23,6 +30,8 @@ class AssemblyAiService implements TranscriptionProviderInterface
         $merged = $this->applyLanguageFeatureRestrictions(
             $this->pruneNulls($this->merge($this->options, $options))
         );
+        $merged = $this->applySpeakerModeRestrictions($merged);
+        $merged = $this->applyLanguageDetectionRestrictions($merged);
 
         $this->payload = ['audio_url' => $audioUrl] + $merged;
 
@@ -224,11 +233,18 @@ class AssemblyAiService implements TranscriptionProviderInterface
      */
     private function applyLanguageFeatureRestrictions(array $payload): array
     {
+        $explicitLanguage = strtolower((string) ($payload['language_code'] ?? ''));
+
+        if ($explicitLanguage !== '' && $explicitLanguage !== 'en') {
+            foreach (self::ENGLISH_ONLY_FEATURES as $feature) {
+                unset($payload[$feature]);
+            }
+        }
+
         if (empty($payload['iab_categories'])) {
             return $payload;
         }
 
-        $explicitLanguage = strtolower((string) ($payload['language_code'] ?? ''));
         if ($explicitLanguage !== '') {
             if (! in_array($explicitLanguage, self::IAB_CATEGORY_LANGUAGES, true)) {
                 unset($payload['iab_categories']);
@@ -243,6 +259,38 @@ class AssemblyAiService implements TranscriptionProviderInterface
             unset($payload['iab_categories']);
 
             return $payload;
+        }
+
+        return $payload;
+    }
+
+    /**
+     * AssemblyAI treats multichannel and speaker diarization as separate modes.
+     * When multichannel is enabled, drop diarization-only fields to avoid conflicts.
+     */
+    private function applySpeakerModeRestrictions(array $payload): array
+    {
+        if (! empty($payload['multichannel'])) {
+            unset(
+                $payload['speaker_labels'],
+                $payload['speakers_expected'],
+                $payload['speaker_options'],
+            );
+
+            return $payload;
+        }
+
+        if (! empty($payload['speaker_labels']) || ! empty($payload['speakers_expected'])) {
+            unset($payload['multichannel']);
+        }
+
+        return $payload;
+    }
+
+    private function applyLanguageDetectionRestrictions(array $payload): array
+    {
+        if (array_key_exists('language_detection', $payload) && ! $payload['language_detection']) {
+            unset($payload['language_detection_options']);
         }
 
         return $payload;

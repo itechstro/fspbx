@@ -62,6 +62,77 @@ class SeedRecorderTestCalls extends Command
         return $this->seedSeparateCalls($domain, $files, $recorderDialplanService);
     }
 
+    /**
+     * @return array{xml_cdr_uuid: string, record_file: string, duration: int, start_local: string}
+     */
+    public function seedFromMp3(
+        Domain $domain,
+        string $mp3File,
+        string $caller,
+        string $destination,
+        ?Carbon $startLocal = null,
+        bool $transcribe = false,
+        array $transcriptionOverrides = [],
+    ): array {
+        if (! is_file($mp3File)) {
+            throw new \InvalidArgumentException("Recording file not found: {$mp3File}");
+        }
+
+        $timezone = get_local_time_zone($domain->domain_uuid);
+        $startLocal ??= Carbon::now($timezone);
+        $recorderDialplanService = app(SrsRecorderDialplanService::class);
+
+        $sessionUuid = (string) Str::uuid();
+        $xmlCdrUuid = (string) Str::uuid();
+        $recordName = sprintf('%s-%s-%s.mp3', $caller, $sessionUuid, $sessionUuid);
+        $recordPath = sprintf(
+            '/var/lib/freeswitch/recordings/%s/archive/%s/%s/%s',
+            $domain->domain_name,
+            $startLocal->format('Y'),
+            $startLocal->format('M'),
+            $startLocal->format('d')
+        );
+        $recordFile = $recordPath . '/' . $recordName;
+
+        if (! is_dir($recordPath) && ! mkdir($recordPath, 0755, true) && ! is_dir($recordPath)) {
+            throw new \RuntimeException("Unable to create directory: {$recordPath}");
+        }
+
+        if (! copy($mp3File, $recordFile)) {
+            throw new \RuntimeException("Unable to copy recording to {$recordFile}");
+        }
+
+        $this->fixRecordingOwnership($recordPath, $recordFile);
+
+        $duration = max(1, (int) round($this->probeDurationSeconds($recordFile)));
+
+        $this->insertRecorderCdr(
+            $domain,
+            $recorderDialplanService,
+            $xmlCdrUuid,
+            $caller,
+            $destination,
+            $startLocal,
+            $duration,
+            $recordPath,
+            $recordName,
+            0,
+            $sessionUuid
+        );
+
+        if ($transcribe) {
+            TranscribeCdrJob::dispatch($xmlCdrUuid, $domain->domain_uuid, $transcriptionOverrides)
+                ->onQueue('transcriptions');
+        }
+
+        return [
+            'xml_cdr_uuid' => $xmlCdrUuid,
+            'record_file' => $recordFile,
+            'duration' => $duration,
+            'start_local' => $startLocal->toDateTimeString(),
+        ];
+    }
+
     protected function seedSeparateCalls(Domain $domain, $files, SrsRecorderDialplanService $recorderDialplanService): int
     {
         $timezone = get_local_time_zone($domain->domain_uuid);

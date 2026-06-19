@@ -126,8 +126,8 @@ class TranscribeCdrJob implements ShouldQueue
                 return;
             }
 
-            $row = \App\Models\CallTranscription::updateOrCreate(
-                ['xml_cdr_uuid' => $this->xmlCdrUuid],         
+            $row = CallTranscription::updateOrCreate(
+                ['xml_cdr_uuid' => $this->xmlCdrUuid],
                 [
                     'domain_uuid'     => $this->domainUuid,
                     'provider_key'    => $providerKey,
@@ -137,18 +137,26 @@ class TranscribeCdrJob implements ShouldQueue
                     'provider_job_id' => null,
                     'started_at'      => null,
                     'completed_at'    => null,
-                    'failed_at'       => null,
                     'error_message'   => null,
                     'notification_email_sent_at' => null,
                 ]
             );
-    
-            // 2) Kick off provider
-            $result = $service->transcribeCdr($this->xmlCdrUuid, $this->domainUuid, $this->overrides);
 
-            CallTranscription::where('xml_cdr_uuid', $this->xmlCdrUuid)->update([
+            try {
+                $result = $service->transcribeCdr($this->xmlCdrUuid, $this->domainUuid, $this->overrides);
+            } catch (\Throwable $exception) {
+                $row->update([
+                    'status'        => 'failed',
+                    'error_message' => $exception->getMessage(),
+                    'completed_at'  => now(),
+                ]);
+
+                throw $exception;
+            }
+
+            $row->update([
                 'external_id'      => data_get($result, 'id'),
-                'status'           => data_get($result, 'status'),
+                'status'           => data_get($result, 'status', 'pending'),
                 'request_payload'  => $service->payload ?? null,
                 'response_payload' => $result ?: null,
             ]);
@@ -156,5 +164,21 @@ class TranscribeCdrJob implements ShouldQueue
         }, function () {
             $this->release(30);
         });
+    }
+
+    public function failed(?\Throwable $exception): void
+    {
+        if (! $exception) {
+            return;
+        }
+
+        CallTranscription::query()
+            ->where('xml_cdr_uuid', $this->xmlCdrUuid)
+            ->whereNull('external_id')
+            ->update([
+                'status'        => 'failed',
+                'error_message' => $exception->getMessage(),
+                'completed_at'  => now(),
+            ]);
     }
 }

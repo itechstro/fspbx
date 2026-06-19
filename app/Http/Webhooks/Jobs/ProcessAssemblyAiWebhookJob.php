@@ -5,6 +5,7 @@ namespace App\Http\Webhooks\Jobs;
 use App\Models\CDR;
 use App\Models\CallTranscription;
 use App\Services\CallTranscription\CallTranscriptionService;
+use App\Services\CallTranscription\AssemblyAiUtteranceNormalizer;
 use App\Services\CallTranscriptionCostService;
 use Spatie\WebhookClient\Models\WebhookCall;
 use Spatie\WebhookClient\Jobs\ProcessWebhookJob as SpatieProcessWebhookJob;
@@ -41,6 +42,7 @@ class ProcessAssemblyAiWebhookJob extends SpatieProcessWebhookJob
             // fetch final transcript JSON from provider
             $provider = $service->providerForScope($row->domain_uuid);
             $full     = $provider->fetchTranscript($transcriptId);
+            $full['utterances'] = app(AssemblyAiUtteranceNormalizer::class)->normalize($full);
 
             // Remove heavy fields like "words" everywhere in the structure
             $sanitized = $full ? $this->deepUnsetKeys($full, ['words']) : null;
