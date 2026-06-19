@@ -271,11 +271,22 @@ class DomainLicenseService
             ->first();
 
         if (! $enabled) {
-            if ($existing) {
-                $existing->update([
+            $default = $this->defaultLimitRow($limitKey);
+
+            DomainSettings::query()->updateOrCreate(
+                [
+                    'domain_uuid' => $domainUuid,
+                    'domain_setting_category' => 'limit',
+                    'domain_setting_subcategory' => $limitKey,
+                ],
+                [
+                    'domain_setting_name' => 'numeric',
+                    'domain_setting_value' => (string) ($value ?? $existing?->domain_setting_value ?? $default?->default_setting_value ?? ''),
+                    'domain_setting_order' => $default?->default_setting_order,
                     'domain_setting_enabled' => 'false',
-                ]);
-            }
+                    'domain_setting_description' => (string) ($default?->default_setting_description ?? ''),
+                ]
+            );
 
             return;
         }
@@ -338,7 +349,8 @@ class DomainLicenseService
             'override_enabled' => $override
                 ? filter_var($override->domain_setting_enabled, FILTER_VALIDATE_BOOLEAN)
                 : null,
-            'inherited_from_default' => ! $override && filter_var($default?->default_setting_enabled, FILTER_VALIDATE_BOOLEAN),
+            'inherited_from_default' => ! $override && setting_is_enabled($default?->default_setting_enabled),
+            'tenant_unlimited_override' => $override && ! setting_is_enabled($override->domain_setting_enabled),
             'effective_limit' => $effectiveLimit,
             'unlimited' => $effectiveLimit === null,
             'usage' => round($usageDisplay, 4),

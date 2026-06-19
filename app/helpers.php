@@ -1769,42 +1769,72 @@ if (!function_exists('buildDestinationAction')) {
         }
     }
 
+    if (!function_exists('setting_is_enabled')) {
+        function setting_is_enabled(mixed $value): bool
+        {
+            if ($value === null || $value === '') {
+                return false;
+            }
+
+            if (is_bool($value)) {
+                return $value;
+            }
+
+            return in_array(strtolower(trim((string) $value)), ['true', '1', 'yes', 'on', 't'], true);
+        }
+    }
+
     if (!function_exists('get_limit_setting')) {
         /**
          * Get a numeric limit for a given category/subcategory, checking domain_settings first, then default_settings.
          *
+         * When a tenant has a disabled domain override row, that tenant is unlimited even if a global default exists.
+         *
          * @param string $subcategory     E.g., 'extensions', 'devices', 'gateways', etc.
          * @param string|null $domain_uuid  If null, will not check domain_settings.
-         * @return int|null   Limit value, or null if unlimited.
+         * @return float|null   Limit value, or null if unlimited.
          */
         function get_limit_setting($subcategory, $domain_uuid = null)
         {
-            // 1. Check domain_settings first if domain_uuid is provided
             if ($domain_uuid) {
-                $domainLimit = \App\Models\DomainSettings::where([
-                    ['domain_setting_category', '=', 'limit'],
-                    ['domain_setting_subcategory', '=', $subcategory],
-                    ['domain_setting_enabled', '=', 'true'],
-                    ['domain_uuid', '=', $domain_uuid]
-                ])->value('domain_setting_value');
+                $overrides = \App\Models\DomainSettings::query()
+                    ->where('domain_uuid', $domain_uuid)
+                    ->where('domain_setting_category', 'limit')
+                    ->where('domain_setting_subcategory', $subcategory)
+                    ->get();
 
-                if ($domainLimit !== null && $domainLimit !== '' && is_numeric($domainLimit)) {
-                    return (float) $domainLimit;
+                $enabledOverride = $overrides->first(function ($row) {
+                    if (! setting_is_enabled($row->domain_setting_enabled)) {
+                        return false;
+                    }
+
+                    $value = $row->domain_setting_value;
+
+                    return $value !== null && $value !== '' && is_numeric($value);
+                });
+
+                if ($enabledOverride) {
+                    return (float) $enabledOverride->domain_setting_value;
+                }
+
+                if ($overrides->isNotEmpty()) {
+                    return null;
                 }
             }
 
-            // 2. Fallback to default_settings
-            $defaultLimit = \App\Models\DefaultSettings::where([
-                ['default_setting_category', '=', 'limit'],
-                ['default_setting_subcategory', '=', $subcategory],
-                ['default_setting_enabled', '=', 'true'],
-            ])->value('default_setting_value');
+            $default = \App\Models\DefaultSettings::query()
+                ->where('default_setting_category', 'limit')
+                ->where('default_setting_subcategory', $subcategory)
+                ->first();
 
-            if ($defaultLimit !== null && $defaultLimit !== '' && is_numeric($defaultLimit)) {
-                return (float) $defaultLimit;
+            if ($default && setting_is_enabled($default->default_setting_enabled)) {
+                $defaultLimit = $default->default_setting_value;
+
+                if ($defaultLimit !== null && $defaultLimit !== '' && is_numeric($defaultLimit)) {
+                    return (float) $defaultLimit;
+                }
             }
 
-            // 3. Unlimited if not found
             return null;
         }
     }

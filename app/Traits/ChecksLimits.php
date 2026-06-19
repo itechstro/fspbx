@@ -19,7 +19,7 @@ trait ChecksLimits
         'devices'               => 'Devices',
         'destinations'          => 'Phone Numbers',
         'call_center_queues'    => 'Call Center Queues',
-        'mobile_app_user'       => 'Mobile App Users',
+        'mobile_app_users'       => 'Mobile App Users',
         // Add more here as needed
     ];
 

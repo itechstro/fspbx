@@ -106,6 +106,9 @@
                                     <p v-if="row.inherited_from_default && !row.revert" class="text-xs text-amber-700">
                                         Global default applies to this tenant.
                                     </p>
+                                    <p v-if="row.tenant_unlimited_override && !row.revert" class="text-xs text-green-700">
+                                        Tenant override: unlimited.
+                                    </p>
                                 </td>
                                 <td class="px-3 py-3">
                                     <input v-model="row.revert" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-indigo-600" />
@@ -205,10 +208,11 @@ function syncLimitRows() {
         enabled: row.override_enabled !== null && row.override_enabled !== undefined
             ? row.override_enabled
             : (row.default_enabled ?? false),
-        value: row.override_value ?? row.default_value ?? '',
+        value: row.enabled ? (row.override_value ?? row.default_value ?? '') : '',
         default_value: row.default_value,
         default_enabled: row.default_enabled,
         inherited_from_default: row.override_enabled == null && row.default_enabled,
+        tenant_unlimited_override: row.tenant_unlimited_override ?? false,
         revert: false,
     }));
 }
