@@ -2176,29 +2176,15 @@ class AppsController extends Controller
 
     protected function resolveMobileAppQrPayload(array $user, ?string $domainUuid = null): string
     {
-        $domainUuid = $domainUuid ?? $user['domain_uuid'] ?? session('domain_uuid');
-
         if (get_mobile_app_provider() === 'cloudplay') {
-            $userId = (int) ($user['id'] ?? 0);
-
-            if ($domainUuid && $userId > 0) {
-                try {
-                    $qrCode = app(CloudPlayApiService::class)->getQrCode($domainUuid, $userId);
-
-                    if (!empty($qrCode)) {
-                        return $qrCode;
-                    }
-                } catch (\Throwable $e) {
-                    logger('AppsController@resolveMobileAppQrPayload getQrCode failed: ' . $e->getMessage());
-                }
-            }
+            return app(CloudPlayApiService::class)->buildMobileAppQrPayload($user);
         }
 
         return json_encode([
             'domain' => $user['domain'] ?? '',
             'username' => $user['username'] ?? '',
             'password' => $user['password'] ?? '',
-        ]);
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     }
 
     protected function buildMobileAppQrCode($provider, array $user, $hidePassInEmail, int $status): ?string

@@ -68,26 +68,13 @@ class AppCredentials extends BaseMailable
     protected function resolveQrPayload(): string
     {
         if (get_mobile_app_provider() === 'cloudplay') {
-            $domainUuid = $this->attributes['domain_uuid'] ?? null;
-            $userId = (int) ($this->attributes['id'] ?? 0);
-
-            if ($domainUuid && $userId > 0) {
-                try {
-                    $qrCode = app(CloudPlayApiService::class)->getQrCode($domainUuid, $userId);
-
-                    if (!empty($qrCode)) {
-                        return $qrCode;
-                    }
-                } catch (\Throwable $e) {
-                    Log::warning('CloudPLAY getQrCode failed for app credentials email: ' . $e->getMessage());
-                }
-            }
+            return app(CloudPlayApiService::class)->buildMobileAppQrPayload($this->attributes);
         }
 
         return json_encode([
             'domain' => $this->attributes['domain'] ?? '',
             'username' => $this->attributes['username'] ?? '',
             'password' => $this->attributes['password'] ?? '',
-        ]);
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     }
 }

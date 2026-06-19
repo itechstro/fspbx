@@ -503,6 +503,20 @@ class CloudPlayApiService implements MobileAppProviderInterface
         ];
     }
 
+    protected function generateAppPassword(): string
+    {
+        return Str::password(12, letters: true, numbers: true, symbols: false);
+    }
+
+    public function buildMobileAppQrPayload(array $user): string
+    {
+        return json_encode([
+            'domain' => (string) ($user['domain'] ?? ''),
+            'username' => (string) ($user['username'] ?? ''),
+            'password' => (string) ($user['password'] ?? ''),
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    }
+
     protected function normalizeUserResponse(array $data, array $params, ?string $plainPassword = null): array
     {
         $domainUuid = $params['domain_uuid'] ?? session('domain_uuid');
@@ -526,7 +540,7 @@ class CloudPlayApiService implements MobileAppProviderInterface
     {
         $domainUuid = $params['domain_uuid'] ?? session('domain_uuid');
         $token = $this->getCustomerToken($domainUuid);
-        $appPassword = $params['app_password'] ?? Str::password(12);
+        $appPassword = $params['app_password'] ?? $this->generateAppPassword();
         $profileId = $params['profile_id'] ?? $this->getProfileId($domainUuid);
         $extension = (string) ($params['ext'] ?? $params['username']);
         $mobileAppUsername = $this->buildMobileAppUsername($domainUuid, $extension);
@@ -593,8 +607,6 @@ class CloudPlayApiService implements MobileAppProviderInterface
 
         if (!empty($params['app_password'])) {
             $payload['usr_password'] = $params['app_password'];
-        } elseif (!empty($params['password'])) {
-            $payload['usr_password'] = $params['app_password'] ?? Str::password(12);
         }
 
         if (isset($params['email']) && $params['email'] !== '') {
@@ -635,7 +647,7 @@ class CloudPlayApiService implements MobileAppProviderInterface
     public function resetPassword(array $params): array
     {
         $domainUuid = $params['domain_uuid'] ?? session('domain_uuid');
-        $newPassword = Str::password(12);
+        $newPassword = $this->generateAppPassword();
 
         return $this->updateUser(array_merge($params, [
             'password' => $newPassword,
@@ -649,7 +661,7 @@ class CloudPlayApiService implements MobileAppProviderInterface
         // CloudPLAY rejects an empty usr_password; rotate the app login password while suspending.
         return $this->updateUser(array_merge($params, [
             'status' => -1,
-            'app_password' => Str::password(16),
+            'app_password' => $this->generateAppPassword(),
         ]));
     }
 
