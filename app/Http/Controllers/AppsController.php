@@ -775,17 +775,6 @@ class AppsController extends Controller
 
         try {
             $currentDomain = session('domain_uuid');
-            
-       // Check for limits
-        if (request('status') == 1) {
-            if ($resp = $this->enforceLimit(
-                'mobile_app_users',
-                \App\Models\MobileAppUsers::class,
-                'domain_uuid'
-            )) {
-                return $resp;
-            }
-        }
 
             $extension = QueryBuilder::for(Extensions::class)
                 ->select([
@@ -812,6 +801,24 @@ class AppsController extends Controller
                 ->where('domain_uuid', $currentDomain)
                 ->whereKey(request('extension_uuid'))
                 ->firstOrFail();
+
+            if ((int) request('status') === 1) {
+                $existingMobileApp = MobileAppUsers::query()
+                    ->where('extension_uuid', $extension->extension_uuid)
+                    ->first();
+                $seatsRequired = ($existingMobileApp && (int) $existingMobileApp->status === 1) ? 0 : 1;
+
+                if ($resp = $this->enforceLimit(
+                    'mobile_app_users',
+                    MobileAppUsers::class,
+                    'domain_uuid',
+                    null,
+                    $extension->domain_uuid,
+                    $seatsRequired,
+                )) {
+                    return $resp;
+                }
+            }
 
 
 
@@ -896,11 +903,17 @@ class AppsController extends Controller
             ]);
         } catch (\Throwable $e) {
             logger('ExtensionsController@createUser error: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
+
+            $message = $e->getMessage();
+            $isLimitError = preg_match('/limit\s*(exceed|exceeded|reached)|maximum number of mobile app users/i', $message) === 1;
+
             return response()->json([
-                'success'  => false,
-                'errors' => ['error' => [$e->getMessage()]],
-                'data'     => [],
-            ], 404);
+                'success' => false,
+                'errors' => $isLimitError
+                    ? ['mobile_app_users' => [$message]]
+                    : ['error' => [$message]],
+                'data' => [],
+            ], $isLimitError ? 403 : 404);
         }
     }
 
@@ -1362,10 +1375,6 @@ class AppsController extends Controller
         try {
             $currentDomain = session('domain_uuid');
 
-            if ($resp = $this->enforceLimit('mobile_app_users', MobileAppUsers::class, 'domain_uuid')) {
-                return $resp;
-            }
-
             $extension = QueryBuilder::for(Extensions::class)
                 ->select([
                     'extension_uuid',
@@ -1392,6 +1401,7 @@ class AppsController extends Controller
                             'mobile_app_user_uuid',
                             'extension_uuid',
                             'conn_id',
+                            'status',
                         );
                     },
 
@@ -1399,6 +1409,20 @@ class AppsController extends Controller
                 ->where('domain_uuid', $currentDomain)
                 ->whereKey(request('extension_uuid'))
                 ->firstOrFail();
+
+            $seatsRequired = ($extension->mobile_app && (int) $extension->mobile_app->status === 1) ? 0 : 1;
+            if ($seatsRequired > 0) {
+                if ($resp = $this->enforceLimit(
+                    'mobile_app_users',
+                    MobileAppUsers::class,
+                    'domain_uuid',
+                    null,
+                    $extension->domain_uuid,
+                    $seatsRequired,
+                )) {
+                    return $resp;
+                }
+            }
 
             $params = [
                 'user_id'   => request('user_id'),
@@ -1463,12 +1487,16 @@ class AppsController extends Controller
             ], 200);
         } catch (\Exception $e) {
             logger('ExtensionsController@activateUser error: ' . $e->getMessage() . " at " . $e->getFile() . ":" . $e->getLine());
+
+            $message = $e->getMessage();
+            $isLimitError = preg_match('/limit\s*(exceed|exceeded|reached)|maximum number of mobile app users/i', $message) === 1;
+
             return response()->json([
-                'status' => 500,
-                'error' => [
-                    'message' => 'An unexpected error occurred. Please try again later.',
-                ],
-            ]);
+                'status' => $isLimitError ? 403 : 500,
+                'errors' => $isLimitError
+                    ? ['mobile_app_users' => [$message]]
+                    : ['error' => [$message]],
+            ], $isLimitError ? 403 : 500);
         }
     }
 

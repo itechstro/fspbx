@@ -28,7 +28,15 @@ class MobileAppUsers extends Model
 
     public function scopeCountsTowardLimit($query)
     {
-        return $query->where('status', 1);
+        return $query->whereIn('status', [1, '1']);
+    }
+
+    public static function countActiveLicensesForDomain(string $domainUuid): int
+    {
+        return (int) static::query()
+            ->where('domain_uuid', $domainUuid)
+            ->countsTowardLimit()
+            ->count();
     }
 
 }

@@ -176,6 +176,13 @@ class CloudPlayApiService implements MobileAppProviderInterface
             return 'CloudPLAY login failed. Check the username and password.';
         }
 
+        if (preg_match('/limit\s*(exceed|exceeded|reached)/i', $message)) {
+            return 'CloudPLAY rejected the request because this tenant\'s CloudPLAY customer license is at its user limit. '
+                . 'Increase the license in CloudPLAY admin or remove unused CloudPLAY users, then try again. '
+                . 'FS PBX tenant limits on Domain License are separate from CloudPLAY licensing. '
+                . 'CloudPLAY message: ' . $message;
+        }
+
         return $message;
     }
 

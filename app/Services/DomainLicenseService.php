@@ -273,20 +273,13 @@ class DomainLicenseService
         if (! $enabled) {
             $default = $this->defaultLimitRow($limitKey);
 
-            DomainSettings::query()->updateOrCreate(
-                [
-                    'domain_uuid' => $domainUuid,
-                    'domain_setting_category' => 'limit',
-                    'domain_setting_subcategory' => $limitKey,
-                ],
-                [
-                    'domain_setting_name' => 'numeric',
-                    'domain_setting_value' => (string) ($value ?? $existing?->domain_setting_value ?? $default?->default_setting_value ?? ''),
-                    'domain_setting_order' => $default?->default_setting_order,
-                    'domain_setting_enabled' => 'false',
-                    'domain_setting_description' => (string) ($default?->default_setting_description ?? ''),
-                ]
-            );
+            $this->upsertDomainLimitRow($domainUuid, $limitKey, [
+                'domain_setting_name' => 'numeric',
+                'domain_setting_value' => (string) ($value ?? $existing?->domain_setting_value ?? $default?->default_setting_value ?? ''),
+                'domain_setting_order' => $default?->default_setting_order,
+                'domain_setting_enabled' => 'false',
+                'domain_setting_description' => (string) ($default?->default_setting_description ?? ''),
+            ]);
 
             return;
         }
@@ -297,20 +290,32 @@ class DomainLicenseService
 
         $default = $this->defaultLimitRow($limitKey);
 
-        DomainSettings::query()->updateOrCreate(
+        $this->upsertDomainLimitRow($domainUuid, $limitKey, [
+            'domain_setting_name' => 'numeric',
+            'domain_setting_value' => (string) $value,
+            'domain_setting_order' => $default?->default_setting_order,
+            'domain_setting_enabled' => 'true',
+            'domain_setting_description' => (string) ($default?->default_setting_description ?? ''),
+        ]);
+    }
+
+    protected function upsertDomainLimitRow(string $domainUuid, string $limitKey, array $attributes): void
+    {
+        $row = DomainSettings::query()->updateOrCreate(
             [
                 'domain_uuid' => $domainUuid,
                 'domain_setting_category' => 'limit',
                 'domain_setting_subcategory' => $limitKey,
             ],
-            [
-                'domain_setting_name' => 'numeric',
-                'domain_setting_value' => (string) $value,
-                'domain_setting_order' => $default?->default_setting_order,
-                'domain_setting_enabled' => 'true',
-                'domain_setting_description' => (string) ($default?->default_setting_description ?? ''),
-            ]
+            $attributes,
         );
+
+        DomainSettings::query()
+            ->where('domain_uuid', $domainUuid)
+            ->where('domain_setting_category', 'limit')
+            ->where('domain_setting_subcategory', $limitKey)
+            ->where('domain_setting_uuid', '!=', $row->domain_setting_uuid)
+            ->delete();
     }
 
     public function revertLimit(string $domainUuid, string $limitKey): void
@@ -325,11 +330,26 @@ class DomainLicenseService
     protected function buildLimitRow(string $domainUuid, string $limitKey, array $meta, string $period): array
     {
         $default = $this->defaultLimitRow($limitKey);
-        $override = DomainSettings::query()
+        $overrides = DomainSettings::query()
             ->where('domain_uuid', $domainUuid)
             ->where('domain_setting_category', 'limit')
             ->where('domain_setting_subcategory', $limitKey)
+            ->get();
+
+        $enabledOverride = $overrides
+            ->filter(function ($row) {
+                if (! setting_is_enabled($row->domain_setting_enabled)) {
+                    return false;
+                }
+
+                $value = trim((string) ($row->domain_setting_value ?? ''));
+
+                return $value !== '' && is_numeric($value);
+            })
+            ->sortByDesc(fn ($row) => (float) trim((string) $row->domain_setting_value))
             ->first();
+
+        $override = $overrides->first();
 
         $effectiveLimit = $this->domainUsageService->getLimit($limitKey, $domainUuid);
         $usage = $this->domainLimitsService->resolveUsage($limitKey, $domainUuid, $period, $this->domainUsageService);
@@ -345,12 +365,12 @@ class DomainLicenseService
             'description' => (string) ($default?->default_setting_description ?? ''),
             'default_value' => $default?->default_setting_value,
             'default_enabled' => filter_var($default?->default_setting_enabled, FILTER_VALIDATE_BOOLEAN),
-            'override_value' => $override?->domain_setting_value,
-            'override_enabled' => $override
-                ? filter_var($override->domain_setting_enabled, FILTER_VALIDATE_BOOLEAN)
-                : null,
-            'inherited_from_default' => ! $override && setting_is_enabled($default?->default_setting_enabled),
-            'tenant_unlimited_override' => $override && ! setting_is_enabled($override->domain_setting_enabled),
+            'override_value' => $enabledOverride?->domain_setting_value ?? $override?->domain_setting_value,
+            'override_enabled' => $overrides->isEmpty()
+                ? null
+                : ($enabledOverride ? true : false),
+            'inherited_from_default' => $overrides->isEmpty() && setting_is_enabled($default?->default_setting_enabled),
+            'tenant_unlimited_override' => $overrides->isNotEmpty() && ! $enabledOverride,
             'effective_limit' => $effectiveLimit,
             'unlimited' => $effectiveLimit === null,
             'usage' => round($usageDisplay, 4),

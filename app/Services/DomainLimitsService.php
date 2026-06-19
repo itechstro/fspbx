@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\DefaultSettings;
+use App\Models\MobileAppUsers;
 use Illuminate\Support\Str;
 
 class DomainLimitsService
@@ -68,6 +69,10 @@ class DomainLimitsService
             $model = (string) ($meta['model'] ?? '');
             if ($model === '' || ! class_exists($model)) {
                 return 0.0;
+            }
+
+            if ($limitKey === 'mobile_app_users') {
+                return (float) MobileAppUsers::countActiveLicensesForDomain($domainUuid);
             }
 
             $query = $model::query()->where('domain_uuid', $domainUuid);

@@ -195,26 +195,32 @@ onMounted(() => {
 
 function syncLimitRows() {
     const rows = usageData.value?.limits || [];
-    limitRows.value = rows.map((row) => ({
-        key: row.key,
-        label: row.label,
-        unit: row.unit,
-        group: row.group,
-        monthly: row.monthly,
-        description: row.description,
-        usage: row.usage,
-        remaining: row.remaining,
-        unlimited: row.unlimited,
-        enabled: row.override_enabled !== null && row.override_enabled !== undefined
+    limitRows.value = rows.map((row) => {
+        const enabled = row.override_enabled !== null && row.override_enabled !== undefined
             ? row.override_enabled
-            : (row.default_enabled ?? false),
-        value: row.enabled ? (row.override_value ?? row.default_value ?? '') : '',
-        default_value: row.default_value,
-        default_enabled: row.default_enabled,
-        inherited_from_default: row.override_enabled == null && row.default_enabled,
-        tenant_unlimited_override: row.tenant_unlimited_override ?? false,
-        revert: false,
-    }));
+            : (row.default_enabled ?? false);
+
+        return {
+            key: row.key,
+            label: row.label,
+            unit: row.unit,
+            group: row.group,
+            monthly: row.monthly,
+            description: row.description,
+            usage: row.usage,
+            remaining: row.remaining,
+            unlimited: row.unlimited,
+            enabled,
+            value: enabled
+                ? String(row.override_value ?? row.effective_limit ?? row.default_value ?? '')
+                : '',
+            default_value: row.default_value,
+            default_enabled: row.default_enabled,
+            inherited_from_default: row.override_enabled == null && row.default_enabled,
+            tenant_unlimited_override: row.tenant_unlimited_override ?? false,
+            revert: false,
+        };
+    });
 }
 
 function loadUsage() {

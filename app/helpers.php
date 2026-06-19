@@ -1803,18 +1803,21 @@ if (!function_exists('buildDestinationAction')) {
                     ->where('domain_setting_subcategory', $subcategory)
                     ->get();
 
-                $enabledOverride = $overrides->first(function ($row) {
-                    if (! setting_is_enabled($row->domain_setting_enabled)) {
-                        return false;
-                    }
+                $enabledOverride = $overrides
+                    ->filter(function ($row) {
+                        if (! setting_is_enabled($row->domain_setting_enabled)) {
+                            return false;
+                        }
 
-                    $value = $row->domain_setting_value;
+                        $value = trim((string) ($row->domain_setting_value ?? ''));
 
-                    return $value !== null && $value !== '' && is_numeric($value);
-                });
+                        return $value !== '' && is_numeric($value);
+                    })
+                    ->sortByDesc(fn ($row) => (float) trim((string) $row->domain_setting_value))
+                    ->first();
 
                 if ($enabledOverride) {
-                    return (float) $enabledOverride->domain_setting_value;
+                    return (float) trim((string) $enabledOverride->domain_setting_value);
                 }
 
                 if ($overrides->isNotEmpty()) {
@@ -1828,9 +1831,9 @@ if (!function_exists('buildDestinationAction')) {
                 ->first();
 
             if ($default && setting_is_enabled($default->default_setting_enabled)) {
-                $defaultLimit = $default->default_setting_value;
+                $defaultLimit = trim((string) ($default->default_setting_value ?? ''));
 
-                if ($defaultLimit !== null && $defaultLimit !== '' && is_numeric($defaultLimit)) {
+                if ($defaultLimit !== '' && is_numeric($defaultLimit)) {
                     return (float) $defaultLimit;
                 }
             }

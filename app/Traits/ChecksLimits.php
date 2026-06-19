@@ -2,6 +2,7 @@
 
 namespace App\Traits;
 
+use App\Models\MobileAppUsers;
 use App\Services\DomainLimitsService;
 use App\Services\DomainUsageService;
 
@@ -31,9 +32,15 @@ trait ChecksLimits
      * @param string $column      — domain column name (usually domain_uuid)
      * @param string $errorKey    — used for domain error message lookup
      */
-    public function enforceLimit($resourceKey, $modelClass, $column = 'domain_uuid', $errorKey = null)
-    {
-        $domain = session('domain_uuid');
+    public function enforceLimit(
+        $resourceKey,
+        $modelClass,
+        $column = 'domain_uuid',
+        $errorKey = null,
+        ?string $domainUuid = null,
+        int $seatsRequired = 1,
+    ) {
+        $domain = $domainUuid ?? session('domain_uuid');
 
         $limit = get_limit_setting($resourceKey, $domain);
         if ($limit === null) {
@@ -51,27 +58,43 @@ trait ChecksLimits
         $errorText = get_domain_setting($errorSettingKey, $domain)
             ?? "You have reached the maximum number of {$friendly} allowed ({$limit}).";
 
-        $domainLimitsService = app(DomainLimitsService::class);
-        if ($domainLimitsService->metric($resourceKey)) {
-            $count = $domainLimitsService->resolveUsage(
+        if ($resourceKey === 'mobile_app_users') {
+            $count = (float) MobileAppUsers::countActiveLicensesForDomain($domain);
+        } elseif (app(DomainLimitsService::class)->metric($resourceKey)) {
+            $count = app(DomainLimitsService::class)->resolveUsage(
                 $resourceKey,
                 $domain,
                 null,
                 app(DomainUsageService::class),
             );
         } else {
-            $count = $modelClass::where($column, $domain)->count();
+            $count = (float) $modelClass::where($column, $domain)->count();
         }
 
-        // Check limit reached
-        if ($count >= $limit) {
+        if (($count + $seatsRequired) > $limit) {
+            $errorText = sprintf(
+                '%s Current usage: %s. Limit: %s.',
+                rtrim($errorText, '.'),
+                $this->formatLimitCount($count),
+                $this->formatLimitCount($limit),
+            );
+
             return response()->json([
                 'errors' => [
-                    $resourceKey => [$errorText]
-                ]
+                    $resourceKey => [$errorText],
+                ],
             ], 403);
         }
 
         return null;
+    }
+
+    protected function formatLimitCount(float $value): string
+    {
+        if (floor($value) == $value) {
+            return (string) (int) $value;
+        }
+
+        return (string) $value;
     }
 }
