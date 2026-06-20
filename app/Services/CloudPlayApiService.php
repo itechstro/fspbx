@@ -709,13 +709,38 @@ class CloudPlayApiService implements MobileAppProviderInterface
 
     protected function generateAppPassword(): string
     {
-        $alphabet = 'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$';
-        $password = '!';
-        for ($i = 0; $i < 11; $i++) {
-            $password .= $alphabet[random_int(0, strlen($alphabet) - 1)];
+        $lowercase = 'abcdefghijkmnopqrstuvwxyz';
+        $uppercase = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+        $digits = '23456789';
+        $special = '!@#$';
+
+        do {
+            $password = $lowercase[random_int(0, strlen($lowercase) - 1)]
+                . $uppercase[random_int(0, strlen($uppercase) - 1)]
+                . $digits[random_int(0, strlen($digits) - 1)]
+                . $special[random_int(0, strlen($special) - 1)];
+
+            $alphabet = $lowercase . $uppercase . $digits . $special;
+            for ($i = 0; $i < 8; $i++) {
+                $password .= $alphabet[random_int(0, strlen($alphabet) - 1)];
+            }
+
+            $password = str_shuffle($password);
+        } while (!$this->appPasswordMeetsCloudPlayRequirements($password));
+
+        return $password;
+    }
+
+    protected function appPasswordMeetsCloudPlayRequirements(string $password): bool
+    {
+        if (strlen($password) < 6) {
+            return false;
         }
 
-        return str_shuffle($password);
+        return preg_match('/[a-z]/', $password) === 1
+            && preg_match('/[A-Z]/', $password) === 1
+            && preg_match('/\d/', $password) === 1
+            && preg_match('/[^a-zA-Z0-9]/', $password) === 1;
     }
 
     public function resolveMobileAppLoginUsername(array $user): string
