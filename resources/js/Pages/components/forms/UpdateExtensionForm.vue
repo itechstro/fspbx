@@ -1461,7 +1461,7 @@
                                                                 </li>
                                                                 <li v-if="mobileAppOptions?.provider === 'cloudplay'"
                                                                     class="text-xs text-gray-500">
-                                                                    Scan the QR code to sign in. It uses the CloudPLAY CSC format with your login username, app password, and Cloud ID. Reset credentials after deploy, then force-quit the app before scanning again.
+                                                                    Scan the QR code to sign in. It uses Acrobits CSC format with your login username, app password, and the per-user CloudPLAY portal token. Reset credentials after deploy, then force-quit the app before scanning again.
                                                                 </li>
 
                                                                 <li
