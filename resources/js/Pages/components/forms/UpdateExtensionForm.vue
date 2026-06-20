@@ -1428,12 +1428,6 @@
                                                                     </button>
                                                                 </li>
 
-                                                                <li v-if="mobileAppOptions?.provider === 'cloudplay' && mobileApp.user.unique_id"
-                                                                    class="flex flex-col sm:flex-row sm:items-center mt-1 gap-1 text-sm text-gray-500">
-                                                                    <strong>Internal ID:</strong>
-                                                                    <span class="font-mono text-xs">{{ mobileApp.user.unique_id }}</span>
-                                                                </li>
-
                                                                 <li v-if="mobileAppOptions?.provider !== 'cloudplay'"
                                                                     class="flex flex-col sm:flex-row sm:items-center mt-1 gap-1 text-sm ">
                                                                     <strong>Username:</strong> {{
@@ -1465,13 +1459,9 @@
                                                                     <strong>Display name:</strong> {{
                                                                         mobileApp.user.account_name }}
                                                                 </li>
-                                                                <li v-if="mobileAppOptions?.provider === 'cloudplay' && mobileAppOptions?.cloudplay_qr_format === 'scloc'"
-                                                                    class="text-xs text-amber-600">
-                                                                    CloudPLAY Softphone does not support scloc QR codes. Set Default Settings → CloudPLAY QR Format to portal, then reset credentials.
-                                                                </li>
-                                                                <li v-else-if="mobileAppOptions?.provider === 'cloudplay'"
+                                                                <li v-if="mobileAppOptions?.provider === 'cloudplay'"
                                                                     class="text-xs text-gray-500">
-                                                                    Scan the QR code to sign in. For manual login, use the login username and app password below. Reset credentials after FS PBX updates if manual login stops working. Force-quit the app before trying again.
+                                                                    Scan the QR code to sign in, or use login username and app password for manual sign-in. Reset credentials after deploy, then force-quit the app before scanning again.
                                                                 </li>
 
                                                                 <li
@@ -1498,36 +1488,6 @@
                                                                         Reset credentials to generate a new app password.
                                                                     </span>
                                                                 </li>
-
-                                                                <li v-if="mobileAppOptions?.provider === 'cloudplay' && mobileApp.user.manual_login_csc"
-                                                                    class="flex flex-col mt-1 gap-1 text-sm">
-                                                                    <strong>Manual login link:</strong>
-                                                                    <span class="font-mono text-xs break-all">{{ mobileApp.user.manual_login_csc }}</span>
-                                                                    <button type="button" class="self-start text-xs text-blue-600 hover:text-blue-900"
-                                                                        @click="handleCopyToClipboard(mobileApp.user.manual_login_csc)">
-                                                                        Copy manual login link
-                                                                    </button>
-                                                                </li>
-
-                                                                <template v-if="mobileAppOptions?.provider === 'cloudplay' && mobileApp.user.sip">
-                                                                    <li class="text-xs font-semibold uppercase tracking-wide text-gray-500 pt-3">
-                                                                        SIP registration
-                                                                    </li>
-                                                                    <li class="text-xs text-gray-500">
-                                                                        The app registers SIP separately using the extension account below, not the CloudPLAY app login above.
-                                                                    </li>
-                                                                    <li class="flex flex-col sm:flex-row sm:items-center mt-1 gap-1 text-sm">
-                                                                        <strong>SIP username:</strong>
-                                                                        <span class="font-mono">{{ mobileApp.user.sip.username }}</span>
-                                                                    </li>
-                                                                    <li class="flex flex-col sm:flex-row sm:items-center mt-1 gap-1 text-sm">
-                                                                        <strong>SIP server:</strong>
-                                                                        <span class="font-mono">{{ mobileApp.user.sip.server }}:{{ mobileApp.user.sip.port }} {{ mobileApp.user.sip.protocol }}</span>
-                                                                    </li>
-                                                                    <li class="text-xs text-gray-500">
-                                                                        SIP password is the extension SIP password from this extension record. It is pushed to CloudPLAY separately from the app login password above.
-                                                                    </li>
-                                                                </template>
 
                                                             </ul>
                                                         </div>

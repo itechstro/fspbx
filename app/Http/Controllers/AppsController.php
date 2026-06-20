@@ -752,12 +752,6 @@ class AppsController extends Controller
                 'supports_contact_only' => $provider->supportsContactOnlyUsers(),
                 'cloudplay_profile_id' => $profileId,
                 'cloudplay_profile_name' => $profileName,
-                'cloudplay_qr_format' => $provider->getProviderKey() === 'cloudplay'
-                    ? app(CloudPlayApiService::class)->getQrFormat()
-                    : null,
-                'cloudplay_supports_scloc_qr' => $provider->getProviderKey() === 'cloudplay'
-                    ? app(CloudPlayApiService::class)->supportsSclocQr()
-                    : false,
             ];
 
             if (
@@ -787,11 +781,6 @@ class AppsController extends Controller
                         (string) $extension->extension,
                         $storedMobileApp?->readAppPassword(),
                     );
-
-                    if ($storedMobileApp && !empty($credentials['password'])) {
-                        $storedMobileApp->storeAppPassword($credentials['password']);
-                        $storedMobileApp->save();
-                    }
 
                     if ($hidePassInEmail !== 'false') {
                         $credentials['password'] = null;
@@ -2299,7 +2288,9 @@ class AppsController extends Controller
         }
 
         if ($provider->getProviderKey() === 'cloudplay') {
-            return app(CloudPlayApiService::class)->describeEmptyQrPayload();
+            return app(CloudPlayApiService::class)->describeEmptyQrPayload(
+                $user['domain_uuid'] ?? session('domain_uuid'),
+            );
         }
 
         return 'Could not build QR code.';

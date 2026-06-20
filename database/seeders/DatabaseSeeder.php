@@ -687,14 +687,6 @@ class DatabaseSeeder extends Seeder
             ],
             [
                 'default_setting_category'      => 'mobile_apps',
-                'default_setting_subcategory'   => 'cloudplay_qr_format',
-                'default_setting_name'          => 'text',
-                'default_setting_value'         => 'portal',
-                'default_setting_enabled'       => true,
-                'default_setting_description'   => 'CloudPLAY QR format: portal (recommended). scloc is not supported by CloudPLAY Softphone.',
-            ],
-            [
-                'default_setting_category'      => 'mobile_apps',
                 'default_setting_subcategory'   => 'cloudplay_send_qr_code',
                 'default_setting_name'          => 'boolean',
                 'default_setting_value'         => 'false',

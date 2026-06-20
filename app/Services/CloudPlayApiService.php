@@ -732,20 +732,9 @@ class CloudPlayApiService implements MobileAppProviderInterface
     {
         $loginUsername = $this->resolveMobileAppLoginUsername($user);
         $password = (string) ($user['password'] ?? '');
-        $code = trim((string) ($user['qr_code'] ?? ''));
+        $cloudId = $this->resolveQrCloudId($domainUuid ?? $user['domain_uuid'] ?? session('domain_uuid'));
 
-        $domainUuid = $domainUuid ?? $user['domain_uuid'] ?? session('domain_uuid');
-        $userId = (int) ($user['id'] ?? 0);
-
-        if ($code === '' && $domainUuid && $userId > 0) {
-            try {
-                $code = trim((string) ($this->getQrCode($domainUuid, $userId) ?? ''));
-            } catch (\Throwable) {
-                // Manual CSC is optional when the portal token cannot be loaded.
-            }
-        }
-
-        if ($loginUsername === '' || $password === '' || $code === '') {
+        if ($loginUsername === '' || $password === '' || $cloudId === '') {
             return '';
         }
 
@@ -753,8 +742,43 @@ class CloudPlayApiService implements MobileAppProviderInterface
             'csc:%s:%s@%s',
             rawurlencode($loginUsername),
             rawurlencode($password),
-            $code,
+            $cloudId,
         );
+    }
+
+    protected function resolveQrCloudId(?string $domainUuid = null): string
+    {
+        $cloudId = trim($this->getCloudId());
+        if ($cloudId !== '') {
+            return $cloudId;
+        }
+
+        $domainUuid = $domainUuid ?? session('domain_uuid');
+        if (!$domainUuid) {
+            return '';
+        }
+
+        return trim($this->getCustomerCredentials($domainUuid)['username']);
+    }
+
+    protected function resolvePortalQrToken(array $user, ?string $domainUuid = null): string
+    {
+        $domainUuid = $domainUuid ?? $user['domain_uuid'] ?? session('domain_uuid');
+        $userId = (int) ($user['id'] ?? 0);
+
+        if ($userId <= 0 || !$domainUuid) {
+            return '';
+        }
+
+        try {
+            $qrToken = trim((string) ($this->getQrCode($domainUuid, $userId) ?? ''));
+
+            return $qrToken;
+        } catch (\Throwable $e) {
+            logger('CloudPLAY get-qr-code failed for user ' . $userId . ': ' . $e->getMessage());
+
+            return '';
+        }
     }
 
     public function findUserInList(string $domainUuid, int $userId): ?array
@@ -803,20 +827,6 @@ class CloudPlayApiService implements MobileAppProviderInterface
             'user_id' => $userId,
             'unique_id' => $cloudPlayUser['usr_unique_id'] ?? '',
         ];
-
-        if ($storedPassword !== null && $storedPassword !== '') {
-            try {
-                return $this->syncStoredAppPasswordToCloudPlay(
-                    $domainUuid,
-                    $userId,
-                    $extension,
-                    $storedPassword,
-                    $cloudPlayUser,
-                );
-            } catch (\Throwable) {
-                // Fall back to the stored password when CloudPLAY cannot be synced right now.
-            }
-        }
 
         $user = $this->normalizeUserResponse(
             $cloudPlayUser ?? [
@@ -912,105 +922,15 @@ class CloudPlayApiService implements MobileAppProviderInterface
         return $host;
     }
 
-    public function enrichUserForQrPayload(array $user, ?string $domainUuid = null, ?Extensions $extension = null): array
-    {
-        $domainUuid = $domainUuid ?? $user['domain_uuid'] ?? session('domain_uuid');
-        $user = $this->enrichMobileAppParams(array_merge($user, [
-            'ext' => $user['extension'] ?? '',
-            'username' => $user['sip_username'] ?? $user['extension'] ?? '',
-            'password' => $user['sip_password'] ?? '',
-            'name' => $user['name'] ?? '',
-        ]), $domainUuid);
-
-        if ($extension instanceof Extensions) {
-            $user['extension'] = (string) $extension->extension;
-            $user['sip_username'] = (string) ($user['sip_username'] ?? $extension->extension);
-            if (trim((string) ($user['sip_password'] ?? '')) === '') {
-                $user['sip_password'] = (string) $extension->password;
-            }
-        }
-
-        return $user;
-    }
-
-    public function supportsSclocQr(): bool
-    {
-        return false;
-    }
-
     public function buildMobileAppQrPayload(array $user, ?string $domainUuid = null): string
     {
         $domainUuid = $domainUuid ?? $user['domain_uuid'] ?? session('domain_uuid');
-        $user = $this->enrichUserForQrPayload($user, $domainUuid);
 
-        if ($this->getCloudPlayQrFormat() === 'scloc') {
-            if (!$this->supportsSclocQr()) {
-                return '';
-            }
-
-            return $this->buildMobileAppSclocQrPayload($user, $domainUuid);
-        }
-
-        $userId = (int) ($user['id'] ?? 0);
-        if ($userId > 0 && $domainUuid) {
-            try {
-                $qrToken = $this->getQrCode($domainUuid, $userId);
-                if (is_string($qrToken) && trim($qrToken) !== '') {
-                    return trim($qrToken);
-                }
-            } catch (\Throwable) {
-                // Fall through when the CloudPLAY portal token cannot be loaded.
-            }
-        }
-
-        return '';
+        return $this->resolvePortalQrToken($user, $domainUuid);
     }
 
-    public function buildMobileAppSclocQrPayload(array $user, ?string $domainUuid = null): string
+    public function describeEmptyQrPayload(?string $domainUuid = null): string
     {
-        $domainUuid = $domainUuid ?? $user['domain_uuid'] ?? session('domain_uuid');
-        $sipUsername = (string) ($user['sip_username'] ?? $user['extension'] ?? '');
-        $sipPassword = (string) ($user['sip_password'] ?? '');
-
-        if ($sipUsername === '' || $sipPassword === '' || !$domainUuid) {
-            return '';
-        }
-
-        $profileSip = [];
-        $profileId = $this->getProfileId($domainUuid);
-        if (!empty($profileId)) {
-            try {
-                $configurations = $this->getProfileConfigurations($domainUuid, (int) $profileId);
-                $profileSip = $configurations['Sip'] ?? [];
-            } catch (\Throwable) {
-                // Fall back to domain defaults when profile configuration cannot be loaded.
-            }
-        }
-
-        $connection = $this->resolveMobileAppConnectionSettings($domainUuid, $user, $profileSip);
-
-        return 'scloc:' . json_encode([
-            'sipaccounts' => [[
-                'sipusername' => $sipUsername,
-                'sippassword' => $sipPassword,
-                'authusername' => $sipUsername,
-                'domain' => $connection['host'],
-                'transport' => strtoupper($connection['protocol']),
-            ]],
-        ], JSON_UNESCAPED_SLASHES);
-    }
-
-    public function getQrFormat(): string
-    {
-        return $this->getCloudPlayQrFormat();
-    }
-
-    public function describeEmptyQrPayload(): string
-    {
-        if ($this->getCloudPlayQrFormat() === 'scloc') {
-            return 'CloudPLAY Softphone only supports portal QR tokens. Set CloudPLAY QR Format to portal, then reset credentials.';
-        }
-
         return 'Could not load the CloudPLAY portal QR token. Reset credentials and try again.';
     }
 
@@ -1040,19 +960,6 @@ class CloudPlayApiService implements MobileAppProviderInterface
         }
 
         return trim((string) config('cloudplay.cloud_id', ''));
-    }
-
-    protected function getCloudPlayQrFormat(): string
-    {
-        $value = DefaultSettings::where([
-            ['default_setting_category', '=', 'mobile_apps'],
-            ['default_setting_subcategory', '=', 'cloudplay_qr_format'],
-            ['default_setting_enabled', '=', 'true'],
-        ])->value('default_setting_value');
-
-        $value = strtolower(trim((string) $value));
-
-        return in_array($value, ['portal', 'token', 'scloc'], true) ? ($value === 'token' ? 'portal' : $value) : 'portal';
     }
 
     protected function isEncryptedAppPasswordHash(string $value): bool
@@ -1274,7 +1181,7 @@ class CloudPlayApiService implements MobileAppProviderInterface
             'profile_id' => (int) $profileId,
         ];
 
-        if (isset($params['email']) && $params['email'] !== '') {
+        if ($this->shouldSendCloudPlayQrEmail($domainUuid) && isset($params['email']) && $params['email'] !== '') {
             $payload['usr_email'] = $params['email'];
         }
 
