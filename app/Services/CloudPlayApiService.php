@@ -748,7 +748,7 @@ class CloudPlayApiService implements MobileAppProviderInterface
 
     protected function resolveQrCloudId(?string $domainUuid = null): string
     {
-        $cloudId = trim($this->getCloudId());
+        $cloudId = trim($this->getCloudId($domainUuid));
         if ($cloudId !== '') {
             return $cloudId;
         }
@@ -927,10 +927,7 @@ class CloudPlayApiService implements MobileAppProviderInterface
         $domainUuid = $domainUuid ?? $user['domain_uuid'] ?? session('domain_uuid');
 
         if ($this->resolveCloudPlayQrFormat($domainUuid) === 'sessiontalk') {
-            $sessionTalkPayload = $this->buildMobileAppSessionTalkQrPayload($user, $domainUuid);
-            if ($sessionTalkPayload !== '') {
-                return $sessionTalkPayload;
-            }
+            return $this->buildMobileAppSessionTalkQrPayload($user, $domainUuid);
         }
 
         return $this->resolvePortalQrToken($user, $domainUuid);
@@ -1065,8 +1062,16 @@ class CloudPlayApiService implements MobileAppProviderInterface
         return $user;
     }
 
-    public function getCloudId(): string
+    public function getCloudId(?string $domainUuid = null): string
     {
+        $domainUuid = $domainUuid ?? session('domain_uuid');
+        if ($domainUuid) {
+            $domainValue = trim((string) (get_domain_setting('cloudplay_cloud_id', $domainUuid) ?? ''));
+            if ($domainValue !== '') {
+                return $domainValue;
+            }
+        }
+
         $value = DefaultSettings::where([
             ['default_setting_category', '=', 'mobile_apps'],
             ['default_setting_subcategory', '=', 'cloudplay_cloud_id'],
@@ -1159,7 +1164,7 @@ class CloudPlayApiService implements MobileAppProviderInterface
             'sip_password' => (string) ($params['password'] ?? ''),
             'domain' => $this->getCustomerCredentials($domainUuid)['username'],
             'customer' => $this->getCustomerCredentials($domainUuid)['username'],
-            'cloud_id' => $this->getCloudId(),
+            'cloud_id' => $this->getCloudId($domainUuid),
             'status' => strtoupper((string) ($data['usr_status'] ?? 'Y')) === 'Y' ? 1 : -1,
             'email' => $data['usr_email'] ?? ($params['email'] ?? ''),
             'name' => $this->resolveMobileAppAccountName($domainUuid, $params),

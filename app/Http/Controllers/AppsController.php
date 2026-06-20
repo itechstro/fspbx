@@ -2267,11 +2267,15 @@ class AppsController extends Controller
 
     protected function resolveMobileAppQrPayload(array $user, ?string $domainUuid = null): string
     {
-        if (get_mobile_app_provider() === 'cloudplay') {
-            return app(CloudPlayApiService::class)->buildMobileAppQrPayload(
-                $user,
-                $domainUuid ?? $user['domain_uuid'] ?? session('domain_uuid'),
-            );
+        $domainUuid = $domainUuid ?? $user['domain_uuid'] ?? session('domain_uuid');
+
+        if ($this->usesCloudPlayQrPayload($domainUuid)) {
+            $payload = trim((string) ($user['qr_code'] ?? ''));
+            if ($payload !== '') {
+                return $payload;
+            }
+
+            return app(CloudPlayApiService::class)->buildMobileAppQrPayload($user, $domainUuid);
         }
 
         return json_encode([
@@ -2279,6 +2283,15 @@ class AppsController extends Controller
             'username' => $user['username'] ?? '',
             'password' => $user['password'] ?? '',
         ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    }
+
+    protected function usesCloudPlayQrPayload(?string $domainUuid): bool
+    {
+        if ($domainUuid && app(CloudPlayApiService::class)->isConfiguredForDomain($domainUuid)) {
+            return true;
+        }
+
+        return app(MobileAppProviderResolver::class)->resolve()->getProviderKey() === 'cloudplay';
     }
 
     protected function resolveMobileAppQrError($provider, array $user, $hidePassInEmail, int $status): ?string
