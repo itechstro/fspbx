@@ -930,7 +930,35 @@ class CloudPlayApiService implements MobileAppProviderInterface
             return $this->buildMobileAppSessionTalkQrPayload($user, $domainUuid);
         }
 
+        if ($this->resolveCloudPlayQrFormat($domainUuid) === 'csc') {
+            return $this->buildMobileAppCscQrPayload($user, $domainUuid);
+        }
+
         return $this->resolvePortalQrToken($user, $domainUuid);
+    }
+
+    protected function buildMobileAppCscQrPayload(array $user, ?string $domainUuid = null): string
+    {
+        $loginUsername = $this->resolveMobileAppLoginUsername($user);
+        $password = (string) ($user['password'] ?? '');
+        $domainUuid = $domainUuid ?? $user['domain_uuid'] ?? session('domain_uuid');
+        $userId = (int) ($user['id'] ?? 0);
+
+        if ($loginUsername === '' || $password === '' || !$domainUuid || $userId <= 0) {
+            return '';
+        }
+
+        $cloudCode = trim((string) ($this->getQrCode($domainUuid, $userId) ?? ''));
+        if ($cloudCode === '') {
+            return '';
+        }
+
+        return sprintf(
+            'csc:%s:%s@%s',
+            rawurlencode($loginUsername),
+            rawurlencode($password),
+            $cloudCode,
+        );
     }
 
     protected function buildMobileAppSessionTalkQrPayload(array $user, ?string $domainUuid = null): string
@@ -988,7 +1016,8 @@ class CloudPlayApiService implements MobileAppProviderInterface
         $value = strtolower(trim($value));
 
         return match ($value) {
-            'sessiontalk', 'json', 'csc', 'scloc' => 'sessiontalk',
+            'sessiontalk', 'json', 'scloc' => 'sessiontalk',
+            'csc', 'csc_token' => 'csc',
             'portal', 'token', '' => 'portal',
             default => 'portal',
         };
@@ -1011,15 +1040,8 @@ class CloudPlayApiService implements MobileAppProviderInterface
         ])->value('default_setting_value');
 
         $defaultFormat = $this->normalizeCloudPlayQrFormat((string) ($value ?? 'portal'));
-        if ($defaultFormat !== 'portal') {
-            return $defaultFormat;
-        }
 
-        if ($domainUuid && (int) ($this->getProfileId($domainUuid) ?? 0) === 1576) {
-            return 'sessiontalk';
-        }
-
-        return 'portal';
+        return $defaultFormat;
     }
 
     public function describeEmptyQrPayload(?string $domainUuid = null, ?array $user = null): string
@@ -1044,6 +1066,15 @@ class CloudPlayApiService implements MobileAppProviderInterface
             }
 
             return 'Could not build the SessionTalk QR code. Reset credentials and try again.';
+        }
+
+        if ($this->resolveCloudPlayQrFormat($domainUuid) === 'csc') {
+            $password = (string) ($user['password'] ?? '');
+            if ($password === '') {
+                return 'App login password is unavailable. Reset credentials to generate a new QR code.';
+            }
+
+            return 'Could not build the CloudPLAY CSC QR code. Reset credentials and try again.';
         }
 
         return 'Could not load the CloudPLAY portal QR token. Reset credentials and try again.';

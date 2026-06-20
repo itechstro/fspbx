@@ -63,7 +63,7 @@ return [
         'cloudplay_admin_username' => 'CloudPLAY admin username for creating and listing customers.',
         'cloudplay_admin_password' => 'CloudPLAY admin password for the provisioning API.',
         'cloudplay_cloud_id' => 'Optional Acrobits Cloud ID for manual login CSC links. Does not change QR codes (portal token or SessionTalk JSON).',
-        'cloudplay_qr_format' => 'portal uses the CloudPLAY get-qr-code token. sessiontalk uses JSON with login username, app password, and SIP host (CP_Ibratro profile 1576). Legacy values csc and scloc map to sessiontalk.',
+        'cloudplay_qr_format' => 'portal uses the CloudPLAY get-qr-code token (works for cpdevel). sessiontalk uses JSON with login and SIP. csc uses csc:user:pass@{get-qr-code token}.',
         'cloudplay_send_qr_code' => 'When enabled, CloudPLAY sends its own provisioning email on create, update, and reset. Leave disabled when FS PBX sends credential emails.',
         'dont_send_user_credentials' => 'When enabled, welcome emails use a one-time password link instead of plain-text credentials.',
         'apple_store_link' => 'App Store download link included in mobile app credential emails.',

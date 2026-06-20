@@ -1461,7 +1461,7 @@
                                                                 </li>
                                                                 <li v-if="mobileAppOptions?.provider === 'cloudplay'"
                                                                     class="text-xs text-gray-500">
-                                                                    Scan with CloudPLAY Talk. CP_Ibratro uses a SessionTalk JSON QR (same login and SIP as manual entry). Other profiles use a portal token. Reset credentials after deploy, then force-quit the app before scanning again.
+                                                                    Scan with CloudPLAY Talk. QR uses the CloudPLAY portal token (same as cpdevel). Reset credentials after deploy, force-quit the app, then scan again.
                                                                 </li>
 
                                                                 <li
