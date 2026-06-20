@@ -2290,6 +2290,7 @@ class AppsController extends Controller
         if ($provider->getProviderKey() === 'cloudplay') {
             return app(CloudPlayApiService::class)->describeEmptyQrPayload(
                 $user['domain_uuid'] ?? session('domain_uuid'),
+                $user,
             );
         }
 

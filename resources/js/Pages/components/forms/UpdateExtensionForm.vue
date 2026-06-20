@@ -1461,7 +1461,7 @@
                                                                 </li>
                                                                 <li v-if="mobileAppOptions?.provider === 'cloudplay'"
                                                                     class="text-xs text-gray-500">
-                                                                    Scan the QR code to sign in, or use login username and app password for manual sign-in. Reset credentials after deploy so the QR matches CloudPLAY, then force-quit the app before scanning again.
+                                                                    Scan the QR code to sign in. It contains the CloudPLAY portal token from get-qr-code, not the login username or password. Reset credentials after deploy, then force-quit the app before scanning again.
                                                                 </li>
 
                                                                 <li

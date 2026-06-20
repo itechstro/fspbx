@@ -924,61 +924,25 @@ class CloudPlayApiService implements MobileAppProviderInterface
 
     public function buildMobileAppQrPayload(array $user, ?string $domainUuid = null): string
     {
-        $domainUuid = $domainUuid ?? $user['domain_uuid'] ?? session('domain_uuid');
-        $sessionTalkPayload = $this->buildMobileAppSessionTalkQrPayload($user, $domainUuid);
-
-        if ($sessionTalkPayload !== '') {
-            return $sessionTalkPayload;
-        }
-
         return $this->resolvePortalQrToken($user, $domainUuid);
     }
 
-    protected function buildMobileAppSessionTalkQrPayload(array $user, ?string $domainUuid = null): string
+    public function describeEmptyQrPayload(?string $domainUuid = null, ?array $user = null): string
     {
+        $userId = (int) ($user['id'] ?? 0);
+        if ($userId <= 0) {
+            return 'CloudPLAY user ID is missing. Reset credentials to recreate the mobile app user.';
+        }
+
         $domainUuid = $domainUuid ?? $user['domain_uuid'] ?? session('domain_uuid');
-        $username = $this->resolveMobileAppLoginUsername($user);
-        $password = (string) ($user['password'] ?? '');
-
-        if ($username === '' || $password === '' || !$domainUuid) {
-            return '';
+        if ($domainUuid) {
+            $cloudPlayUser = $this->findUserInList($domainUuid, $userId);
+            if ($cloudPlayUser === null) {
+                return 'CloudPLAY user ' . $userId . ' was not found. Reset credentials to recreate the mobile app link.';
+            }
         }
 
-        $params = [
-            'domain_uuid' => $domainUuid,
-            'ext' => (string) ($user['extension'] ?? ''),
-            'sip_server' => (string) ($user['sip']['server'] ?? ''),
-        ];
-
-        $connection = $this->resolveMobileAppConnectionSettings($domainUuid, $params);
-        $host = trim((string) ($connection['host'] ?? ''));
-
-        if ($host === '') {
-            return '';
-        }
-
-        $port = (int) ($connection['port'] ?? 0);
-        if ($port <= 0) {
-            $port = 5060;
-        }
-
-        $protocol = strtolower((string) ($connection['protocol'] ?? 'udp'));
-        if ($protocol === '') {
-            $protocol = 'udp';
-        }
-
-        return json_encode([
-            'u' => $username,
-            'p' => $password,
-            'h' => $host,
-            'pt' => $port,
-            't' => $protocol,
-        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-    }
-
-    public function describeEmptyQrPayload(?string $domainUuid = null): string
-    {
-        return 'Could not build the CloudPLAY QR code. Reset credentials and confirm the app login password is available.';
+        return 'Could not load the CloudPLAY portal QR token. Reset credentials and try again.';
     }
 
     protected function attachPortalQrCode(array $user, string $domainUuid): array
@@ -1292,12 +1256,26 @@ class CloudPlayApiService implements MobileAppProviderInterface
 
     public function getQrCode(string $domainUuid, int $userId): ?string
     {
+        if ($userId <= 0) {
+            return null;
+        }
+
         $token = $this->getCustomerToken($domainUuid);
         $response = $this->request('post', '/customer/user/get-qr-code', [
             'user_id' => $userId,
         ], $token);
 
-        return $response['data']['qr_code'] ?? null;
+        $qrCode = $response['data']['qr_code'] ?? null;
+        if ($qrCode === null && is_string($response['data'] ?? null)) {
+            $qrCode = $response['data'];
+        }
+
+        $qrCode = trim((string) ($qrCode ?? ''));
+        if ($qrCode === '' || str_starts_with($qrCode, '{') || str_starts_with($qrCode, 'csc:')) {
+            return null;
+        }
+
+        return $qrCode;
     }
 
     public function clearEnterpriseDirectoryCache(): void
