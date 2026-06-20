@@ -1461,7 +1461,7 @@
                                                                 </li>
                                                                 <li v-if="mobileAppOptions?.provider === 'cloudplay'"
                                                                     class="text-xs text-gray-500">
-                                                                    Scan the QR code with the CloudPLAY Talk app. It contains the CloudPLAY portal token from get-qr-code, not your login password. Reset credentials after deploy, then force-quit the app before scanning again.
+                                                                    Scan with CloudPLAY Talk. Some CloudPLAY profiles use a portal token QR; others use CSC credentials like manual login. Reset credentials after deploy, then force-quit the app before scanning again.
                                                                 </li>
 
                                                                 <li

@@ -924,7 +924,37 @@ class CloudPlayApiService implements MobileAppProviderInterface
 
     public function buildMobileAppQrPayload(array $user, ?string $domainUuid = null): string
     {
+        $domainUuid = $domainUuid ?? $user['domain_uuid'] ?? session('domain_uuid');
+
+        if ($this->resolveCloudPlayQrFormat($domainUuid) === 'csc') {
+            $cscPayload = $this->buildMobileAppManualLoginCsc($user, $domainUuid);
+            if ($cscPayload !== '') {
+                return $cscPayload;
+            }
+        }
+
         return $this->resolvePortalQrToken($user, $domainUuid);
+    }
+
+    protected function resolveCloudPlayQrFormat(?string $domainUuid = null): string
+    {
+        $domainUuid = $domainUuid ?? session('domain_uuid');
+        if ($domainUuid) {
+            $value = strtolower(trim((string) (get_domain_setting('cloudplay_qr_format', $domainUuid) ?? '')));
+            if (in_array($value, ['portal', 'csc'], true)) {
+                return $value;
+            }
+        }
+
+        $value = DefaultSettings::where([
+            ['default_setting_category', '=', 'mobile_apps'],
+            ['default_setting_subcategory', '=', 'cloudplay_qr_format'],
+            ['default_setting_enabled', '=', 'true'],
+        ])->value('default_setting_value');
+
+        $value = strtolower(trim((string) ($value ?? 'portal')));
+
+        return in_array($value, ['portal', 'csc'], true) ? $value : 'portal';
     }
 
     public function describeEmptyQrPayload(?string $domainUuid = null, ?array $user = null): string
@@ -940,6 +970,19 @@ class CloudPlayApiService implements MobileAppProviderInterface
             if ($cloudPlayUser === null) {
                 return 'CloudPLAY user ' . $userId . ' was not found. Reset credentials to recreate the mobile app link.';
             }
+        }
+
+        if ($this->resolveCloudPlayQrFormat($domainUuid) === 'csc') {
+            $password = (string) ($user['password'] ?? '');
+            if ($password === '') {
+                return 'App login password is unavailable. Reset credentials to generate a new QR code.';
+            }
+
+            if ($this->resolveQrCloudId($domainUuid) === '') {
+                return 'CloudPLAY Cloud ID is missing. Set CloudPLAY Cloud ID in Mobile App settings, then reset credentials.';
+            }
+
+            return 'Could not build the CloudPLAY CSC QR code. Reset credentials and try again.';
         }
 
         return 'Could not load the CloudPLAY portal QR token. Reset credentials and try again.';
