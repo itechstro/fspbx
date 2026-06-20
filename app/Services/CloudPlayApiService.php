@@ -924,41 +924,7 @@ class CloudPlayApiService implements MobileAppProviderInterface
 
     public function buildMobileAppQrPayload(array $user, ?string $domainUuid = null): string
     {
-        $domainUuid = $domainUuid ?? $user['domain_uuid'] ?? session('domain_uuid');
-
-        return $this->buildMobileAppCscQrPayload($user, $domainUuid);
-    }
-
-    protected function buildMobileAppCscQrPayload(array $user, ?string $domainUuid = null): string
-    {
-        $domainUuid = $domainUuid ?? $user['domain_uuid'] ?? session('domain_uuid');
-        $provisioningCode = $this->resolvePortalQrToken($user, $domainUuid);
-
-        if ($provisioningCode === '') {
-            return '';
-        }
-
-        $username = $this->resolveMobileAppLoginUsername($user);
-        $password = (string) ($user['password'] ?? '');
-
-        if ($username === '' && $password === '') {
-            return 'csc:' . $provisioningCode;
-        }
-
-        if ($password === '') {
-            return sprintf(
-                'csc:%s@%s',
-                rawurlencode($username),
-                $provisioningCode,
-            );
-        }
-
-        return sprintf(
-            'csc:%s:%s@%s',
-            rawurlencode($username),
-            rawurlencode($password),
-            $provisioningCode,
-        );
+        return $this->resolvePortalQrToken($user, $domainUuid);
     }
 
     public function describeEmptyQrPayload(?string $domainUuid = null, ?array $user = null): string
@@ -974,11 +940,6 @@ class CloudPlayApiService implements MobileAppProviderInterface
             if ($cloudPlayUser === null) {
                 return 'CloudPLAY user ' . $userId . ' was not found. Reset credentials to recreate the mobile app link.';
             }
-        }
-
-        $password = (string) ($user['password'] ?? '');
-        if ($password === '') {
-            return 'App login password is unavailable. Reset credentials to generate a new QR code.';
         }
 
         return 'Could not load the CloudPLAY portal QR token. Reset credentials and try again.';
@@ -1310,7 +1271,7 @@ class CloudPlayApiService implements MobileAppProviderInterface
         }
 
         $qrCode = trim((string) ($qrCode ?? ''));
-        if ($qrCode === '' || str_starts_with($qrCode, '{') || str_starts_with($qrCode, 'csc:')) {
+        if ($qrCode === '' || str_starts_with($qrCode, '{')) {
             return null;
         }
 
