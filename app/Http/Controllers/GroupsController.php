@@ -176,10 +176,18 @@ class GroupsController extends Controller
 
         $validPermissionNames = DB::table('v_permissions')
             ->whereIn('permission_name', $permissionNames)
-            ->pluck('permission_name');
+            ->distinct()
+            ->pluck('permission_name')
+            ->values();
 
-        if ($validPermissionNames->count() !== $permissionNames->count()) {
-            return response()->json(['messages' => ['error' => ['One or more permissions are invalid.']]], 422);
+        $invalidPermissionNames = $permissionNames->diff($validPermissionNames)->values();
+
+        if ($invalidPermissionNames->isNotEmpty()) {
+            return response()->json([
+                'messages' => ['error' => [
+                    'One or more permissions are invalid: ' . $invalidPermissionNames->implode(', ') . '.',
+                ]],
+            ], 422);
         }
 
         DB::transaction(function () use ($assigned, $group, $validPermissionNames) {
