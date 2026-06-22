@@ -113,11 +113,15 @@ class HandleInertiaRequests extends Middleware
             return $menus;
         }
 
-        if (app(CdrDataService::class)->isRecorderEnabled(session('domain_uuid'))) {
-            return $menus;
+        if (! app(CdrDataService::class)->isRecorderEnabled(session('domain_uuid'))) {
+            $menus = $this->filterRecorderMenuItems($menus);
         }
 
-        return $this->filterRecorderMenuItems($menus);
+        if (! userCheckPermission('recorder_view')) {
+            $menus = $this->filterRecorderMenuItems($menus);
+        }
+
+        return $menus;
     }
 
     private function filterRecorderMenuItems($menus): array

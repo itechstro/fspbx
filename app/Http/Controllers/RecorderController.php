@@ -17,7 +17,7 @@ class RecorderController extends Controller
 
     public function index(Request $request)
     {
-        if (! userCheckPermission('xml_cdr_view')) {
+        if (! userCheckPermission('recorder_view') || ! userCheckPermission('xml_cdr_view')) {
             return redirect('/');
         }
 
@@ -57,7 +57,7 @@ class RecorderController extends Controller
 
     public function getData()
     {
-        if (! userCheckPermission('xml_cdr_view')) {
+        if (! userCheckPermission('recorder_view') || ! userCheckPermission('xml_cdr_view')) {
             abort(403);
         }
 
