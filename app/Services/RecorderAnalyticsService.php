@@ -185,7 +185,7 @@ class RecorderAnalyticsService
     public function buildCsvContent(array $report): string
     {
         $handle = fopen('php://temp', 'r+');
-        fputcsv($handle, ['Date', 'Time', 'Caller', 'Dialed', 'Duration', 'Status', 'Sentiment', 'Summary']);
+        fputcsv($handle, ['Date', 'Time', 'Caller', 'Dialed', 'Duration', 'Sentiment', 'Summary']);
 
         foreach ($report['calls'] ?? [] as $call) {
             fputcsv($handle, [
@@ -194,7 +194,6 @@ class RecorderAnalyticsService
                 $call['caller'] ?? '',
                 $call['dialed'] ?? '',
                 $call['duration'] ?? '',
-                $call['status'] ?? '',
                 $call['sentiment'] ?? '',
                 $call['summary'] ?? '',
             ]);

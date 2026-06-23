@@ -203,7 +203,6 @@
                                     <th class="px-2 py-2">Caller</th>
                                     <th class="px-2 py-2">Dialed</th>
                                     <th class="px-2 py-2">Duration</th>
-                                    <th class="px-2 py-2">Status</th>
                                     <th class="px-2 py-2">Sentiment</th>
                                     <th class="px-2 py-2">Summary</th>
                                 </tr>
@@ -217,7 +216,6 @@
                                     <td class="px-2 py-3">{{ call.caller || '—' }}</td>
                                     <td class="px-2 py-3">{{ call.dialed || '—' }}</td>
                                     <td class="px-2 py-3 whitespace-nowrap">{{ call.duration }}</td>
-                                    <td class="px-2 py-3 whitespace-nowrap">{{ formatStatus(call.status) }}</td>
                                     <td class="px-2 py-3 whitespace-nowrap">{{ call.sentiment || '—' }}</td>
                                     <td class="px-2 py-3 text-gray-700">{{ call.summary || '—' }}</td>
                                 </tr>
@@ -423,15 +421,6 @@ const transcriptionStatusColors = {
 const summaryStatusColors = {
     summarized: '#16a34a',
     not_summarized: '#d1d5db',
-};
-
-const formatStatus = (status) => {
-    const value = String(status || '').trim();
-    if (!value || value === 'unknown') {
-        return '—';
-    }
-
-    return value.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
 };
 
 const formatChartDate = (date) => moment(date, 'YYYY-MM-DD').format('MMM D');
