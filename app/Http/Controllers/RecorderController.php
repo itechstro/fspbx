@@ -109,7 +109,7 @@ class RecorderController extends Controller
             'analytics_view' => userCheckPermission('recorder_analytics_view'),
             'call_recording_play' => userCheckPermission('call_recording_play'),
             'transcription_summary' => userCheckPermission('transcription_summary'),
-            'search_sentiment' => userCheckPermission('xml_cdr_search_sentiment')
+            'search_sentiment' => userCheckPermission('recorder_search_sentiment')
                 && $isCallTranscriptionServiceEnabled
                 && (bool) ($config['auto_summarize_recorder'] ?? false),
         ];
