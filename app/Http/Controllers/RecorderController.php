@@ -79,6 +79,12 @@ class RecorderController extends Controller
             break;
         }
 
+        if (! empty(data_get($params, 'filter.sentiment'))) {
+            if (! $this->canSearchRecorderSentiment()) {
+                abort(403);
+            }
+        }
+
         $params['paginate'] = fspbx_pagination_per_page();
         $params['domain_uuid'] = $domainUuid;
 
@@ -100,18 +106,24 @@ class RecorderController extends Controller
 
     private function recorderPermissions(): array
     {
-        $transcriptionService = app(CallTranscriptionService::class);
-        $config = $transcriptionService->getCachedConfig(session('domain_uuid') ?? null);
-        $isCallTranscriptionServiceEnabled = (bool) ($config['enabled'] ?? false);
-
         return [
             'all_cdr_view' => userCheckPermission('xml_cdr_domain'),
             'analytics_view' => userCheckPermission('recorder_analytics_view'),
             'call_recording_play' => userCheckPermission('call_recording_play'),
             'transcription_summary' => userCheckPermission('transcription_summary'),
-            'search_sentiment' => userCheckPermission('recorder_search_sentiment')
-                && $isCallTranscriptionServiceEnabled
-                && (bool) ($config['auto_summarize_recorder'] ?? false),
+            'search_sentiment' => $this->canSearchRecorderSentiment(),
         ];
+    }
+
+    private function canSearchRecorderSentiment(): bool
+    {
+        if (! userCheckPermission('recorder_search_sentiment')) {
+            return false;
+        }
+
+        $transcriptionService = app(CallTranscriptionService::class);
+        $config = $transcriptionService->getCachedConfig(session('domain_uuid') ?? null);
+
+        return (bool) ($config['enabled'] ?? false);
     }
 }

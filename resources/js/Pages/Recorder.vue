@@ -41,8 +41,7 @@
                             @update:date-range="handleUpdateDateRange" />
                     </div>
 
-                    <div v-if="permissions.search_sentiment && permissions.transcription_summary"
-                        class="relative min-w-36 mb-2 shrink-0 sm:mr-4">
+                    <div v-if="permissions.search_sentiment" class="relative min-w-36 mb-2 shrink-0 sm:mr-4">
                         <multiselect v-model="filterData.sentiment" :options="sentimentOptions" :searchable="false"
                             :close-on-select="true" track-by="value" label="name" :show-labels="false"
                             placeholder="Sentiment" aria-label="pick a value">
