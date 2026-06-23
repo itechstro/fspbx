@@ -17,6 +17,8 @@ use App\Services\CallTranscriptionConfigService;
 use App\Http\Requests\StoreAssemblyAiConfigRequest;
 use App\Http\Requests\StoreTranscriptionOptionsRequest;
 use App\Services\CallTranscription\CallTranscriptionService;
+use App\Services\RecorderPermissionService;
+use App\Models\CDR;
 
 class CallTranscriptionController extends Controller
 {
@@ -367,6 +369,13 @@ class CallTranscriptionController extends Controller
             'options'     => ['nullable', 'array'],
         ]);
 
+        $cdr = CDR::query()
+            ->where('xml_cdr_uuid', $data['uuid'])
+            ->select('xml_cdr_uuid', 'direction', 'domain_uuid')
+            ->firstOrFail();
+
+        RecorderPermissionService::assertCanTranscribe($cdr);
+
         try {
             TranscribeCdrJob::dispatch(
                 $data['uuid'],
@@ -399,6 +408,13 @@ class CallTranscriptionController extends Controller
             'uuid'        => ['required', 'uuid'],
         ]);
 
+        $cdr = RecorderPermissionService::cdrForTranscriptionUuid($data['uuid']);
+        if (! $cdr) {
+            abort(404);
+        }
+
+        RecorderPermissionService::assertCanSummarize($cdr);
+
         try {
             // Dispatch the job for summaries
             dispatch(new \App\Jobs\SummarizeCallTranscription($data['uuid']))->onQueue('transcriptions');
@@ -423,6 +439,13 @@ class CallTranscriptionController extends Controller
         $data = $request->validate([
             'uuid' => ['required', 'uuid'],
         ]);
+
+        $cdr = RecorderPermissionService::cdrForTranscriptionUuid($data['uuid']);
+        if (! $cdr) {
+            abort(404);
+        }
+
+        RecorderPermissionService::assertCanTranslate($cdr);
 
         try {
             TranslateCallTranscription::dispatch($data['uuid'])->onQueue('transcriptions');

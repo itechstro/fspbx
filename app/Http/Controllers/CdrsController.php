@@ -13,6 +13,7 @@ use App\Services\CdrDataService;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Storage;
 use App\Services\CallRecordingUrlService;
+use App\Services\RecorderPermissionService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use App\Services\CallTranscription\CallTranscriptionService;
 
@@ -142,6 +143,8 @@ class CdrsController extends Controller
                 throw new \Exception("Failed to fetch item details. Item not found");
             }
 
+            RecorderPermissionService::assertCanViewItemDetails($item);
+
             $this->item_domain_uuid = $item->domain_uuid;
 
             if ($item->direction !== 'recorder') {
@@ -158,6 +161,8 @@ class CdrsController extends Controller
             ];
 
             return $itemOptions;
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+            throw $e;
         } catch (\Exception $e) {
             // Log the error message
             logger($e->getMessage() . " at " . $e->getFile() . ":" . $e->getLine());
@@ -206,6 +211,8 @@ class CdrsController extends Controller
             if (!$item) {
                 throw new \Exception("Failed to fetch item details. Item not found");
             }
+
+            RecorderPermissionService::assertCanOpenRecording($item);
 
             // Add a temporary URL for the audio file (S3 or Local)
             $urls = $urlService->urlsForCdr($item->xml_cdr_uuid, 600); // 10 minutes
@@ -330,10 +337,12 @@ class CdrsController extends Controller
                 'transcription' => $transcription,
                 'filename'    => $urls['filename'],
                 'routes' => $routes,
-                'permissions' => $this->getUserPermissions(),
+                'permissions' => RecorderPermissionService::modalPermissionsForCdr($item),
             ]);
 
             return $itemOptions;
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+            throw $e;
         } catch (\Exception $e) {
             // Log the error message
             logger($e->getMessage() . " at " . $e->getFile() . ":" . $e->getLine());

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\CdrDataService;
-use App\Services\CallTranscription\CallTranscriptionService;
+use App\Services\RecorderPermissionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Inertia\Inertia;
@@ -17,7 +17,7 @@ class RecorderController extends Controller
 
     public function index(Request $request)
     {
-        if (! userCheckPermission('recorder_view') || ! userCheckPermission('xml_cdr_view')) {
+        if (! RecorderPermissionService::canViewRecorder()) {
             return redirect('/');
         }
 
@@ -47,7 +47,7 @@ class RecorderController extends Controller
                 'call_recording_route' => route('cdrs.recording.options'),
                 'analytics_page' => route('recorder.analytics.index'),
             ],
-            'permissions' => fn () => $this->recorderPermissions(),
+            'permissions' => fn () => RecorderPermissionService::pagePermissions(),
             'pagination' => [
                 'per_page' => fspbx_pagination_per_page(),
                 'per_page_options' => fspbx_pagination_options(),
@@ -57,7 +57,7 @@ class RecorderController extends Controller
 
     public function getData()
     {
-        if (! userCheckPermission('recorder_view') || ! userCheckPermission('xml_cdr_view')) {
+        if (! RecorderPermissionService::canViewRecorder()) {
             abort(403);
         }
 
@@ -80,9 +80,14 @@ class RecorderController extends Controller
         }
 
         if (! empty(data_get($params, 'filter.sentiment'))) {
-            if (! $this->canSearchRecorderSentiment()) {
+            if (! RecorderPermissionService::canSearchSentiment()) {
                 abort(403);
             }
+        }
+
+        if (filter_var(data_get($params, 'filter.showGlobal'), FILTER_VALIDATE_BOOLEAN)
+            && ! userCheckPermission('recorder_view_global')) {
+            data_set($params, 'filter.showGlobal', false);
         }
 
         $params['paginate'] = fspbx_pagination_per_page();
@@ -104,26 +109,4 @@ class RecorderController extends Controller
         return $this->cdrDataService->getRecorderData($params);
     }
 
-    private function recorderPermissions(): array
-    {
-        return [
-            'all_cdr_view' => userCheckPermission('xml_cdr_domain'),
-            'analytics_view' => userCheckPermission('recorder_analytics_view'),
-            'call_recording_play' => userCheckPermission('call_recording_play'),
-            'transcription_summary' => userCheckPermission('transcription_summary'),
-            'search_sentiment' => $this->canSearchRecorderSentiment(),
-        ];
-    }
-
-    private function canSearchRecorderSentiment(): bool
-    {
-        if (! userCheckPermission('recorder_search_sentiment')) {
-            return false;
-        }
-
-        $transcriptionService = app(CallTranscriptionService::class);
-        $config = $transcriptionService->getCachedConfig(session('domain_uuid') ?? null);
-
-        return (bool) ($config['enabled'] ?? false);
-    }
 }

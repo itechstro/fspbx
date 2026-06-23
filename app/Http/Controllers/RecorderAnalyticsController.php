@@ -21,7 +21,7 @@ class RecorderAnalyticsController extends Controller
 
     public function index(Request $request)
     {
-        if (! userCheckPermission('recorder_analytics_view') || ! userCheckPermission('xml_cdr_view')) {
+        if (! userCheckPermission('recorder_analytics_view') || ! userCheckPermission('recorder_view')) {
             return redirect('/');
         }
 
@@ -240,7 +240,7 @@ class RecorderAnalyticsController extends Controller
 
     protected function authorizeAnalytics(): void
     {
-        if (! userCheckPermission('recorder_analytics_view') || ! userCheckPermission('xml_cdr_view')) {
+        if (! userCheckPermission('recorder_analytics_view') || ! userCheckPermission('recorder_view')) {
             abort(403);
         }
 

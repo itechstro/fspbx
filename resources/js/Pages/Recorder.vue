@@ -10,13 +10,13 @@
                         Analytics
                     </a>
 
-                    <button v-if="!showGlobal && permissions.all_cdr_view" type="button"
+                    <button v-if="!showGlobal && permissions.view_global" type="button"
                         @click.prevent="handleShowGlobal()"
                         class="rounded-md bg-white px-2.5 py-1.5 ml-2 sm:ml-4 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
                         Show global
                     </button>
 
-                    <button v-if="showGlobal && permissions.all_cdr_view" type="button"
+                    <button v-if="showGlobal && permissions.view_global" type="button"
                         @click.prevent="handleShowLocal()"
                         class="rounded-md bg-white px-2.5 py-1.5 ml-2 sm:ml-4 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
                         Show local
@@ -56,7 +56,7 @@
                 </template>
 
                 <template #table-header>
-                    <TableColumnHeader v-if="showGlobal" header="Domain"
+                    <TableColumnHeader v-if="showGlobal && permissions.view_global" header="Domain"
                         class="px-2 py-3.5 text-left text-sm font-semibold text-gray-900" />
                     <TableColumnHeader class="px-2 py-3.5 text-left text-sm font-semibold text-gray-900">
                         <div class="flex items-center cursor-pointer select-none" @click="handleSortRequest('caller_id_name')">
@@ -107,7 +107,7 @@
 
                 <template #table-body>
                     <tr v-for="row in data.data" :key="row.xml_cdr_uuid">
-                        <TableField v-if="showGlobal" class="whitespace-nowrap px-2 py-2 text-sm text-gray-500"
+                        <TableField v-if="showGlobal && permissions.view_global" class="whitespace-nowrap px-2 py-2 text-sm text-gray-500"
                             :text="row.domain?.domain_description">
                             <ejs-tooltip :content="row.domain?.domain_name" position="TopLeft"
                                 target="#recorder_domain_tooltip_target">
@@ -132,7 +132,7 @@
 
                         <TableField class="whitespace-nowrap px-2 py-1 text-sm text-gray-500">
                             <template v-if="row.has_recording" #action-buttons>
-                                <PlayCircleIcon v-if="permissions.call_recording_play"
+                                <PlayCircleIcon v-if="permissions.recording_play"
                                     @click="handleCallRecordingButtonClick(row.xml_cdr_uuid)"
                                     class="h-9 w-9 transition duration-500 ease-in-out py-2 rounded-full text-blue-400 hover:bg-blue-200 hover:text-blue-600 active:bg-blue-300 active:duration-150 cursor-pointer" />
                             </template>
@@ -140,7 +140,7 @@
 
                         <TableField class="w-16 whitespace-nowrap px-1 py-1 text-sm text-gray-500">
                             <template #action-buttons>
-                                <ejs-tooltip v-if="page.props.auth.can.cdr_view_details" :content="'View details'"
+                                <ejs-tooltip v-if="permissions.view_details" :content="'View details'"
                                     position="TopCenter" target="#recorder_view_tooltip_target">
                                     <div id="recorder_view_tooltip_target">
                                         <MagnifyingGlassIcon @click="handleViewRequest(row.xml_cdr_uuid)"

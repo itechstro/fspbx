@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use App\Models\CDR;
+use App\Services\RecorderPermissionService;
 
 class CallRecordingController extends Controller
 {
@@ -98,15 +99,15 @@ class CallRecordingController extends Controller
             abort(403, 'Invalid or expired link.');
         }
 
-        if (!userCheckPermission('call_recording_download')) {
-            abort(403, 'You do not have permission to download recordings.');
-        }
-
         $cdr = CDR::query()
-            ->select('xml_cdr_uuid', 'record_path', 'record_name', 'domain_uuid')
+            ->select('xml_cdr_uuid', 'record_path', 'record_name', 'domain_uuid', 'direction')
             ->with('archive_recording:xml_cdr_uuid,object_key')
             ->where('xml_cdr_uuid', $uuid)
             ->firstOrFail();
+
+        if (! RecorderPermissionService::canDownloadCdrRecording($cdr)) {
+            abort(403, 'You do not have permission to download recordings.');
+        }
 
         // If stored in S3, redirect to an attachment-presigned URL
         if ($cdr->record_path === 'S3') {
