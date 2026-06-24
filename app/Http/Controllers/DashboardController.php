@@ -123,6 +123,19 @@ class DashboardController extends Controller
 
         $counts['cdrs'] = $cdrs->count();
 
+        if (userCheckPermission('recorder_view') && $cdrDataService->isRecorderEnabled($domain_uuid)) {
+            $recorderParams = [
+                'paginate' => false,
+                'domain_uuid' => $domain_uuid,
+                'filter' => [
+                    'startPeriod' => $startPeriod,
+                    'endPeriod' => $endPeriod,
+                    'showGlobal' => 'false',
+                ],
+            ];
+            $counts['recorder'] = $cdrDataService->getRecorderData($recorderParams)->count();
+        }
+
         if (userCheckPermission("ring_group_view")) {
             //Ring group count
             $counts['ring_groups'] = RingGroups::where('domain_uuid', $domain_uuid)
@@ -498,6 +511,24 @@ class DashboardController extends Controller
         if (userCheckPermission("xml_cdr_view")) {
             $apps[] = ['name' => 'Call History (CDRs)', 'href' => route('cdrs.index'), 'icon' => 'CallHistoryIcon', 'slug' => 'cdrs'];
         }
+
+        $cdrDataService = app(CdrDataService::class);
+        if (userCheckPermission('recorder_view') && $cdrDataService->isRecorderEnabled(Session::get('domain_uuid'))) {
+            $recorderApp = [
+                'name' => 'Recorder',
+                'href' => route('recorder.index'),
+                'icon' => 'PhoneRecorderIcon',
+                'slug' => 'recorder',
+            ];
+
+            if (userCheckPermission('recorder_analytics_view')) {
+                $recorderApp['alt_href'] = route('recorder.analytics.index');
+                $recorderApp['alt_link_label'] = 'Analytics';
+            }
+
+            $apps[] = $recorderApp;
+        }
+
         if (userCheckPermission("call_flow_view")) {
             $apps[] = ['name' => 'Call Flows', 'href' => route('call-flows.index'), 'icon' => 'AlternativeRouteIcon', 'slug' => 'call_flows'];
         }

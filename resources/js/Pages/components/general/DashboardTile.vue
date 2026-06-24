@@ -47,6 +47,7 @@ import ContactPhoneIcon from "../icons/ContactPhoneIcon.vue"
 import AlternativeRouteIcon from "../icons/AlternativeRouteIcon.vue"
 import IvrIcon from "../icons/IvrIcon.vue"
 import SupportAgent from "../icons/SupportAgent.vue"
+import PhoneRecorderIcon from "../icons/PhoneRecorderIcon.vue"
 
 const emit = defineEmits(['card-action']);
 
@@ -73,6 +74,7 @@ const iconMap = {
     AlternativeRouteIcon: AlternativeRouteIcon,
     IvrIcon: IvrIcon,
     SupportAgent: SupportAgent,
+    PhoneRecorderIcon: PhoneRecorderIcon,
     HeartIcon: HeartIcon,
     ClockIcon: ClockIcon,
 }
@@ -90,6 +92,7 @@ const styleMap = {
     AlternativeRouteIcon: { bgColor: 'bg-cyan-50', textColor: 'text-cyan-700', hoverTextColor: 'group-hover:text-cyan-900' },
     IvrIcon: { bgColor: 'bg-blue-50', textColor: 'text-blue-700', hoverTextColor: 'group-hover:text-blue-900' },
     SupportAgent: { bgColor: 'bg-orange-50', textColor: 'text-orange-700', hoverTextColor: 'group-hover:text-orange-900' },
+    PhoneRecorderIcon: { bgColor: 'bg-amber-50', textColor: 'text-amber-700', hoverTextColor: 'group-hover:text-amber-900' },
     HeartIcon: { bgColor: 'bg-rose-50', textColor: 'text-rose-700', hoverTextColor: 'group-hover:text-rose-900' },
     ClockIcon: { bgColor: 'bg-blue-50', textColor: 'text-blue-700', hoverTextColor: 'group-hover:text-blue-900' },
 };
