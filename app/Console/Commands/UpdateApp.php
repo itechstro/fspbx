@@ -113,6 +113,7 @@ use App\Console\Commands\Updates\Update255;
 use App\Console\Commands\Updates\Update256;
 use App\Console\Commands\Updates\Update257;
 use App\Console\Commands\Updates\Update258;
+use App\Console\Commands\Updates\Update259;
 use App\Console\Commands\Updates\Update0917;
 use App\Console\Commands\Updates\Update0918;
 use App\Console\Commands\Updates\Update0924;
@@ -302,6 +303,7 @@ class UpdateApp extends Command
             '1.9.0.14' => Update256::class,
             '1.9.0.15' => Update257::class,
             '1.9.0.16' => Update258::class,
+            '1.9.0.17' => Update259::class,
             // Add more versions as needed
         ];
 

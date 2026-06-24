@@ -68,6 +68,7 @@ use App\Http\Controllers\ProvisioningController;
 use App\Http\Controllers\RegistrationsController;
 use App\Http\Controllers\RecordingsManagerController;
 use App\Http\Controllers\RingGroupsController;
+use App\Http\Controllers\LetsEncryptController;
 use App\Http\Controllers\SipStatusController;
 use App\Http\Controllers\SpeedDialController;
 use App\Http\Controllers\SwitchModuleController;
@@ -76,6 +77,8 @@ use App\Http\Controllers\SystemController;
 use App\Http\Controllers\AiUsageRatesController;
 use App\Http\Controllers\SystemSettingsController;
 use App\Http\Controllers\TestEmailController;
+use App\Http\Controllers\TigerTmsLogsController;
+use App\Http\Controllers\TigerTmsWebhookController;
 use App\Http\Controllers\TokenController;
 use App\Http\Controllers\UserLogsController;
 use App\Http\Controllers\UsersController;
@@ -124,6 +127,9 @@ Route::group(['middleware' => ['auth:sanctum', 'api.cookie.auth']], function () 
     Route::post('/email-logs/retry', [EmailLogsController::class, 'retry'])->name('email-logs.retry');
     Route::get('/email-logs/{uuid}/delivery-details', [EmailLogsController::class, 'deliveryDetails'])->name('email-logs.delivery-details');
     Route::post('/test-email-send', [TestEmailController::class, 'store'])->name('test-email-send.store');
+
+    // TigerTMS logs
+    Route::get('/tigertms-logs', [TigerTmsLogsController::class, 'index'])->name('tigertms-logs.index');
 
     // FreeSWITCH logs
     Route::get('/freeswitch-logs', [FreeswitchLogController::class, 'index'])->name('freeswitch-logs.index');
@@ -222,6 +228,13 @@ Route::group(['middleware' => ['auth:sanctum', 'api.cookie.auth']], function () 
     // SIP Status
     Route::get('sip-status/data', [SipStatusController::class, 'data'])->name('sip-status.data');
     Route::post('sip-status/action', [SipStatusController::class, 'action'])->name('sip-status.action');
+
+    // FreeSWITCH TLS (Let's Encrypt)
+    Route::get('sip-status/tls', [LetsEncryptController::class, 'status'])->name('sip-status.tls.status');
+    Route::post('sip-status/tls/config', [LetsEncryptController::class, 'saveConfig'])->name('sip-status.tls.config');
+    Route::post('sip-status/tls/issue', [LetsEncryptController::class, 'issue'])->name('sip-status.tls.issue');
+    Route::post('sip-status/tls/revoke', [LetsEncryptController::class, 'revoke'])->name('sip-status.tls.revoke');
+    Route::post('sip-status/tls/generate-secret', [LetsEncryptController::class, 'generateSecret'])->name('sip-status.tls.generate-secret');
 
     // Ring Group AI Text-to-Speech & File Serving
     Route::post('ring-groups/{ring_group}/text-to-speech', [RingGroupsController::class, 'textToSpeech'])->name('ring-groups.textToSpeech');
@@ -594,9 +607,11 @@ Route::group(['middleware' => ['auth:sanctum', 'api.cookie.auth']], function () 
     Route::put('faxes/{fax}', [FaxesController::class, 'update'])->name('faxes.update');
     Route::post('faxes/item-options', [FaxesController::class, 'getItemOptions'])->name('faxes.item.options');
     Route::post('faxes/new-fax-options', [FaxesController::class, 'getNewFaxOptions'])->name('faxes.new.fax.options');
+    Route::get('faxes/location-options', [FaxesController::class, 'getLocationOptions'])->name('faxes.location-options');
     Route::post('/faxes/bulk-delete', [FaxesController::class, 'bulkDelete'])->name('faxes.bulk.delete');
     Route::post('/faxes/bulk-update', [FaxesController::class, 'bulkUpdate'])->name('faxes.bulk.update');
     Route::get('faxes/data', [FaxesController::class, 'getData'])->name('faxes.data');
+    Route::get('faxes/stats', [FaxesController::class, 'getStats'])->name('faxes.stats');
     Route::get('faxes/recent-outbound', [FaxesController::class, 'getRecentOutbound'])->name('faxes.recent-outbound');
     Route::get('faxes/recent-inbound', [FaxesController::class, 'getRecentInbound'])->name('faxes.recent-inbound');
     Route::get('/faxes/newfax/create', [FaxesController::class, 'new'])->name('faxes.newfax');
@@ -645,6 +660,8 @@ Route::group(['middleware' => ['auth:sanctum', 'api.cookie.auth']], function () 
     Route::post('/call-detail-records/analytics/send', [CallHistoryAnalyticsController::class, 'send'])->name('cdrs.analytics.send');
 
     // Account Settings
+    Route::get('account-settings/pms-provider', [AccountSettingsController::class, 'pmsProvider'])->name('account-settings.pms-provider');
+    Route::put('account-settings/pms-provider', [AccountSettingsController::class, 'updatePmsProvider'])->name('account-settings.pms-provider.update');
     Route::put('account-settings/update', [AccountSettingsController::class, 'update'])->name('account-settings.update');
 
     // Default Settings
@@ -798,3 +815,12 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     // CHAR PMS
     Route::post('/pms/char', CharPmsWebhookController::class)->name('pms.char');
 });
+
+Route::post('/pms/tigertms', TigerTmsWebhookController::class)->name('pms.tigertms');
+
+// Peer-to-peer ACME token and TLS certificate replication. These endpoints use
+// the shared push secret instead of a user session.
+Route::post('letsencrypt/challenge', [LetsEncryptController::class, 'receiveChallenge'])
+    ->name('letsencrypt.challenge');
+Route::post('letsencrypt/receive-certificate', [LetsEncryptController::class, 'receiveCertificate'])
+    ->name('letsencrypt.receive-certificate');

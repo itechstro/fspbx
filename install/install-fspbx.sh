@@ -44,7 +44,7 @@ BACKUP_DIR="/var/www/fspbx_backup_$(date +%Y%m%d_%H%M%S)"
 FSPBX_REPO_URL="${FSPBX_REPO_URL:-https://github.com/itechstro/fspbx.git}"
 FSPBX_UPSTREAM_REPO_URL="${FSPBX_UPSTREAM_REPO_URL:-https://github.com/nemerald-voip/fspbx.git}"
 export PHP_VERSION="8.1"
-export FREESWITCH_VERSION="v1.10"
+export FREESWITCH_VERSION="v1.11"
 
 #Set Postgres Version
 if [[ "$OS_CODENAME" == "bookworm" ]]; then
