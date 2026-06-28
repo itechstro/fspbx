@@ -365,6 +365,7 @@ class ProvisioningController extends Controller
                 'line_count' => $vars['line_count'] ?? 0,
                 'settings_count' => count($vars['settings'] ?? []),
                 'main_key_count' => count($vars['main_keys'] ?? []),
+                'side_key_count' => count($vars['side_keys'] ?? []),
                 'multi_purpose_key_count' => count($vars['multi_purpose_keys'] ?? []),
                 'expansion_key_count' => count($vars['expansion_keys'] ?? []),
             ]);
@@ -783,6 +784,7 @@ class ProvisioningController extends Controller
         provisioning_debug('ProvisioningController: built effective provisioning keys', [
             'device_uuid' => (string) $device->device_uuid,
             'main_key_count' => count($keyAreas['main'] ?? []),
+            'side_key_count' => count($keyAreas['side'] ?? []),
             'multi_purpose_key_count' => count($keyAreas['multi_purpose'] ?? []),
             'expansion_key_count' => count($keyAreas['expansion'] ?? []),
         ]);
@@ -800,6 +802,7 @@ class ProvisioningController extends Controller
             // all keys flattened for legacy templates that expect a single list:
             'keys' => array_merge(
                 $keyAreas['main'] ?? [],
+                $keyAreas['side'] ?? [],
                 $keyAreas['multi_purpose'] ?? [],
                 $keyAreas['expansion'] ?? []
             ),
@@ -807,6 +810,7 @@ class ProvisioningController extends Controller
             // keys separated by area for newer templates that want to organize by area:
             'keys_by_area' => $keyAreas,
             'main_keys' => $keyAreas['main'] ?? [],
+            'side_keys' => $keyAreas['side'] ?? [],
             'multi_purpose_keys' => $keyAreas['multi_purpose'] ?? [],
             'expansion_keys' => $keyAreas['expansion'] ?? [],
             'polycom_line_key_counts' => $this->buildPolycomLineKeyCounts($polycomMainKeys),
@@ -1203,6 +1207,7 @@ class ProvisioningController extends Controller
 
         $maps = [
             'main' => [],
+            'side' => [],
             'multi_purpose' => [],
             'expansion' => [],
         ];

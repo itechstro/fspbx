@@ -17,6 +17,8 @@ use Illuminate\Support\Collection;
 
 class CdrDataService
 {
+    private const RELATED_CALL_WINDOW_PADDING_SECONDS = 3600;
+
     public function __construct(private ContactCallerIdResolver $contactCallerIdResolver) {}
 
     public function getData($params = [])
@@ -972,9 +974,23 @@ class CdrDataService
         $mainCallFlowData = collect(json_decode($cdr->call_flow, true) ?: []);
         $combinedCallFlowData = $mainCallFlowData;
 
+        $windowStart = null;
+        $windowEnd = null;
+
+        if ((int) $cdr->start_epoch > 0) {
+            $windowStart = max(0, (int) $cdr->start_epoch - self::RELATED_CALL_WINDOW_PADDING_SECONDS);
+            $windowEnd = max(
+                (int) ($cdr->end_epoch ?: $cdr->start_epoch),
+                (int) $cdr->start_epoch
+            ) + self::RELATED_CALL_WINDOW_PADDING_SECONDS;
+        }
+
         if (! empty($cdr->call_center_queue_uuid)) {
             $relatedCalls = $cdr->relatedQueueCalls()
                 ->where('domain_uuid', $cdr->domain_uuid)
+                ->when($windowStart !== null, function ($query) use ($windowStart, $windowEnd) {
+                    $query->whereBetween('start_epoch', [$windowStart, $windowEnd]);
+                })
                 ->select([
                     'xml_cdr_uuid',
                     'domain_uuid',
@@ -1001,6 +1017,9 @@ class CdrDataService
 
         $relatedCalls = $cdr->relatedRingGroupCalls()
             ->where('domain_uuid', $cdr->domain_uuid)
+            ->when($windowStart !== null, function ($query) use ($windowStart, $windowEnd) {
+                $query->whereBetween('start_epoch', [$windowStart, $windowEnd]);
+            })
             ->select([
                 'xml_cdr_uuid',
                 'domain_uuid',

@@ -14,7 +14,7 @@ use Throwable;
  */
 class Update260
 {
-    private const VERSION = '1.9.1.1';
+    private const VERSION = '1.9.3.1';
     private const SERVICE = 'php8.4-fpm.service';
     private const DROP_IN_DIR = '/etc/systemd/system/php8.4-fpm.service.d';
     private const DROP_IN_PATH = self::DROP_IN_DIR.'/override.conf';

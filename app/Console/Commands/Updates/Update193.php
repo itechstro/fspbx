@@ -2,74 +2,44 @@
 
 namespace App\Console\Commands\Updates;
 
-use App\Models\DefaultSettings;
-use Throwable;
+use App\Models\MenuItem;
 
 class Update193
 {
-    private const VERSION = '1.8.8.1';
-
     public function apply(): bool
     {
-        try {
-            $this->seedMobileAppProviderSettings();
-            echo 'Update ' . self::VERSION . " completed successfully.\n";
+        $sipProfilesUpdated = MenuItem::query()
+            ->where('menu_item_link', '/app/sip_profiles/sip_profiles.php')
+            ->update([
+                'menu_item_link' => '/sip-profiles',
+            ]);
 
-            return true;
-        } catch (Throwable $exception) {
-            echo 'Error applying update ' . self::VERSION . ": {$exception->getMessage()}\n";
+        echo $sipProfilesUpdated === 0
+            ? "No SIP Profiles menu items required updating.\n"
+            : "Updated {$sipProfilesUpdated} SIP Profiles menu item(s).\n";
 
-            return false;
-        }
-    }
+        $pinNumbersUpdated = MenuItem::query()
+            ->where('menu_item_link', '/app/pin_numbers/pin_numbers.php')
+            ->update([
+                'menu_item_link' => '/pin-numbers',
+            ]);
 
-    private function seedMobileAppProviderSettings(): void
-    {
-        $settings = [
-            [
-                'default_setting_category' => 'mobile_apps',
-                'default_setting_subcategory' => 'mobile_app_provider',
-                'default_setting_name' => 'text',
-                'default_setting_value' => 'ringotel',
-                'default_setting_enabled' => true,
-                'default_setting_description' => 'Mobile app provider: ringotel or cloudplay',
-            ],
-            [
-                'default_setting_category' => 'mobile_apps',
-                'default_setting_subcategory' => 'cloudplay_api_url',
-                'default_setting_name' => 'text',
-                'default_setting_value' => 'https://vgate.cloudplay.cloud:8091/v1.58.5/api',
-                'default_setting_enabled' => true,
-                'default_setting_description' => 'CloudPLAY provisioning API base URL',
-            ],
-            [
-                'default_setting_category' => 'mobile_apps',
-                'default_setting_subcategory' => 'cloudplay_admin_username',
-                'default_setting_name' => 'text',
-                'default_setting_value' => '',
-                'default_setting_enabled' => true,
-                'default_setting_description' => 'CloudPLAY admin username for tenant provisioning',
-            ],
-            [
-                'default_setting_category' => 'mobile_apps',
-                'default_setting_subcategory' => 'cloudplay_admin_password',
-                'default_setting_name' => 'text',
-                'default_setting_value' => '',
-                'default_setting_enabled' => true,
-                'default_setting_description' => 'CloudPLAY admin password for tenant provisioning',
-            ],
-        ];
+        echo $pinNumbersUpdated === 0
+            ? "No PIN Numbers menu items required updating.\n"
+            : "Updated {$pinNumbersUpdated} PIN Numbers menu item(s).\n";
 
-        foreach ($settings as $setting) {
-            DefaultSettings::firstOrCreate(
-                [
-                    'default_setting_category' => $setting['default_setting_category'],
-                    'default_setting_subcategory' => $setting['default_setting_subcategory'],
-                ],
-                $setting
-            );
-        }
+        $databaseTransactionsUpdated = MenuItem::query()
+            ->where('menu_item_link', '/app/database_transactions/database_transactions.php')
+            ->update([
+                'menu_item_link' => '/database-transactions',
+            ]);
 
-        echo "Seeded CloudPLAY mobile app provider settings.\n";
+        echo $databaseTransactionsUpdated === 0
+            ? "No Database Transactions menu items required updating.\n"
+            : "Updated {$databaseTransactionsUpdated} Database Transactions menu item(s).\n";
+
+        echo "Update 1.9.3 completed successfully.\n";
+
+        return true;
     }
 }

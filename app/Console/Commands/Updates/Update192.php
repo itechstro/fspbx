@@ -2,80 +2,407 @@
 
 namespace App\Console\Commands\Updates;
 
-use Illuminate\Support\Facades\File;
-use Symfony\Component\Process\Process;
+use App\Models\Groups;
+use App\Models\Menu;
+use App\Models\MenuItem;
+use App\Models\MenuItemGroup;
+use App\Models\MenuLanguage;
+use Illuminate\Support\Str;
 use Throwable;
 
 class Update192
 {
-    private const VERSION = '1.8.8';
-    private const SERVICE = 'php8.4-fpm.service';
-    private const DROP_IN_DIR = '/etc/systemd/system/php8.4-fpm.service.d';
-    private const DROP_IN_PATH = self::DROP_IN_DIR . '/override.conf';
-    private const OVERRIDE = <<<'INI'
-[Service]
-RuntimeDirectory=php
-RuntimeDirectoryMode=0755
-ReadWritePaths=/etc/freeswitch /usr/share/freeswitch /var/lib/freeswitch
-INI;
+    private const VERSION = '1.9.2';
+    private const DIALPLAN_TEMPLATE_DIR = 'public/app/dialplans/resources/switch/conf/dialplan';
+
+    private const DIALPLAN_TEMPLATE_FILES = [
+        'public/app/dialplans/resources/switch/conf/dialplan/100_e911_peerless.xml',
+        'public/app/dialplans/resources/switch/conf/dialplan/100_e911_synch.xml',
+        'public/app/dialplans/resources/switch/conf/dialplan/100_e911_thinq.xml',
+    ];
+
+    private const LOG_VIEWER_MENU_LINKS = [
+        '/logs?tab=freeswitch_logs',
+        '/app/log_viewer/log_viewer.php',
+    ];
 
     public function apply(): bool
     {
         try {
-            if (! $this->commandExists('systemctl')) {
-                echo "systemctl not found; skipping php8.4-fpm systemd override.\n";
-                return true;
-            }
+            $removed = $this->removeLegacyE911DialplanTemplates();
+            echo "Removed {$removed} legacy E911 dialplan template file(s).\n";
 
-            if (! $this->serviceExists()) {
-                echo self::SERVICE . " not found; skipping php8.4-fpm systemd override.\n";
-                return true;
-            }
+            $this->removeLogViewerMenuItemsFromAllMenus();
+            $this->removeHomeMenuFromFspbxMenu();
 
-            File::ensureDirectoryExists(self::DROP_IN_DIR);
-            File::put(self::DROP_IN_PATH, self::OVERRIDE . "\n");
-            echo "Wrote " . self::DROP_IN_PATH . ".\n";
+            $this->ensureMenuItem(
+                parentTitle: 'Applications',
+                title: 'Basic Queues',
+                link: '/basic-queues',
+                matchingTitles: ['Basic Queue', 'Basic Queues'],
+                groupNames: ['superadmin', 'admin'],
+            );
 
-            $this->runSystemctl(['daemon-reload'], 'Reloaded systemd manager configuration.');
-            $this->runSystemctl(['restart', self::SERVICE], 'Restarted ' . self::SERVICE . '.');
+            $this->ensureMenuItem(
+                parentTitle: 'Status',
+                title: 'Active Basic Queues',
+                link: '/active-basic-queues',
+                matchingTitles: ['Active Basic Queues', 'Active Call Center'],
+                groupNames: ['superadmin', 'admin'],
+            );
 
-            echo "Update " . self::VERSION . " completed successfully.\n";
+            echo "Menu changes are applied to new sessions; users may need to log out and back in to refresh their top menu.\n";
+            echo 'Update ' . self::VERSION . " completed successfully.\n";
+
             return true;
         } catch (Throwable $exception) {
-            echo "Error applying update " . self::VERSION . ": {$exception->getMessage()}\n";
+            echo 'Error applying update ' . self::VERSION . ': ' . $exception->getMessage() . "\n";
+
             return false;
         }
     }
 
-    private function serviceExists(): bool
+    private function removeLegacyE911DialplanTemplates(): int
     {
-        $process = new Process(['systemctl', 'status', self::SERVICE]);
-        $process->setTimeout(30);
-        $process->run();
+        $removed = 0;
 
-        return $process->getExitCode() !== 4;
-    }
+        $this->ensureDialplanTemplateDirectoryIsWritable();
 
-    private function runSystemctl(array $arguments, string $successMessage): void
-    {
-        $process = new Process(['systemctl', ...$arguments]);
-        $process->setTimeout(120);
-        $process->run();
+        foreach (self::DIALPLAN_TEMPLATE_FILES as $relativePath) {
+            $path = base_path($relativePath);
 
-        if (! $process->isSuccessful()) {
-            $output = trim($process->getErrorOutput() ?: $process->getOutput());
-            throw new \RuntimeException($output ?: 'systemctl ' . implode(' ', $arguments) . ' failed.');
+            if (! file_exists($path)) {
+                continue;
+            }
+
+            if (! is_file($path)) {
+                throw new \RuntimeException($path . ' exists but is not a file.');
+            }
+
+            $this->ensureLegacyE911TemplateIsWritable($path);
+
+            if (! @unlink($path)) {
+                throw new \RuntimeException(
+                    'Unable to remove ' . $path . '. Check ownership and write permissions on its containing directory.'
+                );
+            }
+
+            $removed++;
         }
 
-        echo $successMessage . "\n";
+        return $removed;
     }
 
-    private function commandExists(string $command): bool
+    private function ensureDialplanTemplateDirectoryIsWritable(): void
     {
-        $process = Process::fromShellCommandline('command -v ' . escapeshellarg($command));
-        $process->setTimeout(10);
-        $process->run();
+        $directory = base_path(self::DIALPLAN_TEMPLATE_DIR);
 
-        return $process->isSuccessful();
+        if (! is_dir($directory)) {
+            throw new \RuntimeException($directory . ' does not exist or is not a directory.');
+        }
+
+        if (! is_writable($directory) && ! $this->isRunningAsRoot()) {
+            throw new \RuntimeException(
+                $directory . ' is not writable. Update ' . self::VERSION . ' must be run with sudo to fix ownership. '
+                . ' Run: sudo php artisan app:update'
+            );
+        }
+
+        @chown($directory, 'www-data');
+        @chgrp($directory, 'www-data');
+        @chmod($directory, 0775);
+        clearstatcache(true, $directory);
+
+        if (! is_writable($directory)) {
+            throw new \RuntimeException(
+                'Unable to make ' . $directory . ' writable after setting ownership and permissions.'
+            );
+        }
+    }
+
+    private function isRunningAsRoot(): bool
+    {
+        return function_exists('posix_geteuid') && posix_geteuid() === 0;
+    }
+
+    private function ensureLegacyE911TemplateIsWritable(string $path): void
+    {
+        @chown($path, 'www-data');
+        @chgrp($path, 'www-data');
+        @chmod($path, 0664);
+        clearstatcache(true, $path);
+    }
+
+    private function removeLogViewerMenuItemsFromAllMenus(): void
+    {
+        $menuItemUuids = MenuItem::query()
+            ->where(function ($query) {
+                $query->whereIn('menu_item_link', self::LOG_VIEWER_MENU_LINKS)
+                    ->orWhere('menu_item_title', 'Log Viewer');
+            })
+            ->pluck('menu_item_uuid')
+            ->all();
+
+        if ($menuItemUuids === []) {
+            echo "No Log Viewer menu items found.\n";
+            return;
+        }
+
+        $menuItemUuids = $this->withMenuItemDescendantsAcrossMenus($menuItemUuids);
+
+        MenuLanguage::query()
+            ->whereIn('menu_item_uuid', $menuItemUuids)
+            ->delete();
+
+        MenuItemGroup::query()
+            ->whereIn('menu_item_uuid', $menuItemUuids)
+            ->delete();
+
+        $deleted = MenuItem::query()
+            ->whereIn('menu_item_uuid', $menuItemUuids)
+            ->delete();
+
+        echo "Removed {$deleted} Log Viewer menu item(s) from all menus and associated access/language rows.\n";
+    }
+
+    private function removeHomeMenuFromFspbxMenu(): void
+    {
+        $menu = Menu::query()
+            ->where('menu_name', 'fspbx')
+            ->first();
+
+        if (! $menu) {
+            echo "Menu 'fspbx' was not found; skipping Home menu removal.\n";
+            return;
+        }
+
+        $homeItemUuids = MenuItem::query()
+            ->where('menu_uuid', $menu->menu_uuid)
+            ->where('menu_item_title', 'Home')
+            ->whereNull('menu_item_parent_uuid')
+            ->pluck('menu_item_uuid')
+            ->all();
+
+        if ($homeItemUuids === []) {
+            echo "No Home menu item found in menu 'fspbx'.\n";
+            return;
+        }
+
+        $menuItemUuids = $this->withMenuItemDescendantsInMenu($menu->menu_uuid, $homeItemUuids);
+
+        MenuLanguage::query()
+            ->where('menu_uuid', $menu->menu_uuid)
+            ->whereIn('menu_item_uuid', $menuItemUuids)
+            ->delete();
+
+        MenuItemGroup::query()
+            ->where('menu_uuid', $menu->menu_uuid)
+            ->whereIn('menu_item_uuid', $menuItemUuids)
+            ->delete();
+
+        $deleted = MenuItem::query()
+            ->where('menu_uuid', $menu->menu_uuid)
+            ->whereIn('menu_item_uuid', $menuItemUuids)
+            ->delete();
+
+        echo "Removed {$deleted} Home menu item(s) from menu 'fspbx' and associated access/language rows.\n";
+    }
+
+    private function withMenuItemDescendantsInMenu(string $menuUuid, array $menuItemUuids): array
+    {
+        $allMenuItemUuids = array_values(array_unique(array_filter($menuItemUuids)));
+        $pendingParentUuids = $allMenuItemUuids;
+
+        while ($pendingParentUuids !== []) {
+            $childUuids = MenuItem::query()
+                ->where('menu_uuid', $menuUuid)
+                ->whereIn('menu_item_parent_uuid', $pendingParentUuids)
+                ->pluck('menu_item_uuid')
+                ->all();
+
+            $newChildUuids = array_values(array_diff($childUuids, $allMenuItemUuids));
+
+            if ($newChildUuids === []) {
+                break;
+            }
+
+            $allMenuItemUuids = array_merge($allMenuItemUuids, $newChildUuids);
+            $pendingParentUuids = $newChildUuids;
+        }
+
+        return $allMenuItemUuids;
+    }
+
+    private function withMenuItemDescendantsAcrossMenus(array $menuItemUuids): array
+    {
+        $allMenuItemUuids = array_values(array_unique(array_filter($menuItemUuids)));
+        $pendingParentUuids = $allMenuItemUuids;
+
+        while ($pendingParentUuids !== []) {
+            $childUuids = MenuItem::query()
+                ->whereIn('menu_item_parent_uuid', $pendingParentUuids)
+                ->pluck('menu_item_uuid')
+                ->all();
+
+            $newChildUuids = array_values(array_diff($childUuids, $allMenuItemUuids));
+
+            if ($newChildUuids === []) {
+                break;
+            }
+
+            $allMenuItemUuids = array_merge($allMenuItemUuids, $newChildUuids);
+            $pendingParentUuids = $newChildUuids;
+        }
+
+        return $allMenuItemUuids;
+    }
+
+    private function ensureMenuItem(
+        string $parentTitle,
+        string $title,
+        string $link,
+        array $matchingTitles,
+        array $groupNames
+    ): void {
+        $menu = Menu::query()
+            ->where('menu_name', 'fspbx')
+            ->first();
+
+        if (! $menu) {
+            echo "Menu 'fspbx' was not found; skipping {$title} menu item.\n";
+            return;
+        }
+
+        $parentItem = MenuItem::query()
+            ->where('menu_uuid', $menu->menu_uuid)
+            ->where('menu_item_title', $parentTitle)
+            ->whereNull('menu_item_parent_uuid')
+            ->first();
+
+        if (! $parentItem) {
+            echo "{$parentTitle} menu item was not found in menu '{$menu->menu_name}'; skipping {$title} menu item.\n";
+            return;
+        }
+
+        $menuItem = MenuItem::query()
+            ->where('menu_uuid', $menu->menu_uuid)
+            ->where('menu_item_parent_uuid', $parentItem->menu_item_uuid)
+            ->where(fn ($query) => $this->matchMenuItem($query, $link, $matchingTitles))
+            ->first();
+
+        $menuItemIsUnderParent = (bool) $menuItem;
+
+        if (! $menuItem) {
+            $menuItem = MenuItem::query()
+                ->where('menu_uuid', $menu->menu_uuid)
+                ->where(fn ($query) => $this->matchMenuItem($query, $link, $matchingTitles))
+                ->first();
+        }
+
+        if ($menuItem) {
+            $menuItem->forceFill([
+                'menu_item_title' => $title,
+                'menu_item_link' => $link,
+                'menu_item_parent_uuid' => $parentItem->menu_item_uuid,
+                'menu_item_category' => $menuItem->menu_item_category ?: 'internal',
+                'menu_item_protected' => $menuItem->menu_item_protected ?: 'false',
+                'menu_item_order' => $menuItemIsUnderParent && $menuItem->menu_item_order
+                    ? $menuItem->menu_item_order
+                    : $this->nextMenuItemOrder($menu, $parentItem),
+            ])->save();
+
+            echo "{$title} menu item already exists; ensured it is under {$parentTitle} with the correct title and link.\n";
+        } else {
+            $menuItem = MenuItem::query()->create([
+                'menu_item_uuid' => (string) Str::uuid(),
+                'menu_uuid' => $menu->menu_uuid,
+                'menu_item_parent_uuid' => $parentItem->menu_item_uuid,
+                'menu_item_title' => $title,
+                'menu_item_link' => $link,
+                'menu_item_icon' => '',
+                'menu_item_category' => 'internal',
+                'menu_item_protected' => 'false',
+                'menu_item_order' => $this->nextMenuItemOrder($menu, $parentItem),
+            ]);
+
+            echo "Added {$title} menu item under {$parentTitle}.\n";
+        }
+
+        $this->ensureMenuLanguage($menu, $menuItem);
+        $this->ensureMenuItemGroups($menu, $menuItem, $groupNames);
+    }
+
+    private function matchMenuItem($query, string $link, array $matchingTitles): void
+    {
+        $query->where('menu_item_link', $link)
+            ->orWhereIn('menu_item_title', $matchingTitles);
+    }
+
+    private function nextMenuItemOrder(Menu $menu, MenuItem $parentItem): int
+    {
+        return ((int) MenuItem::query()
+            ->where('menu_uuid', $menu->menu_uuid)
+            ->where('menu_item_parent_uuid', $parentItem->menu_item_uuid)
+            ->max('menu_item_order')) + 1;
+    }
+
+    private function ensureMenuLanguage(Menu $menu, MenuItem $menuItem): void
+    {
+        $language = MenuLanguage::query()
+            ->where('menu_uuid', $menu->menu_uuid)
+            ->where('menu_item_uuid', $menuItem->menu_item_uuid)
+            ->where('menu_language', 'en-us')
+            ->first();
+
+        if ($language) {
+            if ($language->menu_item_title !== $menuItem->menu_item_title) {
+                $language->forceFill([
+                    'menu_item_title' => $menuItem->menu_item_title,
+                ])->save();
+            }
+
+            return;
+        }
+
+        MenuLanguage::query()->create([
+            'menu_language_uuid' => (string) Str::uuid(),
+            'menu_uuid' => $menu->menu_uuid,
+            'menu_item_uuid' => $menuItem->menu_item_uuid,
+            'menu_language' => 'en-us',
+            'menu_item_title' => $menuItem->menu_item_title,
+        ]);
+    }
+
+    private function ensureMenuItemGroups(Menu $menu, MenuItem $menuItem, array $groupNames): void
+    {
+        foreach ($groupNames as $groupName) {
+            $group = Groups::query()
+                ->where('group_name', $groupName)
+                ->first();
+
+            if (! $group) {
+                echo "Group '{$groupName}' not found; {$menuItem->menu_item_title} menu access not created for it.\n";
+                continue;
+            }
+
+            $exists = MenuItemGroup::query()
+                ->where('menu_item_uuid', $menuItem->menu_item_uuid)
+                ->where('group_uuid', $group->group_uuid)
+                ->exists();
+
+            if ($exists) {
+                continue;
+            }
+
+            MenuItemGroup::query()->create([
+                'menu_item_group_uuid' => (string) Str::uuid(),
+                'menu_uuid' => $menu->menu_uuid,
+                'menu_item_uuid' => $menuItem->menu_item_uuid,
+                'group_name' => $groupName,
+                'group_uuid' => $group->group_uuid,
+            ]);
+
+            echo "Granted {$menuItem->menu_item_title} menu access to group '{$groupName}'.\n";
+        }
     }
 }

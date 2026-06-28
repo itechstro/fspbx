@@ -237,9 +237,7 @@ class UpdateApp extends Command
             '1.8.7.1' => Update188::class,
             '1.8.7.2' => Update189::class,
             '1.8.7.3' => Update190::class,
-            '1.8.7.4' => Update191::class,
-            '1.8.8' => Update192::class,
-            '1.8.8.1' => Update193::class,
+            '1.8.8' => Update188::class,
             '1.8.8.2' => Update194::class,
             '1.8.8.3' => Update195::class,
             '1.8.8.4' => Update196::class,
@@ -305,7 +303,12 @@ class UpdateApp extends Command
             '1.9.0.15' => Update257::class,
             '1.9.0.16' => Update258::class,
             '1.9.0.17' => Update259::class,
-            '1.9.1.1' => Update260::class,
+            '1.8.9' => Update189::class,
+            '1.9.0' => Update190::class,
+            '1.9.1' => Update191::class,
+            '1.9.2' => Update192::class,
+            '1.9.3' => Update193::class,
+            '1.9.3.1' => Update260::class,
             // Add more versions as needed
         ];
 

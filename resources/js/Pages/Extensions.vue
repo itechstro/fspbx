@@ -497,13 +497,6 @@ const advancedActions = computed(() => {
             category: "Users",
             actions: [],
         },
-        {
-            category: "Contact Center",
-            actions: [
-                { id: 'make_cc_agent', label: 'Make Agent', icon: 'SupportAgent' },
-                { id: 'make_cc_admin', label: 'Make Admin', icon: 'KeyIcon' },
-            ],
-        },
     ];
 
     // Only show if permission allows
@@ -520,6 +513,16 @@ const advancedActions = computed(() => {
             id: 'make_admin',
             label: 'Make Admin',
             icon: 'KeyIcon',
+        });
+    }
+
+    if (props.routes?.create_contact_center_user) {
+        actions.push({
+            category: "Contact Center",
+            actions: [
+                { id: 'make_cc_agent', label: 'Make Agent', icon: 'SupportAgent' },
+                { id: 'make_cc_admin', label: 'Make Admin', icon: 'KeyIcon' },
+            ],
         });
     }
 
@@ -727,6 +730,10 @@ const handleAdvancedActionRequest = (action, extension_uuid) => {
         role = 'user';
     } else {
         return; // ignore other actions
+    }
+
+    if (!url) {
+        return;
     }
 
     const payload = {
