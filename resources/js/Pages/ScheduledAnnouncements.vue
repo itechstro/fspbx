@@ -163,6 +163,11 @@
                         <TableField class="whitespace-nowrap px-2 py-1 align-middle text-sm text-gray-500">
                             <template #action-buttons>
                                 <div class="flex items-center whitespace-nowrap justify-end">
+                                    <PlayCircleIcon v-if="permissions.execute && item.canRun"
+                                        @click="runScheduleNow(item.row)"
+                                        class="h-9 w-9 transition duration-500 ease-in-out py-2 rounded-full text-gray-400 hover:bg-gray-200 hover:text-gray-600 active:bg-gray-300 active:duration-150 cursor-pointer"
+                                        :class="{ 'pointer-events-none opacity-40': runningScheduleUuid === item.row.scheduled_announcement_schedule_uuid }"
+                                        title="Run Now" />
                                     <PencilSquareIcon v-if="permissions.update" @click="handleEditButtonClick(item.row)"
                                         class="h-9 w-9 transition duration-500 ease-in-out py-2 rounded-full text-gray-400 hover:bg-gray-200 hover:text-gray-600 active:bg-gray-300 active:duration-150 cursor-pointer"
                                         title="Edit" />
@@ -257,6 +262,7 @@ import {
     ChevronUpIcon,
     MagnifyingGlassIcon,
     PencilSquareIcon,
+    PlayCircleIcon,
     TrashIcon,
 } from '@heroicons/vue/24/solid'
 import {
@@ -295,6 +301,7 @@ const confirmationButtonLabel = ref('Continue')
 const notificationType = ref(null)
 const notificationMessages = ref(null)
 const notificationShow = ref(false)
+const runningScheduleUuid = ref(null)
 
 const filterData = ref({
     search: null,
@@ -391,6 +398,7 @@ const scheduleRows = computed(() => {
         to: extensionSummary(row),
         when: whenSummary(row),
         status: scheduleStatus(row),
+        canRun: firstRunnableEvent(row) !== null,
     }))
 })
 
@@ -536,6 +544,34 @@ function formRoutes(tab) {
     return {
         store_route: routes.exception_store,
         update_route: item ? routeFor('exception_update', item.scheduled_announcement_exception_uuid) : null,
+    }
+}
+
+function firstRunnableEvent(schedule) {
+    const events = [...(schedule?.events ?? [])].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+
+    return events.find((event) => event?.scheduled_announcement_event_uuid) ?? null
+}
+
+async function runScheduleNow(schedule) {
+    const event = firstRunnableEvent(schedule)
+
+    if (!event?.scheduled_announcement_event_uuid) {
+        showNotification('error', { server: ['Add at least one announcement time before running this schedule.'] })
+        return
+    }
+
+    runningScheduleUuid.value = schedule.scheduled_announcement_schedule_uuid
+
+    try {
+        const response = await axios.post(routeFor('event_run', event.scheduled_announcement_event_uuid))
+        showNotification('success', response.data?.messages ?? { server: ['Run requested.'] })
+        await fetchData()
+        activeTab.value = 'runs'
+    } catch (error) {
+        handleErrorResponse(error)
+    } finally {
+        runningScheduleUuid.value = null
     }
 }
 
