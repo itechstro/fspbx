@@ -407,7 +407,16 @@ class LetsEncryptService
         $tmp = $path.'.tmp'.bin2hex(random_bytes(4));
 
         if (file_put_contents($tmp, $allPem) === false) {
-            throw new RuntimeException("Unable to write certificate to {$tmp}.");
+            $message = error_get_last()['message'] ?? "Unable to write certificate to {$tmp}.";
+            if (str_contains($message, 'Read-only file system') && str_starts_with($this->tlsDir, '/etc/')) {
+                throw new RuntimeException(
+                    "Unable to write the certificate to {$this->tlsDir}: PHP-FPM cannot write under /etc until "
+                    .'the php8.4-fpm service is restarted after the FS PBX systemd override is applied. '
+                    .'Run: sudo systemctl restart php8.4-fpm'
+                );
+            }
+
+            throw new RuntimeException($message);
         }
         @chmod($tmp, 0660);
 

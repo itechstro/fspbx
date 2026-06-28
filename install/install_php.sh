@@ -91,10 +91,11 @@ ensure_systemd_fspbx_override_php84() {
 [Service]
 RuntimeDirectory=php
 RuntimeDirectoryMode=0755
-ReadWritePaths=-/etc/freeswitch -/usr/share/freeswitch -/var/lib/freeswitch
+ReadWritePaths=/etc/freeswitch /usr/share/freeswitch /var/lib/freeswitch
 EOF
 
   systemctl daemon-reload
+  systemctl restart php8.4-fpm || true
   print_success "Ensured FS PBX systemd override for php8.4-fpm."
 }
 
