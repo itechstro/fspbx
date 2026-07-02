@@ -53,7 +53,7 @@
         @endfor
 @elseif ($layout === 'video')
         @php
-            $internalKeys = array_merge($lineKeys, $memoryKeys);
+            $internalKeys = IntradeKeyXml::mergeKeyedRows($lineKeys, $memoryKeys);
         @endphp
         @for ($page = 1; $page <= $pages; $page++)
         <internal index="{{ $page }}">

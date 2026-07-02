@@ -106,6 +106,32 @@ class IntradeKeyXml
     }
 
     /**
+     * Merge keyed provisioning rows without PHP array_merge() renumbering.
+     * Later row sets override earlier rows at the same index.
+     *
+     * @param  array<int, array<string, mixed>>  ...$rowSets
+     * @return array<int, array<string, mixed>>
+     */
+    public static function mergeKeyedRows(array ...$rowSets): array
+    {
+        $merged = [];
+
+        foreach ($rowSets as $rows) {
+            foreach ($rows as $index => $row) {
+                if (! is_array($row)) {
+                    continue;
+                }
+
+                $merged[(int) $index] = $row;
+            }
+        }
+
+        ksort($merged, SORT_NUMERIC);
+
+        return $merged;
+    }
+
+    /**
      * Return every slot on a page, including cleared positions.
      *
      * @return array<int, array{index: int, row: ?array<string, mixed>}>
@@ -196,11 +222,11 @@ class IntradeKeyXml
                 'mwi_index' => 7,
                 'headset_index' => 8,
             ],
-            // Screen DSS page 1 (internal keys): same first eight slots as Advanced.
+            // Screen DSS page 1: SIP1-4, voice mail on 5, headset on 6.
             'video' => [
-                'sip_slots' => [1, 2, 3, 4, 5, 6],
-                'mwi_index' => 7,
-                'headset_index' => 8,
+                'sip_slots' => [1, 2, 3, 4],
+                'mwi_index' => 5,
+                'headset_index' => 6,
             ],
             default => null,
         };
