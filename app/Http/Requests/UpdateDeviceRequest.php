@@ -250,12 +250,9 @@ class UpdateDeviceRequest extends FormRequest
             'device_address_modified' => $macAddress,
         ]);
 
-        // Preserve the device's current domain when the field is omitted from the form.
+        // Default domain
         if (!$this->has('domain_uuid')) {
-            $device = $this->route('device');
-            $domainUuid = $device?->domain_uuid ?: session('domain_uuid');
-
-            $this->merge(['domain_uuid' => $domainUuid]);
+            $this->merge(['domain_uuid' => session('domain_uuid')]);
         }
 
         if (!$this->has('device_enabled')) {

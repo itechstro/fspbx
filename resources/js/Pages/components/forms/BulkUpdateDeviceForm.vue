@@ -191,10 +191,9 @@
                                                     :conditions="[() => options?.permissions?.device_domain_update]" />
 
                                                 <SelectElement name="domain_uuid" :items="options.domains"
-                                                    :search="true" :native="false" :strict="true"
-                                                    label="Assigned To (Account)" input-type="search"
-                                                    autocomplete="new-password" label-prop="name" value-prop="value"
-                                                    placeholder="Select Account" :floating="false"
+                                                    :search="true" :native="false" label="Assigned To (Account)"
+                                                    input-type="search" autocomplete="off" label-prop="name"
+                                                    value-prop="value" placeholder="Select Account" :floating="false"
                                                     :conditions="[() => options?.permissions?.device_domain_update]"
                                                     :columns="{
                                                         container: 11,
