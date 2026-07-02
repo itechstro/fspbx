@@ -19,7 +19,7 @@
 
                 <SelectElement name="key_value_select" label="Value" label-prop="name" value-prop="extension"
                     :search="true" :native="false" :submit="false" allow-absent
-                    :create="['blf', 'speed_dial', 'park'].includes(formData?.[name]?.[index]?.key_type)"
+                    :create="KEY_TYPES_WITH_EXTENSION_CREATE.includes(formData?.[name]?.[index]?.key_type)"
                     :append-new-option="false" input-type="search" autocomplete="off"
                     :columns="{ sm: { container: 4 } }" placeholder="Choose Ext/Number" :floating="false"
                     :items="(query, input) => getKeyValueSelectItems(query, input, index, name)"
@@ -42,7 +42,7 @@
 </template>
 
 <script setup>
-import { applyFixedKeyTypeDefaults } from "./deviceKeyTypes.js";
+import { applyFixedKeyTypeDefaults, KEY_TYPES_WITH_EXTENSION_CREATE } from "./deviceKeyTypes.js";
 
 const props = defineProps({
     name: String,

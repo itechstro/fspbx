@@ -207,6 +207,8 @@ import {
     defaultKeyLabel,
     fixedKeyValue,
     getKeyTypes,
+    isBlfKeyType,
+    KEY_TYPES_WITH_EXTENSION_CREATE,
     KEY_TYPES_WITH_VALUE_TEXT,
     KEY_TYPES_WITH_VALUE_SELECT,
     keyLabelDisabledConditions,
@@ -263,7 +265,7 @@ const normalizeKeysForForm = (keys = []) => {
         const keyValue = key?.key_value ?? null;
         let label = null;
 
-        if (keyType === "blf" || keyType === "speed_dial") {
+        if (isBlfKeyType(keyType) || keyType === "speed_dial") {
             const match = props.options?.extensions?.find((extension) =>
                 String(extension.value ?? extension.extension) === String(keyValue)
             );
@@ -335,7 +337,7 @@ const getKeyValueSelectItems = async (query, input, index, listName) => {
     }
 
     const category = keyType === "check_voicemail" ? "voicemails" : "extensions";
-    if (!["check_voicemail", "blf", "speed_dial"].includes(keyType)) {
+    if (!["check_voicemail", "speed_dial"].includes(keyType) && !isBlfKeyType(keyType)) {
         return [];
     }
 
@@ -383,7 +385,7 @@ const updateLabel = (newValue, oldValue, el$, index, listName) => {
         label = selected?.extension ? `VM ${selected.extension}` : null;
     }
 
-    if (keyType === "blf" || keyType === "speed_dial") {
+    if (isBlfKeyType(keyType) || keyType === "speed_dial") {
         const selected = (keyValueOptionsByIndex[cacheKey] ?? [])
             .find((option) => String(option.extension) === String(newValue));
         label = nameOnlyFromOption(selected);

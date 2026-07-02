@@ -468,7 +468,7 @@
                                                             <SelectElement name="key_value_select" label="Value"
                                                                 label-prop="name" value-prop="extension" :search="true"
                                                                 :native="false" :submit="false"
-                                                                :create="['blf', 'speed_dial', 'park']
+                                                                :create="KEY_TYPES_WITH_EXTENSION_CREATE
                                                                     .includes(form$?.data?.device_keys?.[index]?.key_type)" :append-new-option="false"
                                                                 input-type="search" autocomplete="off" :columns="{
 
@@ -593,7 +593,7 @@
                                                             <SelectElement name="key_value_select" label="Value"
                                                                 label-prop="name" value-prop="extension" :search="true"
                                                                 :native="false" :submit="false"
-                                                                :create="['blf', 'speed_dial', 'park']
+                                                                :create="KEY_TYPES_WITH_EXTENSION_CREATE
                                                                     .includes(form$?.data?.multi_purpose_keys?.[index]?.key_type)"
                                                                 :append-new-option="false" input-type="search"
                                                                 autocomplete="off" :columns="{
@@ -679,6 +679,9 @@ import DeviceLinePasswordElement from "./DeviceLinePasswordElement.vue"
 import {
     applyFixedKeyTypeDefaults,
     getKeyTypes,
+    resolveDeviceVendor,
+    isBlfKeyType,
+    KEY_TYPES_WITH_EXTENSION_CREATE,
     KEY_TYPES_WITH_VALUE_TEXT,
     KEY_TYPES_WITH_VALUE_SELECT,
     keyLabelDisabledConditions,
@@ -700,21 +703,14 @@ function supportsMultiPurposeKeys(vendor) {
 }
 
 function selectedDeviceVendor() {
-    const fromItem = props.options?.item?.device_vendor
-    if (fromItem) {
-        return fromItem
-    }
+    const item = props.options?.item
+    const templateFromForm = form$?.value?.el$('device_template')?.value
 
-    const templateValue = form$?.value?.el$('device_template')?.value
-    if (!templateValue) {
-        return ''
-    }
-
-    const templates = props.options?.templates ?? []
-    const match = templates.find((template) => String(template.value) === String(templateValue))
-    const label = match?.name ?? String(templateValue)
-
-    return label.split('/')[0]?.toLowerCase() ?? ''
+    return resolveDeviceVendor({
+        deviceVendor: item?.device_vendor,
+        templateValue: templateFromForm,
+        templates: props.options?.templates ?? [],
+    })
 }
 
 const form$ = ref(null)
@@ -847,7 +843,7 @@ const getKeyValueSelectItems = async (query, input, index, listName = 'device_ke
         }
     }
 
-    if (keyType === 'blf' || keyType === 'speed_dial') {
+    if (isBlfKeyType(keyType) || keyType === 'speed_dial') {
         try {
             const axios = keyTypeEl.$vueform.services.axios
             const response = await axios.post(
@@ -896,7 +892,7 @@ const updateLabel = (newValue, oldValue, el$, index, listName = 'device_keys') =
         label = selected?.extension ? `VM ${selected.extension}` : null
     }
 
-    if (keyType === 'blf' || keyType === 'speed_dial') {
+    if (isBlfKeyType(keyType) || keyType === 'speed_dial') {
         const selected = (keyValueOptionsByIndex[cacheKey] ?? [])
             .find(o => String(o.extension) === String(newValue))
 

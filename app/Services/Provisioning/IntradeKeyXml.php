@@ -76,6 +76,7 @@ class IntradeKeyXml
             'ba' => '/ba',
             'bb' => '/bb',
             'bf' => '/bf',
+            'bd' => '/bd',
             'bc', 'bcV' => '/bc',
             'a' => '/a',
             'c' => '/c',

@@ -1,4 +1,4 @@
-{{-- version: 1.1.3 --}}
+{{-- version: 1.1.4 --}}
 
 @switch($flavor)
 
@@ -54,7 +54,11 @@
         $typeCode = match ($type) {
             'speed_dial', 'speeddial' => 'f',
             'park' => 'c',
-            'blf' => 'ba',
+            'blf', 'blf_new' => 'bc',
+            'blf_bxfer' => 'bb',
+            'blf_axfer' => 'ba',
+            'blf_conference' => 'bf',
+            'blf_dtmf' => 'bd',
             'check_voicemail' => 'bc',
             default => $type,
         };

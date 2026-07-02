@@ -575,7 +575,7 @@
                                                             <SelectElement name="key_value_select" label="Value"
                                                                 label-prop="name" value-prop="extension" :search="true"
                                                                 :native="false" :submit="false" allow-absent
-                                                                :create="['blf', 'speed_dial', 'park']
+                                                                :create="KEY_TYPES_WITH_EXTENSION_CREATE
                                                                     .includes(form$?.data?.device_keys?.[index]?.key_type)" :append-new-option="false"
                                                                 input-type="search" autocomplete="off" :columns="{
 
@@ -699,7 +699,7 @@
                                                             <SelectElement name="key_value_select" label="Value"
                                                                 label-prop="name" value-prop="extension" :search="true"
                                                                 :native="false" :submit="false"
-                                                                :create="['blf', 'speed_dial', 'park']
+                                                                :create="KEY_TYPES_WITH_EXTENSION_CREATE
                                                                     .includes(form$?.data?.side_keys?.[index]?.key_type)" :append-new-option="false"
                                                                 input-type="search" autocomplete="off" :columns="{
 
@@ -825,7 +825,7 @@
                                                             <SelectElement name="key_value_select" label="Value"
                                                                 label-prop="name" value-prop="extension" :search="true"
                                                                 :native="false" :submit="false"
-                                                                :create="['blf', 'speed_dial', 'park']
+                                                                :create="KEY_TYPES_WITH_EXTENSION_CREATE
                                                                     .includes(form$?.data?.multi_purpose_keys?.[index]?.key_type)"
                                                                 :append-new-option="false" input-type="search"
                                                                 autocomplete="off" :columns="{
@@ -952,7 +952,7 @@
                                                             <SelectElement name="key_value_select" label="Value"
                                                                 label-prop="name" value-prop="extension" :search="true"
                                                                 :native="false" :submit="false"
-                                                                :create="['blf', 'speed_dial', 'park']
+                                                                :create="KEY_TYPES_WITH_EXTENSION_CREATE
                                                                     .includes(form$?.data?.expansion_keys?.[index]?.key_type)"
                                                                 :append-new-option="false" input-type="search"
                                                                 autocomplete="off" :columns="{
@@ -1353,6 +1353,9 @@ import {
     defaultKeyLabel,
     fixedKeyValue,
     getKeyTypes,
+    resolveDeviceVendor,
+    isBlfKeyType,
+    KEY_TYPES_WITH_EXTENSION_CREATE,
     KEY_TYPES_WITH_VALUE_TEXT,
     KEY_TYPES_WITH_VALUE_SELECT,
     keyLabelDisabledConditions,
@@ -1468,7 +1471,18 @@ const filterKeysByArea = (keys = [], area = 'main') => {
     })
 }
 
-const keyTypes = computed(() => getKeyTypes(props.options?.item?.device_vendor))
+function selectedDeviceVendor() {
+    const item = props.options?.item
+    const templateFromForm = form$?.value?.el$('device_template')?.value
+
+    return resolveDeviceVendor({
+        deviceVendor: item?.device_vendor,
+        templateValue: templateFromForm ?? item?.device_template_uuid ?? item?.device_template,
+        templates: props.options?.templates ?? [],
+    })
+}
+
+const keyTypes = computed(() => getKeyTypes(selectedDeviceVendor()))
 const keyTypesWithSelect = KEY_TYPES_WITH_VALUE_SELECT
 const keyTypesWithValueText = KEY_TYPES_WITH_VALUE_TEXT
 
@@ -1514,7 +1528,7 @@ const getKeyValueSelectItems = async (query, input, index, listName = 'device_ke
         }
     }
 
-    if (keyType === 'blf' || keyType === 'speed_dial') {
+    if (isBlfKeyType(keyType) || keyType === 'speed_dial') {
         try {
             const axios = keyTypeEl.$vueform.services.axios
             const response = await axios.post(
@@ -1593,7 +1607,7 @@ const updateLabel = (newValue, oldValue, el$, index, listName = 'device_keys') =
         label = selected?.extension ? `VM ${selected.extension}` : null
     }
 
-    if (keyType === 'blf' || keyType === 'speed_dial') {
+    if (isBlfKeyType(keyType) || keyType === 'speed_dial') {
         const selected = (keyValueOptionsByIndex[cacheKey] ?? [])
             .find(o => String(o.extension) === String(newValue))
 
@@ -1746,7 +1760,7 @@ const normalizeDeviceKeysForForm = (keys = []) => {
 
         let label = null
 
-        if (key_type === 'blf' || key_type === 'speed_dial') {
+        if (isBlfKeyType(key_type) || key_type === 'speed_dial') {
             const match = props.options.extensions?.find(ext =>
                 String(ext.value ?? ext.extension) === String(key_value)
             )

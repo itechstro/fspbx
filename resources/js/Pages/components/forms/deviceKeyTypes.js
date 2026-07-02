@@ -13,10 +13,38 @@ export const INTRADE_FANVIL_KEY_TYPES = [
     { value: 'headset', name: 'Headset' },
 ]
 
+/** Fanvil / Intrade / Ibratro BLF memory-key subtypes (FusionPBX Fanvil codes). */
+export const INTRADE_FANVIL_BLF_KEY_TYPES = [
+    { value: 'blf_bxfer', name: 'BLF / Blind Transfer' },
+    { value: 'blf_axfer', name: 'BLF / Attended Transfer' },
+    { value: 'blf_conference', name: 'BLF / Conference' },
+    { value: 'blf_dtmf', name: 'BLF / DTMF' },
+]
+
+export const BLF_KEY_TYPES = [
+    'blf',
+    'blf_new',
+    ...INTRADE_FANVIL_BLF_KEY_TYPES.map((type) => type.value),
+]
+
+export function isBlfKeyType(keyType) {
+    return BLF_KEY_TYPES.includes(String(keyType ?? ''))
+}
+
+export const KEY_TYPES_WITH_EXTENSION_CREATE = [
+    ...BLF_KEY_TYPES,
+    'speed_dial',
+    'park',
+]
+
 export const KEY_TYPES_WITH_VALUE_SELECT = [
     'line',
     'check_voicemail',
     'blf',
+    'blf_bxfer',
+    'blf_axfer',
+    'blf_conference',
+    'blf_dtmf',
     'speed_dial',
     'park',
 ]
@@ -36,14 +64,46 @@ export function supportsIntradeFanvilKeys(vendor) {
     return ['fanvil', 'intrade', 'ibratro'].includes(value)
 }
 
+export function resolveDeviceVendor({ deviceVendor, templateValue, templates = [] } = {}) {
+    const vendor = String(deviceVendor || '').toLowerCase().trim()
+    if (vendor) {
+        return vendor
+    }
+
+    if (!templateValue) {
+        return ''
+    }
+
+    const value = String(templateValue)
+    const match = templates.find((template) => String(template.value) === value)
+    const label = match?.name ?? value
+
+    if (label.includes('/')) {
+        return label.split('/')[0]?.toLowerCase() ?? ''
+    }
+
+    return label.toLowerCase()
+}
+
 export function getKeyTypes(vendor) {
     if (!supportsIntradeFanvilKeys(vendor)) {
         return [...BASE_KEY_TYPES]
     }
 
-    const types = [...BASE_KEY_TYPES]
-    const insertAt = types.findIndex((type) => type.value === 'check_voicemail') + 1
+    const types = BASE_KEY_TYPES.map((type) => {
+        if (type.value === 'blf') {
+            return { value: 'blf', name: 'BLF / New Call' }
+        }
 
+        return type
+    })
+
+    const blfIndex = types.findIndex((type) => type.value === 'blf')
+    if (blfIndex >= 0) {
+        types.splice(blfIndex + 1, 0, ...INTRADE_FANVIL_BLF_KEY_TYPES)
+    }
+
+    const insertAt = types.findIndex((type) => type.value === 'check_voicemail') + 1
     types.splice(insertAt, 0, ...INTRADE_FANVIL_KEY_TYPES)
 
     return types

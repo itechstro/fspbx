@@ -1928,7 +1928,11 @@ if (!function_exists('buildDestinationAction')) {
                     'speed_dial' => 'f',
                     'dtmf' => 'dtmf',
                     'park' => 'c',
-                    'blf', 'check_voicemail' => 'bc',
+                    'blf', 'blf_new', 'check_voicemail' => 'bc',
+                    'blf_bxfer' => 'bb',
+                    'blf_axfer' => 'ba',
+                    'blf_conference' => 'bf',
+                    'blf_dtmf' => 'bd',
                     'voice_mail' => 'mwi',
                     'headset' => 'headset',
                     '' => '3',
@@ -2109,7 +2113,7 @@ if (!function_exists('buildDestinationAction')) {
             } elseif ($rawType === 'speed_dial' || $rawType === 'dtmf') {
                 $row['device_key_value'] = ($value !== null ? (string)$value : '');
                 $row['device_key_label'] = (strlen((string)$label) ? (string)$label : '');
-            } elseif ($rawType === 'blf') {
+            } elseif (in_array($rawType, ['blf', 'blf_new', 'blf_bxfer', 'blf_axfer', 'blf_conference', 'blf_dtmf'], true)) {
                 $row['device_key_value'] = ($value !== null ? (string)$value : '');
 
                 if (!strlen((string)$label)) {
@@ -2478,6 +2482,22 @@ if (!function_exists('buildDestinationAction')) {
     }
 
 
+    if (!function_exists('fspbx_is_blf_key_type')) {
+        function fspbx_is_blf_key_type(string $type): bool
+        {
+            static $types = [
+                'blf',
+                'blf_new',
+                'blf_bxfer',
+                'blf_axfer',
+                'blf_conference',
+                'blf_dtmf',
+            ];
+
+            return in_array(strtolower(trim($type)), $types, true);
+        }
+    }
+
     if (!function_exists('fspbx_prefetch_extension_labels')) {
         function fspbx_prefetch_extension_labels(string $domain_uuid, array $new_keys_rows): array
         {
@@ -2488,7 +2508,7 @@ if (!function_exists('buildDestinationAction')) {
                 $label = (string)($nk['key_label'] ?? '');
                 $val   = (string)($nk['key_value'] ?? '');
 
-                if ($type === 'blf' && $label === '' && $val !== '') {
+                if (fspbx_is_blf_key_type($type) && $label === '' && $val !== '') {
                     $exts[$val] = true; // unique
                 }
             }
