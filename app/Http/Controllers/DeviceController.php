@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Inertia\Inertia;
 use App\Models\Devices;
+use App\Models\Domain;
 use App\Data\DeviceData;
 use App\Models\Extensions;
 use App\Models\DeviceLines;
@@ -618,12 +619,15 @@ class DeviceController extends Controller
                 // New device defaults
                 $deviceDto     = new DeviceData(
                     device_uuid: '',
+                    domain_uuid: session('domain_uuid'),
                 );
             }
 
             // $device = $this->model::find(request('itemUuid'));
 
-            $domain_uuid = request('domain_uuid') ?? session('domain_uuid');
+            $domain_uuid = request('domain_uuid')
+                ?? ($deviceDto->domain_uuid ?? null)
+                ?? session('domain_uuid');
 
             // Define the options for the 'extensions' field
             $extensions = Extensions::where('domain_uuid', $domain_uuid)
@@ -643,16 +647,7 @@ class DeviceController extends Controller
                 ];
             }
 
-            $domainOptions = [];
-            // Loop through each domain and create an option
-            if (session('domains')) {
-                foreach (session('domains') as $domain) {
-                    $domainOptions[] = [
-                        'value' => $domain->domain_uuid,
-                        'name' => $domain->domain_description,
-                    ];
-                }
-            }
+            $domainOptions = $this->buildDomainOptionsForDeviceForm($deviceDto->domain_uuid ?? null);
 
             $routes = array_merge($routes, [
                 'store_route' => route('devices.store'),
@@ -1038,5 +1033,59 @@ class DeviceController extends Controller
         }
 
         return [];
+    }
+
+    private function buildDomainOptionsForDeviceForm(?string $ensureDomainUuid = null): array
+    {
+        $options = [];
+        $seen = [];
+
+        foreach (collect(session('domains', [])) as $domain) {
+            $uuid = (string) data_get($domain, 'domain_uuid', '');
+            $label = $this->domainOptionLabel($domain);
+
+            if ($uuid === '' || $label === '' || isset($seen[$uuid])) {
+                continue;
+            }
+
+            $options[] = [
+                'value' => $uuid,
+                'name' => $label,
+            ];
+            $seen[$uuid] = true;
+        }
+
+        if ($ensureDomainUuid && ! isset($seen[$ensureDomainUuid])) {
+            $domain = Domain::query()
+                ->where('domain_uuid', $ensureDomainUuid)
+                ->first(['domain_uuid', 'domain_name', 'domain_description']);
+
+            if ($domain) {
+                $options[] = [
+                    'value' => $domain->domain_uuid,
+                    'name' => $this->domainOptionLabel($domain),
+                ];
+                $seen[$ensureDomainUuid] = true;
+            }
+        }
+
+        if ($options === [] && session('domain_uuid')) {
+            $options[] = [
+                'value' => session('domain_uuid'),
+                'name' => (string) (session('domain_description') ?: session('domain_name')),
+            ];
+        }
+
+        usort($options, fn (array $left, array $right) => strcasecmp($left['name'], $right['name']));
+
+        return $options;
+    }
+
+    private function domainOptionLabel(mixed $domain): string
+    {
+        $description = trim((string) data_get($domain, 'domain_description', ''));
+        $name = trim((string) data_get($domain, 'domain_name', ''));
+
+        return $description !== '' ? $description : $name;
     }
 }
