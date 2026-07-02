@@ -1621,6 +1621,14 @@ class DatabaseSeeder extends Seeder
                 'default_setting_enabled'       => false,
                 'default_setting_description'   => "It configures the password of a specific wireless network.",
             ],
+            [
+                'default_setting_category'      => 'provision',
+                'default_setting_subcategory'   => 'fanvil_time_zone',
+                'default_setting_name'          => 'text',
+                'default_setting_value'         => '32',
+                'default_setting_enabled'       => true,
+                'default_setting_description'   => 'Fanvil time zone index. Use 32 for UTC+8 on Fanvil X-series phones.',
+            ],
             ...IntradeProvisionSettings::definitions(),
 
         ];

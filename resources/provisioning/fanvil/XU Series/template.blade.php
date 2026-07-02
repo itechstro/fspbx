@@ -1,4 +1,4 @@
-{{-- version: 1.1.4 --}}
+{{-- version: 1.1.5 --}}
 
 @switch($flavor)
 
@@ -249,8 +249,8 @@
             <EnableSNTP>{{ $enabled('fanvil_enable_sntp', true) }}</EnableSNTP>
             <SNTPServer>{{ $setting('ntp_server_primary', 'pool.ntp.org') }}</SNTPServer>
             <SecondSNTPServer>{{ $setting('ntp_server_secondary') }}</SecondSNTPServer>
-            <TimeZone>{{ $setting('fanvil_time_zone', 0) }}</TimeZone>
-            <TimeZoneName>{{ $setting('fanvil_time_zone_name', 'UTC') }}</TimeZoneName>
+            <TimeZone>{{ $setting('fanvil_time_zone', 32) }}</TimeZone>
+            <TimeZoneName>{{ $setting('fanvil_time_zone_name', 'UTC+8') }}</TimeZoneName>
             <Enable_DST>{{ $enabled('fanvil_enable_dst') }}</Enable_DST>
             <DST_Fixed_Type>{{ $setting('fanvil_dst_fixed_type', 0) }}</DST_Fixed_Type>
             <DSTLocation>{{ $setting('fanvil_location', 4) }}</DSTLocation>
