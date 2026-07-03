@@ -76,7 +76,13 @@ class DomainLicenseController extends Controller
             'limits.*.enabled' => ['required', 'boolean'],
             'limits.*.value' => ['nullable', 'numeric', 'min:0'],
             'limits.*.revert' => ['sometimes', 'boolean'],
+            'alert_email' => ['nullable', 'string', 'max:1000'],
         ]);
+
+        if (array_key_exists('alert_email', $data)) {
+            app(\App\Services\DomainUsageLimitAlertService::class)
+                ->updateAlertEmail($domain->domain_uuid, $data['alert_email']);
+        }
 
         foreach ($data['limits'] as $row) {
             $key = (string) $row['key'];

@@ -28,6 +28,7 @@ class DomainLicenseService
             'usage' => $this->domainUsageService->buildSummary($domainUuid, $period),
             'ai_costs' => $this->domainUsageService->buildAiCostSummary($domainUuid, $period),
             'limits' => $this->buildLimitRows($domainUuid, $period),
+            'alert_email' => app(DomainUsageLimitAlertService::class)->getAlertEmailSetting($domainUuid),
         ];
     }
 

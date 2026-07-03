@@ -93,6 +93,10 @@ class DomainUsageService
             }
             $row->save();
         });
+
+        if ($this->shouldEvaluateAiLimitAlerts($metric)) {
+            app(DomainUsageLimitAlertService::class)->evaluateAiLimits($domainUuid, $period);
+        }
     }
 
     /**
@@ -116,6 +120,13 @@ class DomainUsageService
         $currentUsage = $this->getUsage($metric, $domainUuid);
 
         if (($currentUsage + $proposedAmount) > $limitAmount) {
+            app(DomainUsageLimitAlertService::class)->notifyLimitBlocked(
+                (string) $domainUuid,
+                $limitKey,
+                $currentUsage,
+                $limitAmount,
+            );
+
             throw new DomainUsageLimitExceededException(
                 metric: $metric,
                 limitKey: $limitKey,
@@ -226,6 +237,17 @@ class DomainUsageService
             ->whereBetween('start_epoch', [(string) $start->timestamp, (string) $end->timestamp])
             ->get(['billsec', 'duration'])
             ->sum(fn ($row) => max(0, (int) ($row->billsec ?: $row->duration ?: 0)));
+    }
+
+    protected function shouldEvaluateAiLimitAlerts(string $metric): bool
+    {
+        return in_array($metric, [
+            'ai_transcription_seconds',
+            'ai_summary_count',
+            'ai_translation_count',
+            'ai_executive_summary_count',
+            'ai_spend_usd',
+        ], true);
     }
 
     public function buildAiCostSummary(?string $domainUuid, ?string $period = null): array

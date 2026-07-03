@@ -90,4 +90,19 @@ return [
             'scale' => 60,
         ],
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | AI usage limit alert emails
+    |--------------------------------------------------------------------------
+    */
+    'limit_alerts' => [
+        'limit_keys' => [
+            'ai_transcription_minutes',
+            'ai_summary_requests',
+            'ai_translation_requests',
+            'ai_executive_summary_requests',
+            'ai_spend_usd_monthly',
+        ],
+    ],
 ];

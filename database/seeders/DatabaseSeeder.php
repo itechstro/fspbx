@@ -1575,6 +1575,22 @@ class DatabaseSeeder extends Seeder
             ],
             [
                 'default_setting_category'      => 'limit',
+                'default_setting_subcategory'   => 'ai_usage_alert_email',
+                'default_setting_name'          => 'text',
+                'default_setting_value'         => '',
+                'default_setting_enabled'       => false,
+                'default_setting_description'   => 'Comma-separated email addresses for AI usage limit alerts. Leave blank to fall back to Support Email.',
+            ],
+            [
+                'default_setting_category'      => 'limit',
+                'default_setting_subcategory'   => 'ai_usage_alert_approaching_percent',
+                'default_setting_name'          => 'numeric',
+                'default_setting_value'         => '80',
+                'default_setting_enabled'       => true,
+                'default_setting_description'   => 'Send an approaching-limit alert when monthly AI usage reaches this percentage of the assigned limit (1-100).',
+            ],
+            [
+                'default_setting_category'      => 'limit',
                 'default_setting_subcategory'   => 'outbound_minutes_monthly',
                 'default_setting_name'          => 'numeric',
                 'default_setting_value'         => '10000',

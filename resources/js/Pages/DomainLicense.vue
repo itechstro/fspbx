@@ -60,6 +60,18 @@
             </div>
 
             <div class="mt-4 overflow-x-auto">
+                <div v-if="permissions.edit" class="mb-4 max-w-xl">
+                    <label for="ai-usage-alert-email" class="block text-sm font-medium text-gray-700">AI usage alert email</label>
+                    <p class="mt-1 text-xs text-gray-500">Comma-separated recipients for approaching and limit-reached alerts. Leave blank to use Support Email.</p>
+                    <input
+                        id="ai-usage-alert-email"
+                        v-model="alertEmail"
+                        type="text"
+                        placeholder="alerts@example.com"
+                        class="mt-2 block w-full rounded-md border-0 py-1.5 text-sm text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600"
+                    />
+                </div>
+
                 <table class="min-w-full divide-y divide-gray-200 text-sm">
                     <thead>
                         <tr class="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
@@ -142,6 +154,7 @@ const saving = ref(false);
 const usageData = ref(null);
 const selectedPeriod = ref(new URLSearchParams(window.location.search).get('period') || new Date().toISOString().slice(0, 7));
 const limitRows = ref([]);
+const alertEmail = ref('');
 const notificationShow = ref(false);
 const notificationType = ref(null);
 const notificationMessages = ref('');
@@ -230,6 +243,7 @@ function loadUsage() {
     })
         .then((response) => {
             usageData.value = response.data;
+            alertEmail.value = response.data.alert_email || '';
             syncLimitRows();
         })
         .catch((error) => {
@@ -248,6 +262,7 @@ function handlePeriodChange(period) {
 function saveLimits() {
     saving.value = true;
     axios.put(props.routes.update, {
+        alert_email: alertEmail.value,
         limits: limitRows.value.map((row) => ({
             key: row.key,
             enabled: row.enabled,
@@ -257,6 +272,7 @@ function saveLimits() {
     })
         .then((response) => {
             usageData.value = response.data.data;
+            alertEmail.value = response.data.data.alert_email || '';
             syncLimitRows();
             showNotification('success', response.data.messages ?? { success: ['Limits saved.'] });
         })
