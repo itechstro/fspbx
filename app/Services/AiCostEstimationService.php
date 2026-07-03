@@ -132,7 +132,6 @@ class AiCostEstimationService
         }
 
         $utterances = (array) data_get($row->result_payload, 'utterances', []);
-        $summaryText = trim((string) data_get($row->summary_payload, 'summary', ''));
         $targetLanguage = trim((string) ($row->translation_target_language ?? 'unknown'));
 
         if ($utterances !== []) {
@@ -140,8 +139,6 @@ class AiCostEstimationService
                 "Target language: {$targetLanguage}",
                 'Utterances JSON:',
                 json_encode($utterances, JSON_UNESCAPED_UNICODE) ?: '',
-                'Summary:',
-                $summaryText !== '' ? $summaryText : '[none]',
             ]);
             $outputText = json_encode($row->translation_payload ?? [], JSON_UNESCAPED_UNICODE) ?: '';
         } else {
@@ -150,8 +147,6 @@ class AiCostEstimationService
                 "Target language: {$targetLanguage}",
                 'Transcript:',
                 $transcriptText,
-                'Summary:',
-                $summaryText !== '' ? $summaryText : '[none]',
             ]);
             $outputText = json_encode($row->translation_payload ?? [], JSON_UNESCAPED_UNICODE) ?: '';
         }

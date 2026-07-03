@@ -33,6 +33,19 @@ class SummarizeCallTranscription implements ShouldQueue
             $row = CallTranscription::find($this->uuid);
             if (!$row) return;
 
+            if (in_array($row->summary_status, ['queued', 'in_progress', 'processing'], true)) {
+                return;
+            }
+
+            if ($row->status !== 'completed') {
+                $row->update([
+                    'summary_status' => 'failed',
+                    'summary_error' => 'Transcription must be completed before summarization.',
+                ]);
+
+                return;
+            }
+
             try {
                 $domainUsageService->assertWithinLimit('ai_summary_requests', 1, $row->domain_uuid);
                 $domainUsageService->assertWithinLimit(
@@ -78,9 +91,10 @@ class SummarizeCallTranscription implements ShouldQueue
                 return;
             }
 
-            // Kick off OpenAI background task
             $openAiService = app(\App\Services\OpenAIService::class);
-            $start  = $openAiService->createBackgroundSummary($lines, 'gpt-5-nano');
+            $outputLanguage = app(\App\Services\CallTranscription\CallTranscriptionService::class)
+                ->summaryOutputLanguage($row->domain_uuid);
+            $start  = $openAiService->createBackgroundSummary($lines, 'gpt-5-nano', $outputLanguage);
 
             $responseId = $start['id'] ?? null;
             $status     = $start['status'] ?? 'queued';
@@ -99,6 +113,9 @@ class SummarizeCallTranscription implements ShouldQueue
                 'summary_external_id'=> $responseId,
                 'summary_status'     => in_array($status, ['queued','in_progress']) ? $status : 'queued',
                 'summary_error'      => null,
+                'summary_payload'    => null,
+                'summary_requested_at' => now(),
+                'summary_completed_at' => null,
             ]);
 
 

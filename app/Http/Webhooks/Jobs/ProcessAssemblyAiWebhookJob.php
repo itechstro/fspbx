@@ -51,8 +51,6 @@ class ProcessAssemblyAiWebhookJob extends SpatieProcessWebhookJob
                 ->where('xml_cdr_uuid', $row->xml_cdr_uuid)
                 ->value('direction');
 
-            $shouldSummarize = $service->shouldAutoSummarize($row->domain_uuid, $direction);
-
             $updates = [
                 'status'          => 'completed',
                 'result_payload'  => $sanitized ?: null,
@@ -60,18 +58,10 @@ class ProcessAssemblyAiWebhookJob extends SpatieProcessWebhookJob
                 'error_message'   => null,
             ];
 
-            if ($shouldSummarize) {
-                $updates['summary_status'] = 'pending';
-                $updates['summary_error'] = null;
-                $updates['summary_requested_at'] = now();
-            }
-
             $row->update($updates);
             $costService->applyTranscriptionCompletion($row->refresh(), $full ?: []);
 
-            if ($shouldSummarize) {
-                dispatch(new \App\Jobs\SummarizeCallTranscription($row->uuid))->onQueue('transcriptions');
-            } elseif ($service->shouldAutoTranslate($row->domain_uuid, $direction)) {
+            if ($service->shouldAutoTranslate($row->domain_uuid, $direction)) {
                 dispatch(new \App\Jobs\TranslateCallTranscription($row->uuid))->onQueue('transcriptions');
             } else {
                 $service->maybeDispatchTranscriptionEmail($row);

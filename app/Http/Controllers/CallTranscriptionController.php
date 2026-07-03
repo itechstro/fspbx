@@ -82,6 +82,8 @@ class CallTranscriptionController extends Controller
         $emailRecorder      = $domain?->email_recorder ?? ($system?->email_recorder ?? null);
         $translationLanguage = $domain?->translation_language
             ?? ($system?->translation_language ?? null);
+        $recorderSummaryLanguage = $domain?->recorder_summary_language
+            ?? ($system?->recorder_summary_language ?? null);
 
         return response()->json([
             'scope'         => $domain ? 'domain' : 'system',
@@ -101,6 +103,7 @@ class CallTranscriptionController extends Controller
             'email'              => $email,
             'email_recorder'     => $emailRecorder,
             'translation_language' => $translationLanguage,
+            'recorder_summary_language' => $recorderSummaryLanguage,
         ]);
     }
 
@@ -133,6 +136,7 @@ class CallTranscriptionController extends Controller
                     'email'       => $data['email'] ?? null,
                     'email_recorder' => $data['email_recorder'] ?? null,
                     'translation_language' => $data['translation_language'] ?? null,
+                    'recorder_summary_language' => $data['recorder_summary_language'] ?? null,
                 ]
             );
 

@@ -261,7 +261,9 @@ class RecorderAnalyticsService
         );
 
         $decoded = $this->openAIService->createExecutiveSummary(
-            $this->buildExecutiveSummaryContext($report)
+            $this->buildExecutiveSummaryContext($report),
+            'gpt-4.1-mini',
+            app(\App\Services\CallTranscription\CallTranscriptionService::class)->recorderSummaryLanguage($domainUuid)
         );
 
         $model = (string) ($decoded['model'] ?? 'gpt-4.1-mini');

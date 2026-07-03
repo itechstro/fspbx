@@ -116,6 +116,51 @@ class CallTranscriptionService
         return (bool) ($cfg['auto_summarize'] ?? false);
     }
 
+    public function recorderSummaryLanguage(?string $domainUuid): ?string
+    {
+        return $this->summaryOutputLanguage($domainUuid);
+    }
+
+    public function summaryOutputLanguage(?string $domainUuid): ?string
+    {
+        $cfg = $this->transcriptionConfigCached($domainUuid);
+
+        foreach ([
+            $cfg['recorder_summary_language'] ?? null,
+            $cfg['translation_language'] ?? null,
+            get_domain_setting('language', $domainUuid),
+        ] as $candidate) {
+            $normalized = $this->normalizeSummaryLanguageCode($candidate);
+            if ($normalized !== null) {
+                return $normalized;
+            }
+        }
+
+        return null;
+    }
+
+    private function normalizeSummaryLanguageCode(mixed $code): ?string
+    {
+        $code = strtolower(trim((string) $code));
+        if ($code === '') {
+            return null;
+        }
+
+        if (in_array($code, ['en', 'en-us', 'en-gb'], true)) {
+            return null;
+        }
+
+        if (in_array($code, ['zh-hant', 'zh_hant', 'zh-hk', 'zh-mo', 'traditional'], true)) {
+            return 'zh-tw';
+        }
+
+        if (in_array($code, ['zh-hans', 'zh_hans', 'simplified'], true)) {
+            return 'zh-cn';
+        }
+
+        return $code;
+    }
+
     public function emailDeliveryConfig(?string $domainUuid, ?string $direction = null): array
     {
         $cfg = $this->transcriptionConfigCached($domainUuid);
@@ -199,10 +244,9 @@ class CallTranscriptionService
             return false;
         }
 
-        $autoSummarize = $this->shouldAutoSummarize($row->domain_uuid, $direction);
         $autoTranslate = $this->shouldAutoTranslate($row->domain_uuid, $direction);
 
-        if ($autoSummarize && ! $this->isOptionalStepTerminal($row->summary_status)) {
+        if ($this->isSummaryInProgress($row->summary_status)) {
             return false;
         }
 
@@ -229,6 +273,11 @@ class CallTranscriptionService
     private function isOptionalStepTerminal(?string $status): bool
     {
         return in_array($status, ['completed', 'failed'], true);
+    }
+
+    private function isSummaryInProgress(?string $status): bool
+    {
+        return in_array($status, ['pending', 'queued', 'processing', 'in_progress'], true);
     }
 
     public function shouldAutoTranslate(?string $domainUuid, ?string $direction = null): bool

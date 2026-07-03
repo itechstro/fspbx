@@ -82,6 +82,14 @@
                                 :true-value="true" :false-value="false" :disabled="disableOptions"
                                 :conditions="[['enabled', '==', true]]" />
 
+                            <SelectElement name="recorder_summary_language" label="Summary Language"
+                                :items="translationLanguages" :search="true" :native="false" input-type="search"
+                                autocomplete="off" :allow-absent="true" :strict="false"
+                                placeholder="e.g. th, en-us, zh-tw"
+                                :columns="{ lg: { wrapper: 5 } }" :disabled="disableOptions"
+                                description="Language for call and recorder summaries. Leave blank to use Translation Language, then domain language, then English."
+                                :conditions="[['enabled', '==', true]]" />
+
                             <ToggleElement name="auto_translate_recorder"
                                 text="Automatically translate recorder transcriptions"
                                 :true-value="true" :false-value="false" :disabled="disableOptions"
@@ -274,6 +282,7 @@ function cancelOverride() {
         email: policy.value.email ?? null,
         email_recorder: policy.value.email_recorder ?? null,
         translation_language: policy.value.translation_language ?? null,
+        recorder_summary_language: policy.value.recorder_summary_language ?? null,
     })
 }
 
@@ -324,6 +333,7 @@ const submitForm = async (FormData, form$) => {
         auto_translate: form$.data.auto_translate ?? false,
         auto_translate_recorder: form$.data.auto_translate_recorder ?? false,
         translation_language: form$.data.translation_language ?? null,
+        recorder_summary_language: form$.data.recorder_summary_language ?? null,
         // Legacy columns kept in DB; always save false when using the simplified email UI.
         email_translation: false,
         email_translation_recorder: false,

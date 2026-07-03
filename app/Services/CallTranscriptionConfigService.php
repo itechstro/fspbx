@@ -62,6 +62,8 @@ class CallTranscriptionConfigService
         $emailRecorder      = $domain?->email_recorder ?? ($system?->email_recorder ?? null);
         $translationLanguage = $domain?->translation_language
             ?? ($system?->translation_language ?? null);
+        $recorderSummaryLanguage = $domain?->recorder_summary_language
+            ?? ($system?->recorder_summary_language ?? null);
 
         // 2) Provider row (may be null if not set yet)
         $provider = null;
@@ -110,6 +112,7 @@ class CallTranscriptionConfigService
             'email' => $email,
             'email_recorder' => $emailRecorder,
             'translation_language' => $translationLanguage,
+            'recorder_summary_language' => $recorderSummaryLanguage,
             'provider_uuid'    => $providerUuid,
             'provider_key'     => $providerKey,
             'provider_active'  => $providerActive,

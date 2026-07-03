@@ -141,11 +141,11 @@ class OpenAIService
      * Kick off a background Responses task with your exact system/user prompt and utterances.
      * Returns ["id" => "resp_...","status" => "queued|in_progress|..."].
      */
-    public function createBackgroundSummary(array $utteranceLines, string $model = 'gpt-4.1-mini'): array
+    public function createBackgroundSummary(array $utteranceLines, string $model = 'gpt-4.1-mini', ?string $outputLanguage = null): array
     {
         $url = 'https://api.openai.com/v1/responses';
 
-        $systemText = implode("\n", [
+        $systemText = implode("\n", array_filter([
             'You are a precise call-summary assistant for a VoIP platform.',
             'Transform call transcripts into a concise summary and structured insights.',
             'Rules:',
@@ -155,6 +155,7 @@ class OpenAIService
             '- If a field is unknown, use null.',
             '- If you can guess the participants name, use that name in your responses.',
             '- If the name is unknown, use the guessed role instead (e.g., "Agent", "Customer").',
+            $this->outputLanguageRule($outputLanguage),
             '- Return ONLY valid JSON matching the schema below—no prose.',
             '',
             'Output JSON schema:',
@@ -174,7 +175,7 @@ class OpenAIService
             '  "next_best_step": "string",',
             '  "confidence": 0.0',
             '}',
-        ]);
+        ]));
 
         $userText = implode("\n", array_merge(
             [
@@ -255,34 +256,30 @@ class OpenAIService
      */
     public function createBackgroundTranslation(
         array $utterances,
-        ?string $summaryText,
         string $targetLanguage,
         ?string $fallbackTranscriptText = null,
         string $model = 'gpt-4.1-mini'
     ): array
     {
         $url = 'https://api.openai.com/v1/responses';
-        $summaryInput = trim((string) $summaryText) !== '' ? (string) $summaryText : '[none]';
         $hasUtterances = count($utterances) > 0;
 
         if ($hasUtterances) {
             $instructions = implode("\n", [
                 'You are a precise translation assistant for call transcriptions.',
-                'Translate each utterance and the optional summary to the requested target language.',
+                'Translate each utterance to the requested target language.',
                 'Rules:',
                 '- Translate only the "text" field of each utterance.',
                 '- Keep speaker labels and numeric start/end values exactly as provided.',
                 '- Return one utterance per input utterance, in the same order.',
                 '- Preserve meaning, speaker intent, and tone.',
                 '- Return ONLY valid JSON, no markdown and no commentary.',
-                '- If summary is missing, return summary_text as null.',
                 '',
                 'Output JSON schema:',
                 '{',
                 '  "utterances": [',
                 '    {"speaker": "A|B|C...", "start": 0, "end": 0, "text": "translated line"}',
-                '  ],',
-                '  "summary_text": "string|null"',
+                '  ]',
                 '}',
             ]);
 
@@ -290,24 +287,20 @@ class OpenAIService
                 "Target language: {$targetLanguage}",
                 'Utterances JSON:',
                 json_encode($utterances, JSON_UNESCAPED_UNICODE),
-                'Summary:',
-                $summaryInput,
             ]);
         } else {
             $transcriptText = trim((string) $fallbackTranscriptText);
             $instructions = implode("\n", [
                 'You are a precise translation assistant for call transcriptions.',
-                'Translate the provided transcript and summary to the requested target language.',
+                'Translate the provided transcript to the requested target language.',
                 'Rules:',
                 '- Preserve meaning, speaker intent, and tone.',
                 '- Keep line breaks when they exist.',
                 '- Return ONLY valid JSON, no markdown and no commentary.',
-                '- If summary is missing, return summary_text as null.',
                 '',
                 'Output JSON schema:',
                 '{',
-                '  "transcript_text": "string",',
-                '  "summary_text": "string|null"',
+                '  "transcript_text": "string"',
                 '}',
             ]);
 
@@ -315,8 +308,6 @@ class OpenAIService
                 "Target language: {$targetLanguage}",
                 'Transcript:',
                 $transcriptText,
-                'Summary:',
-                $summaryInput,
             ]);
         }
 
@@ -394,7 +385,6 @@ class OpenAIService
     {
         return [
             'text' => $parsed['text'] ?? '',
-            'summary_text' => $parsed['summary_text'] ?? null,
             'utterances' => $parsed['utterances'] ?? [],
             'target_language' => $targetLanguage,
         ];
@@ -458,7 +448,7 @@ class OpenAIService
      *
      * @return array{overview?: string, highlights?: array, concerns?: array, recommendations?: array, model?: string, usage?: array}
      */
-    public function createExecutiveSummary(array $context, string $model = 'gpt-4.1-mini'): array
+    public function createExecutiveSummary(array $context, string $model = 'gpt-4.1-mini', ?string $outputLanguage = null): array
     {
         if (empty($this->apiKey)) {
             throw new \RuntimeException('OpenAI API key is not configured.');
@@ -467,12 +457,13 @@ class OpenAIService
         $url = 'https://api.openai.com/v1/responses';
         $timeout = (int) config('services.openai.executive_summary_timeout', 120);
 
-        $instructions = implode("\n", [
+        $instructions = implode("\n", array_filter([
             'You are an executive reporting assistant for a business phone recorder analytics dashboard.',
             'Synthesize the provided period stats, trends, topics, and per-call summaries into a concise leadership brief.',
             'Rules:',
             '- Use only information present in the input; do not invent calls, metrics, or outcomes.',
             '- Write in plain, practical business language.',
+            $this->outputLanguageRule($outputLanguage),
             '- Keep overview to 2-4 short paragraphs.',
             '- Highlights should capture positive trends, wins, or useful patterns.',
             '- Concerns should capture risks, negative sentiment patterns, or operational issues supported by the data.',
@@ -487,7 +478,7 @@ class OpenAIService
             '  "concerns": ["string"],',
             '  "recommendations": ["string"]',
             '}',
-        ]);
+        ]));
 
         $input = implode("\n\n", [
             'Using the recorder analytics context below, produce the Output JSON.',
@@ -552,5 +543,38 @@ class OpenAIService
         }
 
         return $decoded;
+    }
+
+    public static function resolveLanguageLabel(?string $code): ?string
+    {
+        $code = strtolower(trim((string) $code));
+        if ($code === '') {
+            return null;
+        }
+
+        return match ($code) {
+            'en', 'en-us', 'en-gb' => 'English',
+            'zh-cn' => 'Chinese (Simplified)',
+            'zh-tw' => 'Chinese (Traditional)',
+            'ms' => 'Malay',
+            'ta' => 'Tamil',
+            'id' => 'Indonesian',
+            'th' => 'Thai',
+            'ja' => 'Japanese',
+            'ko' => 'Korean',
+            default => strtoupper($code),
+        };
+    }
+
+    private function outputLanguageRule(?string $languageCode): ?string
+    {
+        $code = strtolower(trim((string) $languageCode));
+        if ($code === '' || in_array($code, ['en', 'en-us', 'en-gb'], true)) {
+            return null;
+        }
+
+        $label = self::resolveLanguageLabel($code) ?? $code;
+
+        return '- Write all natural-language fields in '.$label.' ('.$code.'). Keep JSON property names in English.';
     }
 }

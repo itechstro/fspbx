@@ -74,12 +74,9 @@ class TranslateCallTranscription implements ShouldQueue
                     ?? 'en-us';
             }
 
-            $summaryText = trim((string) data_get($row->summary_payload, 'summary', ''));
-
             $openAiService = app(OpenAIService::class);
             $start = $openAiService->createBackgroundTranslation(
                 $utterances,
-                $summaryText !== '' ? $summaryText : null,
                 (string) $targetLanguage,
                 $transcriptText !== '' ? $transcriptText : null,
                 'gpt-4.1-mini'

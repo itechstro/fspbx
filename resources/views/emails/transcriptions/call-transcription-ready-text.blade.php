@@ -9,11 +9,6 @@ EXECUTIVE SUMMARY
 -----------------
 "{{ $data['summary'] }}"
 
-@if(!empty($data['translation_summary']))
-SUMMARY TRANSLATION @if(!empty($data['translation_target_language']))({{ $data['translation_target_language'] }})@endif
---------------------------------------------------------------------
-{{ $data['translation_summary'] }}
-@endif
 @endif
 
 @if(!empty($data['action_items']))

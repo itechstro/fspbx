@@ -33,6 +33,7 @@ class CallTranscriptionPolicy extends Model
         'email',
         'email_recorder',
         'translation_language',
+        'recorder_summary_language',
     ];
 
     public function provider()

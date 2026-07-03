@@ -324,7 +324,6 @@ class CdrsController extends Controller
                     'translation_error' => $item->callTranscription->translation_error,
                     'translation_text' => data_get($item->callTranscription->translation_payload, 'text'),
                     'translation_utterances' => data_get($item->callTranscription->translation_payload, 'utterances', []),
-                    'translation_summary' => data_get($item->callTranscription->translation_payload, 'summary_text'),
                     'translation_target_language' => $item->callTranscription->translation_target_language ?? data_get($item->callTranscription->translation_payload, 'target_language'),
                     'transcription_cost_usd' => $item->callTranscription->transcription_cost_usd,
                     'summary_cost_usd' => $item->callTranscription->summary_cost_usd,

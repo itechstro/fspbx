@@ -78,18 +78,6 @@
         <div class="summary-box">
             "{{ $data['summary'] }}"
         </div>
-
-        @if(!empty($data['translation_summary']))
-            <div class="section-title" style="margin-top: 16px;">
-                Summary Translation
-                @if(!empty($data['translation_target_language']))
-                    ({{ $data['translation_target_language'] }})
-                @endif
-            </div>
-            <div class="summary-box" style="font-style: normal;">
-                {!! nl2br(e($data['translation_summary'])) !!}
-            </div>
-        @endif
     </div>
     @endif
 

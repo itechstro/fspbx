@@ -46,6 +46,7 @@ class StoreTranscriptionOptionsRequest extends FormRequest
             'email' => ['nullable', 'string'],
             'email_recorder' => ['nullable', 'string'],
             'translation_language' => ['nullable', 'string', 'max:32'],
+            'recorder_summary_language' => ['nullable', 'string', 'max:32'],
         ];
     }
 

@@ -133,83 +133,142 @@
                                 <div v-else-if="recordingOptions?.isCallTranscriptionServiceEnabled && recordingOptions?.permissions?.transcription_view"
                                     class="mt-6 rounded-lg border bg-slate-50 p-4">
                                     <div class="flex flex-wrap items-center justify-between gap-4">
-                                        <!-- Left Side: Title and Description -->
                                         <div class="flex items-start gap-4">
                                             <div
                                                 class="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-indigo-200 bg-indigo-100">
                                                 <SparklesIcon class="h-6 w-6 text-indigo-600" />
                                             </div>
                                             <div>
-                                                <h3 class="text-base font-semibold text-gray-800">AI Voice Transcription
-                                                </h3>
-                                                <p class="text-sm text-gray-500">Generate a searchable text version of
-                                                    this audio.</p>
+                                                <h3 class="text-base font-semibold text-gray-800">AI Call Insights</h3>
+                                                <p class="text-sm text-gray-500">Transcribe, summarize, and translate this recording.</p>
                                             </div>
                                         </div>
 
-                                        <!-- Right Side: Action Button and Status Pills -->
-                                        <div class="flex items-center gap-4 pl-14 sm:pl-0">
-                                            <!-- Transcribe Button -->
-                                            <button
-                                                v-if="showTranscribeBtn && recordingOptions?.permissions?.transcription_create"
-                                                type="button" @click="requestTranscription"
-                                                :disabled="isRequestingTranscription"
-                                                class="inline-flex items-center justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:cursor-not-allowed disabled:opacity-50">
-                                                <svg v-if="isRequestingTranscription" class="mr-2 h-5 w-5 animate-spin"
-                                                    xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                                    <circle class="opacity-25" cx="12" cy="12" r="10"
-                                                        stroke="currentColor" stroke-width="4"></circle>
-                                                    <path class="opacity-75" fill="currentColor"
-                                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                                                    </path>
-                                                </svg>
-                                                <span>{{ isRequestingTranscription ? 'Requesting...' : 'Transcribe'
-                                                }}</span>
-                                            </button>
+                                        <button
+                                            v-if="showRefreshBtn"
+                                            type="button"
+                                            @click="refreshStatus"
+                                            :disabled="!canRefresh"
+                                            class="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">
+                                            <ArrowPathIcon class="-ml-0.5 mr-1.5 h-5 w-5 text-gray-400"
+                                                :class="{ 'animate-spin': !canRefresh }" />
+                                            <span v-if="canRefresh">Refresh Status</span>
+                                            <span v-else>Refresh in {{ cooldownSeconds }}s</span>
+                                        </button>
+                                    </div>
 
-                                            <!-- Status pill shows after request OR if API already returns a status -->
-                                            <div v-else-if="displayStatus"
-                                                class="inline-flex items-center gap-2 rounded-full px-3 ring-1" :class="{
-                                                    'bg-yellow-50 text-yellow-600 ring-yellow-200': displayStatus === 'pending' || displayStatus === 'queued',
-                                                    'bg-sky-50 text-sky-600 ring-sky-200': displayStatus === 'processing',
-                                                    'bg-emerald-50 text-emerald-600 ring-emerald-200': displayStatus === 'completed',
-                                                    'bg-rose-50 text-rose-600 ring-rose-200': displayStatus === 'failed'
-                                                }">
-                                                <span class="h-2 w-2 rounded-full" :class="{
-                                                    'bg-yellow-500': displayStatus === 'pending' || displayStatus === 'queued',
-                                                    'bg-sky-500': displayStatus === 'processing',
-                                                    'bg-emerald-500': displayStatus === 'completed',
-                                                    'bg-rose-500': displayStatus === 'failed'
-                                                }"></span>
-                                                <span class="font-medium capitalize">{{ displayStatus }}</span>
+                                    <div class="mt-4 space-y-3 border-t border-slate-200 pt-4">
+                                        <!-- Transcription -->
+                                        <div class="flex flex-wrap items-center justify-between gap-3">
+                                            <div class="flex min-w-0 items-center gap-3">
+                                                <span class="w-28 shrink-0 text-sm font-medium text-gray-700">Transcription</span>
+                                                <span
+                                                    class="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ring-1"
+                                                    :class="statusPillClasses(transcriptionPillStatus)">
+                                                    <span class="h-2 w-2 rounded-full" :class="statusDotClasses(transcriptionPillStatus)"></span>
+                                                    {{ statusPillLabel(transcriptionPillStatus) }}
+                                                </span>
                                             </div>
+                                            <div class="flex flex-wrap items-center gap-2">
+                                                <button
+                                                    v-if="showTranscribeBtn && recordingOptions?.permissions?.transcription_create"
+                                                    type="button"
+                                                    @click="requestTranscription"
+                                                    :disabled="isRequestingTranscription"
+                                                    class="inline-flex items-center justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50">
+                                                    <svg v-if="isRequestingTranscription" class="mr-1.5 h-4 w-4 animate-spin"
+                                                        xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                        <path class="opacity-75" fill="currentColor"
+                                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                    </svg>
+                                                    <span>{{ isRequestingTranscription ? 'Requesting...' : 'Transcribe' }}</span>
+                                                </button>
+                                                <button
+                                                    v-if="showRegenerateBtn && recordingOptions?.permissions?.transcription_create"
+                                                    type="button"
+                                                    @click="regenerateTranscription"
+                                                    :disabled="isRegenerating"
+                                                    class="inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-500 disabled:opacity-50">
+                                                    <ArrowPathIcon :class="['h-4 w-4', isRegenerating ? 'animate-spin' : '']" />
+                                                    <span class="ml-1">{{ isRegenerating ? 'Regenerating…' : 'Regenerate' }}</span>
+                                                </button>
+                                                <button
+                                                    v-if="showReTranscribeBtn"
+                                                    type="button"
+                                                    @click="retranscribe"
+                                                    :disabled="isRegenerating"
+                                                    class="inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-500 disabled:opacity-50">
+                                                    <ArrowPathIcon :class="['h-4 w-4', isRegenerating ? 'animate-spin' : '']" />
+                                                    <span class="ml-1">{{ isRegenerating ? 'Re-transcribing…' : 'Re-transcribe' }}</span>
+                                                </button>
+                                            </div>
+                                        </div>
 
-                                            <!-- Manual refresh (throttled to every 10s) -->
+                                        <!-- Summary -->
+                                        <div v-if="showSummaryRow" class="flex flex-wrap items-center justify-between gap-3">
+                                            <div class="flex min-w-0 items-center gap-3">
+                                                <span class="w-28 shrink-0 text-sm font-medium text-gray-700">Summary</span>
+                                                <span
+                                                    class="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ring-1"
+                                                    :class="statusPillClasses(summaryPillStatus)">
+                                                    <span class="h-2 w-2 rounded-full" :class="statusDotClasses(summaryPillStatus)"></span>
+                                                    {{ statusPillLabel(summaryPillStatus) }}
+                                                </span>
+                                            </div>
+                                            <div class="flex flex-wrap items-center gap-2">
+                                                <button
+                                                    v-if="showSummarizeBtn"
+                                                    type="button"
+                                                    @click="requestSummary"
+                                                    :disabled="isRegeneratingSummary"
+                                                    class="inline-flex items-center justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50">
+                                                    <ArrowPathIcon :class="['mr-1 h-4 w-4', isRegeneratingSummary ? 'animate-spin' : '']" />
+                                                    <span>{{ isRegeneratingSummary ? 'Requesting...' : 'Summarize' }}</span>
+                                                </button>
+                                                <button
+                                                    v-if="showReSummarizeBtn"
+                                                    type="button"
+                                                    @click="requestSummary"
+                                                    :disabled="isRegeneratingSummary"
+                                                    class="inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-500 disabled:opacity-50">
+                                                    <ArrowPathIcon :class="['h-4 w-4', isRegeneratingSummary ? 'animate-spin' : '']" />
+                                                    <span class="ml-1">{{ isRegeneratingSummary ? 'Re-summarizing…' : 'Re-summarize' }}</span>
+                                                </button>
+                                            </div>
+                                        </div>
 
-
-                                            <!-- Regenerate (only when failed) -->
-
-                                            <button
-                                                v-if="showRegenerateBtn && recordingOptions?.permissions?.transcription_create"
-                                                type="button" @click="regenerateTranscription"
-                                                :disabled="isRegenerating"
-                                                class="inline-flex items-center text-sm/6 font-medium text-indigo-600 hover:text-indigo-500">
-                                                <ArrowPathIcon
-                                                    :class="['h-4 w-4', isRegenerating ? 'animate-spin' : '']" />
-                                                <span class="ml-1">{{ isRegenerating ? 'Regenerating…' : 'Regenerate'
-                                                }}</span>
-
-                                            </button>
-
-                                            <button
-                                                v-if="hasTranscript && recordingOptions?.permissions?.transcription_summary"
-                                                type="button"
-                                                @click="requestTranslation"
-                                                :disabled="isRequestingTranslation || displayTranslationStatus === 'queued' || displayTranslationStatus === 'in_progress' || displayTranslationStatus === 'processing'"
-                                                class="inline-flex items-center text-sm/6 font-medium text-indigo-600 hover:text-indigo-500 disabled:cursor-not-allowed disabled:opacity-50">
-                                                <ArrowPathIcon :class="['h-4 w-4', isRequestingTranslation ? 'animate-spin' : '']" />
-                                                <span class="ml-1">{{ isRequestingTranslation ? 'Translating…' : (hasTranslation ? 'Re-translate' : 'Translate') }}</span>
-                                            </button>
+                                        <!-- Translation -->
+                                        <div v-if="showTranslationRow" class="flex flex-wrap items-center justify-between gap-3">
+                                            <div class="flex min-w-0 items-center gap-3">
+                                                <span class="w-28 shrink-0 text-sm font-medium text-gray-700">Translation</span>
+                                                <span
+                                                    class="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ring-1"
+                                                    :class="statusPillClasses(translationPillStatus)">
+                                                    <span class="h-2 w-2 rounded-full" :class="statusDotClasses(translationPillStatus)"></span>
+                                                    {{ statusPillLabel(translationPillStatus) }}
+                                                </span>
+                                            </div>
+                                            <div class="flex flex-wrap items-center gap-2">
+                                                <button
+                                                    v-if="showTranslateBtn"
+                                                    type="button"
+                                                    @click="requestTranslation"
+                                                    :disabled="isRequestingTranslation"
+                                                    class="inline-flex items-center justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50">
+                                                    <ArrowPathIcon :class="['mr-1 h-4 w-4', isRequestingTranslation ? 'animate-spin' : '']" />
+                                                    <span>{{ isRequestingTranslation ? 'Requesting...' : 'Translate' }}</span>
+                                                </button>
+                                                <button
+                                                    v-if="showReTranslateBtn"
+                                                    type="button"
+                                                    @click="requestTranslation"
+                                                    :disabled="isRequestingTranslation || isTranslationInProgress"
+                                                    class="inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-500 disabled:opacity-50">
+                                                    <ArrowPathIcon :class="['h-4 w-4', isRequestingTranslation ? 'animate-spin' : '']" />
+                                                    <span class="ml-1">{{ isRequestingTranslation ? 'Translating…' : 'Re-translate' }}</span>
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -224,11 +283,11 @@
                                             generated</h3>
                                         <p v-if="recordingOptions?.permissions?.transcription_create"
                                             class="mt-1 text-sm text-gray-500">
-                                            Click the "Transcribe" button above to generate the transcript.
+                                            Use the Transcribe action in AI Call Insights above.
                                         </p>
                                     </div>
 
-                                    <div v-else-if="!hasTranscript && transcriptRequested"
+                                    <div v-else-if="showTranscriptInProgress"
                                         class="mt-6 flex flex-col items-center justify-center rounded-lg border border-gray-200 bg-gray-50 p-12 text-center">
 
                                         <!-- Spinner -->
@@ -240,23 +299,13 @@
                                                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
                                             </path>
                                         </svg> -->
-                                        <p class="mt-4 text-sm font-semibold text-indigo-600">Transcription in progress.
-                                            Click Refresh to check status.</p>
-
-                                        <!-- START: REFRESH BUTTON -->
-                                        <button type="button" @click="refreshStatus" :disabled="!canRefresh"
-                                            class="mt-6 inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">
-                                            <ArrowPathIcon class="-ml-0.5 mr-1.5 h-5 w-5 text-gray-400"
-                                                :class="{ 'animate-spin': !canRefresh }" />
-                                            <span v-if="canRefresh">Refresh Status</span>
-                                            <span v-else>Refresh in {{ cooldownSeconds }}s</span>
-                                        </button>
-                                        <!-- END: REFRESH BUTTON -->
+                                        <p class="mt-4 text-sm font-semibold text-indigo-600">Transcription in progress.</p>
+                                        <p class="mt-1 text-sm text-gray-500">Use Refresh Status in AI Call Insights to check progress.</p>
 
                                     </div>
 
                                     <!-- State 3: Completed Tabs (Transcript is ready) -->
-                                    <div v-else-if="hasTranscript && recordingOptions?.permissions?.transcription_read"
+                                    <div v-else-if="showTranscriptTabs && recordingOptions?.permissions?.transcription_read"
                                         class="mt-6 text-sm">
                                         <TabGroup :selectedIndex="selectedTabIndex" @change="selectedTabIndex = $event">
 
@@ -427,20 +476,8 @@
                                                             Generating AI summary...
                                                         </p>
                                                         <p class="mt-1 text-sm text-gray-500">
-                                                            You can check the progress by clicking Refresh.
+                                                            Use Refresh Status in AI Call Insights to check progress.
                                                         </p>
-
-                                                        <!-- START: REFRESH BUTTON -->
-                                                        <button type="button" @click="refreshStatus"
-                                                            :disabled="!canRefresh"
-                                                            class="mt-6 inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">
-                                                            <ArrowPathIcon
-                                                                class="-ml-0.5 mr-1.5 h-5 w-5 text-gray-400"
-                                                                :class="{ 'animate-spin': !canRefresh }" />
-                                                            <span v-if="canRefresh">Refresh Status</span>
-                                                            <span v-else>Refresh in {{ cooldownSeconds }}s</span>
-                                                        </button>
-                                                        <!-- END: REFRESH BUTTON -->
                                                     </div>
 
                                                     <!-- Summary State: Failed -->
@@ -452,15 +489,12 @@
                                                             Summary Generation Failed
                                                         </h3>
                                                         <p class="mt-1 text-sm text-rose-700">
-                                                            We were unable to generate a summary for this call.
+                                                            {{ recordingOptions?.transcription?.summary_error || 'We were unable to generate a summary for this call.' }}
                                                         </p>
-                                                        <button type="button" @click="regenerateSummary"
-                                                            :disabled="isRegeneratingSummary"
-                                                            class="mt-4 inline-flex items-center rounded-md bg-rose-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rose-500 disabled:opacity-50">
-                                                            <ArrowPathIcon class="-ml-0.5 mr-1.5 h-5 w-5"
-                                                                :class="{ 'animate-spin': isRegeneratingSummary }" />
-                                                            {{ isRegeneratingSummary ? 'Retrying...' : 'Retry' }}
-                                                        </button>
+                                                        <p v-if="recordingOptions?.permissions?.transcription_summary"
+                                                            class="mt-3 text-sm text-rose-700">
+                                                            Use Re-summarize in AI Call Insights to try again.
+                                                        </p>
                                                     </div>
 
                                                     <!-- Summary State: Not Yet Generated -->
@@ -468,10 +502,11 @@
                                                         class="rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
                                                         <SparklesIcon class="mx-auto h-12 w-12 text-gray-400" />
                                                         <h3 class="mt-2 text-sm font-semibold text-gray-900">
-                                                            AI Summary is available
+                                                            Summary not yet generated
                                                         </h3>
-                                                        <p class="mt-1 text-sm text-gray-500">
-                                                            Summary generation is part of the transcription process.
+                                                        <p v-if="recordingOptions?.permissions?.transcription_summary"
+                                                            class="mt-1 text-sm text-gray-500">
+                                                            Use the Summarize action in AI Call Insights above.
                                                         </p>
                                                     </div>
                                                 </TabPanel>
@@ -487,13 +522,6 @@
                                                                 ({{ recordingOptions?.transcription?.translation_target_language }})
                                                             </span>
                                                         </h3>
-
-                                                        <div v-if="recordingOptions?.transcription?.translation_summary" class="space-y-1">
-                                                            <h4 class="text-sm font-semibold text-gray-700">Summary</h4>
-                                                            <p class="whitespace-pre-wrap leading-relaxed text-gray-700">
-                                                                {{ recordingOptions?.transcription?.translation_summary }}
-                                                            </p>
-                                                        </div>
 
                                                         <div class="space-y-1">
                                                             <h4 class="text-sm font-semibold text-gray-700">Transcript</h4>
@@ -527,14 +555,9 @@
                                                         <p class="mt-4 text-sm font-semibold text-indigo-600">
                                                             Generating translation...
                                                         </p>
-                                                        <button type="button" @click="refreshStatus"
-                                                            :disabled="!canRefresh"
-                                                            class="mt-6 inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">
-                                                            <ArrowPathIcon class="-ml-0.5 mr-1.5 h-5 w-5 text-gray-400"
-                                                                :class="{ 'animate-spin': !canRefresh }" />
-                                                            <span v-if="canRefresh">Refresh Status</span>
-                                                            <span v-else>Refresh in {{ cooldownSeconds }}s</span>
-                                                        </button>
+                                                        <p class="mt-1 text-sm text-gray-500">
+                                                            Use Refresh Status in AI Call Insights to check progress.
+                                                        </p>
                                                     </div>
 
                                                     <div v-else-if="displayTranslationStatus === 'failed'"
@@ -546,16 +569,21 @@
                                                         <p class="mt-1 text-sm text-rose-700">
                                                             {{ recordingOptions?.transcription?.translation_error || 'Unable to translate this transcript.' }}
                                                         </p>
+                                                        <p v-if="recordingOptions?.permissions?.transcription_summary"
+                                                            class="mt-3 text-sm text-rose-700">
+                                                            Use Re-translate in AI Call Insights to try again.
+                                                        </p>
                                                     </div>
 
                                                     <div v-else
                                                         class="rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
                                                         <SparklesIcon class="mx-auto h-12 w-12 text-gray-400" />
                                                         <h3 class="mt-2 text-sm font-semibold text-gray-900">
-                                                            Translation is available
+                                                            Translation not yet generated
                                                         </h3>
-                                                        <p class="mt-1 text-sm text-gray-500">
-                                                            Use the Translate button above to translate the transcript.
+                                                        <p v-if="recordingOptions?.permissions?.transcription_summary"
+                                                            class="mt-1 text-sm text-gray-500">
+                                                            Use the Translate action in AI Call Insights above.
                                                         </p>
                                                     </div>
                                                 </TabPanel>
@@ -648,6 +676,150 @@ const showRegenerateBtn = computed(() =>
     !hasTranscript.value && !transcriptRequested.value && status.value == "failed"
 )
 
+const isTranscriptionInProgress = computed(() =>
+    ['pending', 'queued', 'processing', 'in_progress'].includes(displayStatus.value)
+)
+
+const isSummaryInProgress = computed(() =>
+    ['pending', 'queued', 'processing', 'in_progress'].includes(displaySummaryStatus.value)
+    || (summaryRequested.value && !hasSummary.value && displaySummaryStatus.value !== 'failed')
+)
+
+const isTranslationInProgress = computed(() =>
+    ['pending', 'queued', 'processing', 'in_progress'].includes(displayTranslationStatus.value)
+)
+
+const showReTranscribeBtn = computed(() =>
+    hasTranscript.value
+    && recordingOptions.value?.permissions?.transcription_create
+    && !isTranscriptionInProgress.value
+)
+
+const showSummarizeBtn = computed(() =>
+    hasTranscript.value
+    && !hasSummary.value
+    && displaySummaryStatus.value !== 'failed'
+    && !isSummaryInProgress.value
+    && recordingOptions.value?.permissions?.transcription_summary
+)
+
+const showReSummarizeBtn = computed(() =>
+    hasTranscript.value
+    && (hasSummary.value || displaySummaryStatus.value === 'failed')
+    && !isSummaryInProgress.value
+    && recordingOptions.value?.permissions?.transcription_summary
+)
+
+const showSummaryRow = computed(() =>
+    Boolean(recordingOptions.value?.permissions?.transcription_summary)
+)
+
+const showTranslationRow = computed(() =>
+    Boolean(recordingOptions.value?.permissions?.transcription_summary)
+)
+
+const showTranslateBtn = computed(() =>
+    hasTranscript.value
+    && !hasTranslation.value
+    && displayTranslationStatus.value !== 'failed'
+    && !isTranslationInProgress.value
+    && recordingOptions.value?.permissions?.transcription_summary
+)
+
+const showReTranslateBtn = computed(() =>
+    hasTranscript.value
+    && (hasTranslation.value || displayTranslationStatus.value === 'failed')
+    && !isTranslationInProgress.value
+    && recordingOptions.value?.permissions?.transcription_summary
+)
+
+const showRefreshBtn = computed(() =>
+    Boolean(status.value)
+    || transcriptRequested.value
+    || hasTranscript.value
+    || Boolean(summaryStatus.value)
+    || summaryRequested.value
+    || Boolean(translationStatus.value)
+    || Boolean(currentTranslationStatus.value)
+)
+
+const transcriptionPillStatus = computed(() => displayStatus.value || 'not_started')
+
+const summaryPillStatus = computed(() => {
+    if (!hasTranscript.value) {
+        return 'waiting'
+    }
+    if (hasSummary.value) {
+        return 'completed'
+    }
+    return displaySummaryStatus.value || 'not_started'
+})
+
+const translationPillStatus = computed(() => {
+    if (!hasTranscript.value) {
+        return 'waiting'
+    }
+    if (hasTranslation.value) {
+        return 'completed'
+    }
+    return displayTranslationStatus.value || 'not_started'
+})
+
+function statusPillLabel(status) {
+    if (status === 'not_started') return 'Not started'
+    if (status === 'waiting') return 'Waiting for transcript'
+    const label = status === 'in_progress'
+        ? 'In progress'
+        : String(status).replace(/_/g, ' ')
+    return label.charAt(0).toUpperCase() + label.slice(1)
+}
+
+function statusPillClasses(status) {
+    if (status === 'waiting' || status === 'not_started') {
+        return 'bg-slate-50 text-slate-600 ring-slate-200'
+    }
+    if (status === 'pending' || status === 'queued') {
+        return 'bg-yellow-50 text-yellow-600 ring-yellow-200'
+    }
+    if (status === 'processing' || status === 'in_progress') {
+        return 'bg-sky-50 text-sky-600 ring-sky-200'
+    }
+    if (status === 'completed') {
+        return 'bg-emerald-50 text-emerald-600 ring-emerald-200'
+    }
+    if (status === 'failed') {
+        return 'bg-rose-50 text-rose-600 ring-rose-200'
+    }
+    return 'bg-slate-50 text-slate-600 ring-slate-200'
+}
+
+function statusDotClasses(status) {
+    if (status === 'waiting' || status === 'not_started') {
+        return 'bg-slate-400'
+    }
+    if (status === 'pending' || status === 'queued') {
+        return 'bg-yellow-500'
+    }
+    if (status === 'processing' || status === 'in_progress') {
+        return 'bg-sky-500'
+    }
+    if (status === 'completed') {
+        return 'bg-emerald-500'
+    }
+    if (status === 'failed') {
+        return 'bg-rose-500'
+    }
+    return 'bg-slate-400'
+}
+
+const showTranscriptInProgress = computed(() =>
+    isTranscriptionInProgress.value && (transcriptRequested.value || hasTranscript.value)
+)
+
+const showTranscriptTabs = computed(() =>
+    hasTranscript.value && !isTranscriptionInProgress.value
+)
+
 const displayStatus = computed(() =>
     currentStatus.value ?? status.value ?? null
 )
@@ -721,11 +893,36 @@ async function regenerateTranscription() {
     }
 }
 
-async function regenerateSummary() {
+async function retranscribe() {
+    if (isRegenerating.value) return
+    isRegenerating.value = true
+    summaryRequested.value = false
+    currentSummaryStatus.value = null
+    currentTranslationStatus.value = null
+    try {
+        const { data } = await axios.post(
+            recordingOptions.value.routes.transcribe_route,
+            {
+                uuid: recordingOptions.value?.item?.xml_cdr_uuid ?? null,
+                domain_uuid: recordingOptions.value?.item?.domain_uuid ?? null,
+            }
+        )
+        emit('success', 'success', data.messages)
+        transcriptRequested.value = true
+        currentStatus.value = 'queued'
+        getCallRecordingOptions()
+    } catch (err) {
+        emit('error', err)
+    } finally {
+        isRegenerating.value = false
+    }
+}
+
+async function requestSummary() {
     if (isRegeneratingSummary.value) return;
     isRegeneratingSummary.value = true;
     summaryRequested.value = true;
-    currentSummaryStatus.value = 'queued'; // Provide immediate UI feedback
+    currentSummaryStatus.value = 'queued';
 
     try {
         const { data } = await axios.post(
@@ -735,10 +932,8 @@ async function regenerateSummary() {
             }
         );
         emit('success', 'success', data.messages);
-        // Do NOT await a refresh here. Let the user do it manually.
     } catch (err) {
         emit('error', err);
-        // If the request fails, reset the state so the user can try again
         summaryRequested.value = false;
         currentSummaryStatus.value = null;
     } finally {
@@ -799,11 +994,18 @@ async function refreshStatus() {
     if (!canRefresh.value) return
     await getCallRecordingOptions()
     currentStatus.value = null
-    // IMPORTANT: allow the button to re-appear if we’re still failed
     if (status.value === 'failed') {
         transcriptRequested.value = false
     }
-    currentTranslationStatus.value = null
+    if (summaryStatus.value === 'completed' || summaryStatus.value === 'failed') {
+        summaryRequested.value = false
+        currentSummaryStatus.value = null
+    }
+    if (translationStatus.value === 'completed' || translationStatus.value === 'failed') {
+        currentTranslationStatus.value = null
+    } else if (!translationStatus.value) {
+        currentTranslationStatus.value = null
+    }
     startCooldown()
 }
 
@@ -918,7 +1120,9 @@ watch(
         if (isOpen) {
             loading.value = true
             transcriptRequested.value = false
+            summaryRequested.value = false
             currentStatus.value = null
+            currentSummaryStatus.value = null
             currentTranslationStatus.value = null
             getCallRecordingOptions()
         }
