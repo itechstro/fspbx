@@ -659,6 +659,7 @@ class ProvisioningController extends Controller
                     'sip_transport',
                     'register_expires',
                     'shared_line',
+                    'external_line',
                     'domain_uuid',
                 ]);
             },
@@ -747,6 +748,7 @@ class ProvisioningController extends Controller
         $lines = [];
         foreach ($device->lines as $line) {
             $isSharedLine = $this->isSharedLineValue($line->shared_line ?? null);
+            $isExternalLine = $this->isExternalLineValue($line->external_line ?? null);
 
             $lines[$line->line_number] = [
                 'user_id'           => $line->user_id ?? null,
@@ -762,7 +764,8 @@ class ProvisioningController extends Controller
                 'sip_transport'     => $this->normalizeTransportForVendor($device->device_vendor, $line->sip_transport),
                 'register_expires'  => $line->register_expires ?? null,
                 'shared_line'       => $isSharedLine,
-                'line_type_id'      => $isSharedLine ? 'sharedline' : 'line',
+                'external_line'     => $isExternalLine,
+                'line_type_id'      => $isSharedLine ? 'sharedline' : ($isExternalLine ? 'externalline' : 'line'),
                 'line_number'       => $line->line_number,
             ];
         }
@@ -2024,6 +2027,19 @@ class ProvisioningController extends Controller
         }
 
         return in_array(strtolower(trim((string) $value)), ['1', 'true', 'yes', 'on', 'sharedline'], true);
+    }
+
+    private function isExternalLineValue(mixed $value): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_numeric($value)) {
+            return (int) $value === 1;
+        }
+
+        return in_array(strtolower(trim((string) $value)), ['1', 'true', 'yes', 'on', 't', 'externalline'], true);
     }
 
     private function lineKeyTargetsSharedLine(Devices $device, array $key): bool

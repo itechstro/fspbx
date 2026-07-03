@@ -1,4 +1,4 @@
-{{-- version: 1.1.5 --}}
+{{-- version: 1.1.6 --}}
 
 @switch($flavor)
 
@@ -139,12 +139,17 @@
     $hasBackup = trim((string) ($line['server_address_secondary'] ?? '')) !== '';
     $hasBackupProxy = trim((string) ($line['outbound_proxy_secondary'] ?? '')) !== '';
     $usesDnsSrv = in_array($transport, ['dns srv', 'dnssrv', 'dnsnaptr'], true);
+    $registerAddr = trim((string) ($line['server_address_primary'] ?? $line['server_address'] ?? $domain_name ?? ''));
+    $isExternalLine = !empty($line['external_line']) || ($line['line_type_id'] ?? '') === 'externalline';
+    $localDomain = $isExternalLine
+        ? (trim((string) ($line['server_address'] ?? '')) ?: $registerAddr)
+        : $setting('fanvil_realm', $domain_name ?? '');
 @endphp
         <line index="{{ $lineNumber }}">
             <PhoneNumber>{{ $line['user_id'] ?? $line['auth_id'] ?? '' }}</PhoneNumber>
             <DisplayName>{{ $line['display_name'] ?? $line['auth_id'] ?? '' }}</DisplayName>
             <SipName>{{ $line['auth_id'] ?? '' }}</SipName>
-            <RegisterAddr>{{ $line['server_address_primary'] ?? $line['server_address'] ?? $domain_name ?? '' }}</RegisterAddr>
+            <RegisterAddr>{{ $registerAddr }}</RegisterAddr>
             <RegisterPort>{{ $sipPort }}</RegisterPort>
             <RegisterUser>{{ $line['auth_id'] ?? '' }}</RegisterUser>
             <RegisterPswd>{{ $line['password'] ?? '' }}</RegisterPswd>
@@ -168,7 +173,7 @@
             <FailbackInterval>1800</FailbackInterval>
             <SignalRetryCounts>3</SignalRetryCounts>
             <MediaCrypto>0</MediaCrypto>
-            <LocalDomain>{{ $setting('fanvil_realm', $domain_name ?? '') }}</LocalDomain>
+            <LocalDomain>{{ $localDomain }}</LocalDomain>
             <AlwaysFWD>0</AlwaysFWD>
             <BusyFWD>0</BusyFWD>
             <NoAnswerFWD>0</NoAnswerFWD>
