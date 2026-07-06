@@ -66,16 +66,11 @@ class SrsRecorderDialplanService
         return '^' . preg_quote($this->recorderDestinationNumber($domainName), '/') . '$';
     }
 
-    public function recorderCatchDialplanName(string $domainName): string
-    {
-        return 'recorder_catch_' . $this->domainPrefix($domainName);
-    }
-
     public function provisionForDomain(Domain $domain): void
     {
         DB::transaction(function () use ($domain) {
+            $this->removeRecorderCatchDialplan($domain);
             $this->upsertSrsRecorderDialplan($domain);
-            $this->upsertRecorderCatchDialplan($domain);
             $this->upsertRecorderConferenceProfile();
         });
 
@@ -85,6 +80,8 @@ class SrsRecorderDialplanService
     public function disableForDomain(Domain $domain): void
     {
         DB::transaction(function () use ($domain) {
+            $this->removeRecorderCatchDialplan($domain);
+
             foreach ($this->recorderDialplansForDomain($domain) as $dialplan) {
                 $dialplan->dialplan_enabled = 'false';
                 $dialplan->update_date = now();
@@ -105,19 +102,23 @@ class SrsRecorderDialplanService
      */
     protected function recorderDialplansForDomain(Domain $domain): \Illuminate\Support\Collection
     {
-        $catchName = $this->recorderCatchDialplanName($domain->domain_name);
-
         return Dialplans::query()
-            ->where(function ($query) use ($domain, $catchName) {
-                $query->where(function ($inner) use ($domain) {
-                    $inner->where('domain_uuid', $domain->domain_uuid)
-                        ->where('dialplan_name', 'srs_recorder');
-                })->orWhere(function ($inner) use ($catchName) {
-                    $inner->where('dialplan_name', $catchName)
-                        ->where('dialplan_context', 'public');
-                });
-            })
+            ->where('domain_uuid', $domain->domain_uuid)
+            ->where('dialplan_name', 'srs_recorder')
             ->get();
+    }
+
+    protected function removeRecorderCatchDialplan(Domain $domain): void
+    {
+        $catchName = 'recorder_catch_' . $this->domainPrefix($domain->domain_name);
+
+        Dialplans::query()
+            ->where('dialplan_name', $catchName)
+            ->where('dialplan_context', 'public')
+            ->each(function (Dialplans $dialplan) {
+                $dialplan->dialplan_details()->delete();
+                $dialplan->delete();
+            });
     }
 
     protected function upsertSrsRecorderDialplan(Domain $domain): Dialplans
@@ -161,49 +162,6 @@ class SrsRecorderDialplanService
         return $dialplan;
     }
 
-    protected function upsertRecorderCatchDialplan(Domain $domain): Dialplans
-    {
-        $catchName = $this->recorderCatchDialplanName($domain->domain_name);
-
-        $dialplan = Dialplans::query()
-            ->where('dialplan_name', $catchName)
-            ->where('dialplan_context', 'public')
-            ->first();
-
-        $isNew = ! $dialplan;
-        $dialplan ??= new Dialplans();
-        $dialplanUuid = $dialplan->dialplan_uuid ?: (string) Str::uuid();
-
-        $details = $this->recorderCatchDetails($domain->domain_name);
-
-        $dialplan->dialplan_uuid = $dialplanUuid;
-        $dialplan->dialplan_name = $catchName;
-        $dialplan->dialplan_continue = 'false';
-
-        $dialplan->forceFill([
-            'dialplan_uuid' => $dialplanUuid,
-            'domain_uuid' => null,
-            'dialplan_name' => $catchName,
-            'dialplan_number' => null,
-            'dialplan_destination' => 'false',
-            'dialplan_context' => 'public',
-            'dialplan_continue' => 'false',
-            'dialplan_order' => 45,
-            'dialplan_enabled' => 'true',
-            'dialplan_description' => 'Route public ' . $this->recorderDestinationNumber($domain->domain_name) . ' calls to ' . $domain->domain_name,
-            'dialplan_xml' => $this->dialplanService->buildXml($dialplan, $details),
-            'insert_date' => $isNew ? now() : ($dialplan->insert_date ?? now()),
-            'insert_user' => $isNew ? session('user_uuid') : $dialplan->insert_user,
-            'update_date' => $isNew ? null : now(),
-            'update_user' => $isNew ? null : session('user_uuid'),
-        ])->save();
-
-        $dialplan->dialplan_details()->delete();
-        $this->createDetails($dialplan, $details);
-
-        return $dialplan;
-    }
-
     /**
      * @return array<int, array<string, mixed>>
      */
@@ -233,47 +191,6 @@ class SrsRecorderDialplanService
             ['dialplan_detail_tag' => 'action', 'dialplan_detail_type' => 'set', 'dialplan_detail_data' => 'recording_file=${record_path}/${record_name}', 'dialplan_detail_break' => null, 'dialplan_detail_inline' => 'true', 'dialplan_detail_group' => 20, 'dialplan_detail_order' => 30, 'dialplan_detail_enabled' => 'true'],
             ['dialplan_detail_tag' => 'condition', 'dialplan_detail_type' => 'destination_number', 'dialplan_detail_data' => $destinationExpression, 'dialplan_detail_break' => 'on-false', 'dialplan_detail_inline' => null, 'dialplan_detail_group' => 30, 'dialplan_detail_order' => 10, 'dialplan_detail_enabled' => 'true'],
             ['dialplan_detail_tag' => 'action', 'dialplan_detail_type' => 'conference', 'dialplan_detail_data' => '${room_name}@recorder+flags{nomoh|endconf}', 'dialplan_detail_break' => null, 'dialplan_detail_inline' => null, 'dialplan_detail_group' => 30, 'dialplan_detail_order' => 20, 'dialplan_detail_enabled' => 'true'],
-        ];
-    }
-
-    /**
-     * @return array<int, array<string, mixed>>
-     */
-    protected function recorderCatchDetails(string $domainName): array
-    {
-        $destination = $this->recorderDestinationNumber($domainName);
-
-        return [
-            [
-                'dialplan_detail_tag' => 'condition',
-                'dialplan_detail_type' => 'destination_number',
-                'dialplan_detail_data' => $this->recorderDestinationExpression($domainName),
-                'dialplan_detail_break' => null,
-                'dialplan_detail_inline' => null,
-                'dialplan_detail_group' => 0,
-                'dialplan_detail_order' => 10,
-                'dialplan_detail_enabled' => 'true',
-            ],
-            [
-                'dialplan_detail_tag' => 'action',
-                'dialplan_detail_type' => 'export',
-                'dialplan_detail_data' => 'call_direction=inbound',
-                'dialplan_detail_break' => null,
-                'dialplan_detail_inline' => 'true',
-                'dialplan_detail_group' => 0,
-                'dialplan_detail_order' => 20,
-                'dialplan_detail_enabled' => 'true',
-            ],
-            [
-                'dialplan_detail_tag' => 'action',
-                'dialplan_detail_type' => 'transfer',
-                'dialplan_detail_data' => $destination . ' XML ' . $domainName,
-                'dialplan_detail_break' => null,
-                'dialplan_detail_inline' => null,
-                'dialplan_detail_group' => 0,
-                'dialplan_detail_order' => 30,
-                'dialplan_detail_enabled' => 'true',
-            ],
         ];
     }
 
