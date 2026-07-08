@@ -56,6 +56,7 @@ use App\Http\Controllers\MusicOnHoldController;
 use App\Http\Controllers\PhoneFirmwareController;
 use App\Http\Controllers\PhoneNumbersController;
 use App\Http\Controllers\PinNumberController;
+use App\Http\Controllers\ClassOfServiceController;
 use App\Http\Controllers\PolycomLogController;
 use App\Http\Controllers\PolycomProvisioningFileController;
 use App\Http\Controllers\ProFeaturesController;
@@ -278,6 +279,10 @@ Route::group(['middleware' => 'auth'], function () {
     // PIN Numbers
     Route::get('pin-numbers', [PinNumberController::class, 'index'])->name('pin-numbers.index');
     Route::get('pin-numbers/export', [PinNumberController::class, 'export'])->name('pin-numbers.export');
+
+    // Class of Service
+    Route::get('class-of-service', [ClassOfServiceController::class, 'index'])->name('class-of-service.index');
+    Route::get('class-of-service/export', [ClassOfServiceController::class, 'export'])->name('class-of-service.export');
 
     // Call Blocks
     Route::get('call-blocks', [CallBlockController::class, 'index'])->name('call-blocks.index');

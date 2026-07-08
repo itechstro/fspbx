@@ -68,6 +68,7 @@ use App\Http\Controllers\PaymentGatewayController;
 use App\Http\Controllers\PhoneFirmwareController;
 use App\Http\Controllers\PhoneNumbersController;
 use App\Http\Controllers\PinNumberController;
+use App\Http\Controllers\ClassOfServiceController;
 use App\Http\Controllers\ProvisioningController;
 use App\Http\Controllers\RegistrationsController;
 use App\Http\Controllers\RecordingsManagerController;
@@ -493,6 +494,16 @@ Route::group(['middleware' => ['auth:sanctum', 'api.cookie.auth']], function () 
     Route::post('/pin-numbers/bulk-copy', [PinNumberController::class, 'bulkCopy'])->name('pin-numbers.bulk.copy');
     Route::post('/pin-numbers/bulk-delete', [PinNumberController::class, 'bulkDelete'])->name('pin-numbers.bulk.delete');
     Route::post('/pin-numbers/bulk-toggle', [PinNumberController::class, 'bulkToggle'])->name('pin-numbers.bulk.toggle');
+
+    // Class of Service
+    Route::post('class-of-service', [ClassOfServiceController::class, 'store'])->name('class-of-service.store');
+    Route::put('class-of-service/{class_of_service}', [ClassOfServiceController::class, 'update'])->name('class-of-service.update');
+    Route::get('/class-of-service/data', [ClassOfServiceController::class, 'getData'])->name('class-of-service.data');
+    Route::post('/class-of-service/item-options', [ClassOfServiceController::class, 'getItemOptions'])->name('class-of-service.item.options');
+    Route::post('/class-of-service/select-all', [ClassOfServiceController::class, 'selectAll'])->name('class-of-service.select.all');
+    Route::post('/class-of-service/bulk-copy', [ClassOfServiceController::class, 'bulkCopy'])->name('class-of-service.bulk.copy');
+    Route::post('/class-of-service/bulk-delete', [ClassOfServiceController::class, 'bulkDelete'])->name('class-of-service.bulk.delete');
+    Route::post('/class-of-service/bulk-toggle', [ClassOfServiceController::class, 'bulkToggle'])->name('class-of-service.bulk.toggle');
 
     // Call Blocks
     Route::post('call-blocks', [CallBlockController::class, 'store'])->name('call-blocks.store');

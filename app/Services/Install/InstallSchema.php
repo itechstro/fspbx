@@ -65,6 +65,7 @@ class InstallSchema
                 $table->text('missed_call_data')->nullable();
                 $table->text('user_context')->nullable()->index();
                 $table->text('toll_allow')->nullable();
+                $table->uuid('class_of_service_uuid')->nullable()->index();
                 $table->decimal('call_timeout', 20, 0)->nullable();
                 $table->text('call_group')->nullable()->index();
                 $table->text('call_screen_enabled')->nullable();
@@ -485,6 +486,7 @@ SQL);
             'extension_extension' => ['superadmin', 'admin'],
             'number_alias' => [],
             'extension_toll' => ['superadmin'],
+            'extension_class_of_service' => ['superadmin', 'admin'],
             'extension_call_screen' => ['superadmin', 'admin'],
             'extension_import' => ['superadmin'],
             'extension_caller_id' => ['superadmin', 'admin', 'user'],

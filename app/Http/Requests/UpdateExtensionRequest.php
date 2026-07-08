@@ -46,6 +46,13 @@ class UpdateExtensionRequest extends FormRequest
             'limit_max' => ['nullable', 'string'],
             'limit_destination' => ['nullable', 'string'],
             'toll_allow' => ['nullable', 'string'],
+            'class_of_service_uuid' => [
+                'nullable',
+                'uuid',
+                Rule::exists('v_class_of_service', 'class_of_service_uuid')->where(function ($query) {
+                    $query->where('domain_uuid', session('domain_uuid'));
+                }),
+            ],
             'call_group' => ['nullable', 'string'],
             'hold_music' => ['nullable', 'string'],
             'cidr' => ['nullable', 'string'],

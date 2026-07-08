@@ -47,6 +47,7 @@ use Spatie\QueryBuilder\AllowedFilter;
 use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\HeadingRowImport;
 use App\Services\CallRoutingOptionsService;
+use App\Services\ClassOfServiceService;
 use Maatwebsite\Excel\Excel as ExcelWriter;
 use App\Http\Requests\BulkUpdateExtensionRequest;
 use App\Http\Requests\StoreExtensionRequest;
@@ -434,6 +435,7 @@ class ExtensionsController extends Controller
                     'limit_max',
                     'limit_destination',
                     'toll_allow',
+                    'class_of_service_uuid',
                     'call_group',
                     'hold_music',
                     'cidr',
@@ -879,6 +881,9 @@ class ExtensionsController extends Controller
             'sample_message' => $sampleMessage ?? null,
             'recorded_name' => $recordedName ?? null,
             'music_on_hold_options' => $music_on_hold_options ?? null,
+            'class_of_service_options' => userCheckPermission('extension_class_of_service')
+                ? app(ClassOfServiceService::class)->optionsForDomain($currentDomain)
+                : [],
         ]);
     }
 
@@ -1334,6 +1339,15 @@ public function store(StoreExtensionRequest $request)
             if (isset($data['follow_me_enabled'])) {
                 $followMeUuid = $this->saveOrUpdateFollowMe($extension, $data);
                 $data['follow_me_uuid'] = $followMeUuid;
+            }
+
+            if (array_key_exists('class_of_service_uuid', $data) && userCheckPermission('extension_class_of_service')) {
+                $tollAllow = app(ClassOfServiceService::class)->applyProfileToExtension($data['class_of_service_uuid'] ?? null);
+                if ($tollAllow !== null) {
+                    $data['toll_allow'] = $tollAllow;
+                }
+            } elseif (! userCheckPermission('extension_class_of_service')) {
+                unset($data['class_of_service_uuid']);
             }
 
             $extension->update($data);
@@ -2384,6 +2398,7 @@ public function store(StoreExtensionRequest $request)
         $permissions['extension_limit'] = userCheckPermission('extension_limit');
         $permissions['extension_max_registrations'] = userCheckPermission('extension_max_registrations');
         $permissions['extension_toll'] = userCheckPermission('extension_toll');
+        $permissions['extension_class_of_service'] = userCheckPermission('extension_class_of_service');
         $permissions['extension_user_context'] = userCheckPermission('extension_user_context');
 
         $permissions['manage_external_caller_id_number'] = userCheckPermission('outbound_caller_id_number');

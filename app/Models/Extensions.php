@@ -52,6 +52,7 @@ class Extensions extends Model
         'missed_call_data',
         'user_context',
         'toll_allow',
+        'class_of_service_uuid',
         'call_timeout',
         'call_group',
         'call_screen_enabled',
@@ -234,6 +235,11 @@ class Extensions extends Model
     public function domain()
     {
         return $this->belongsTo(Domain::class, 'domain_uuid', 'domain_uuid');
+    }
+
+    public function classOfService()
+    {
+        return $this->belongsTo(ClassOfService::class, 'class_of_service_uuid', 'class_of_service_uuid');
     }
 
     // Pull all device lines for this extension in the same domain
