@@ -1,5 +1,5 @@
--- class_of_service.lua
--- Enforces Class of Service destination allow/deny rules on outbound calls.
+-- call_permissions.lua
+-- Enforces Call Permissions destination allow/deny rules on outbound calls.
 -- toll_allow route matching is handled separately by outbound dialplan conditions.
 --
 -- If Redis and Postgres are both unavailable, this script fails open.
@@ -15,7 +15,7 @@ local api = freeswitch.API()
 
 local function log(level, message)
     if DEBUG_MODE then
-        freeswitch.consoleLog(level, "[class_of_service.lua] " .. tostring(message) .. "\n")
+        freeswitch.consoleLog(level, "[call_permissions.lua] " .. tostring(message) .. "\n")
     end
 end
 
@@ -40,13 +40,13 @@ local function redis(command)
 end
 
 local function current_version(domain_uuid)
-    local version = redis("GET class_of_service:version:" .. domain_uuid)
+    local version = redis("GET call_permissions:version:" .. domain_uuid)
     version = blank(version) and "1" or tostring(version)
     return version
 end
 
-local function cache_key(version, domain_uuid, cos_uuid)
-    return "class_of_service:profile:v" .. version .. ":" .. domain_uuid .. ":" .. cos_uuid
+local function cache_key(version, domain_uuid, permission_uuid)
+    return "call_permissions:profile:v" .. version .. ":" .. domain_uuid .. ":" .. permission_uuid
 end
 
 local function decode_profile(encoded)
@@ -89,22 +89,22 @@ local function encode_profile(profile)
     return encoded
 end
 
-local function load_profile_from_database(domain_uuid, cos_uuid)
+local function load_profile_from_database(domain_uuid, permission_uuid)
     local ok, profile = pcall(function()
         local Database = require "resources.functions.database"
         local dbh = Database.new("system")
         assert(dbh:connected())
 
         local row = nil
-        local sql = "select class_of_service_uuid, default_action, enabled "
-            .. "from v_class_of_service "
+        local sql = "select call_permission_uuid, default_action, enabled "
+            .. "from v_call_permissions "
             .. "where domain_uuid = :domain_uuid "
-            .. "and class_of_service_uuid = :class_of_service_uuid "
+            .. "and call_permission_uuid = :call_permission_uuid "
             .. "and enabled = 'true' "
             .. "limit 1"
         local params = {
             domain_uuid = domain_uuid,
-            class_of_service_uuid = cos_uuid,
+            call_permission_uuid = permission_uuid,
         }
 
         dbh:query(sql, params, function(result)
@@ -118,12 +118,12 @@ local function load_profile_from_database(domain_uuid, cos_uuid)
 
         local destinations = {}
         local destination_sql = "select destination_prefix, destination_action, destination_order "
-            .. "from v_class_of_service_destinations "
-            .. "where class_of_service_uuid = :class_of_service_uuid "
+            .. "from v_call_permission_destinations "
+            .. "where call_permission_uuid = :call_permission_uuid "
             .. "and enabled = 'true' "
             .. "order by destination_order asc, destination_prefix asc"
         local destination_params = {
-            class_of_service_uuid = cos_uuid,
+            call_permission_uuid = permission_uuid,
         }
 
         dbh:query(destination_sql, destination_params, function(destination_row)
@@ -137,7 +137,7 @@ local function load_profile_from_database(domain_uuid, cos_uuid)
         dbh:release()
 
         return {
-            class_of_service_uuid = row.class_of_service_uuid,
+            call_permission_uuid = row.call_permission_uuid,
             default_action = row.default_action or "allow",
             destinations = destinations,
         }
@@ -151,8 +151,8 @@ local function load_profile_from_database(domain_uuid, cos_uuid)
     return profile
 end
 
-local function load_profile(domain_uuid, cos_uuid, version)
-    local key = cache_key(version, domain_uuid, cos_uuid)
+local function load_profile(domain_uuid, permission_uuid, version)
+    local key = cache_key(version, domain_uuid, permission_uuid)
     local cached = redis("GET " .. key)
     local profile = decode_profile(cached)
 
@@ -160,7 +160,7 @@ local function load_profile(domain_uuid, cos_uuid, version)
         return profile
     end
 
-    profile = load_profile_from_database(domain_uuid, cos_uuid)
+    profile = load_profile_from_database(domain_uuid, permission_uuid)
     if profile == nil then
         return nil
     end
@@ -217,9 +217,9 @@ if direction ~= "outbound" then
 end
 
 local domain_uuid = session:getVariable("domain_uuid")
-local cos_uuid = session:getVariable("class_of_service_uuid")
+local permission_uuid = session:getVariable("call_permission_uuid")
 
-if blank(domain_uuid) or blank(cos_uuid) then
+if blank(domain_uuid) or blank(permission_uuid) then
     return
 end
 
@@ -234,15 +234,15 @@ if number == "" then
 end
 
 local version = current_version(domain_uuid)
-local profile = load_profile(domain_uuid, cos_uuid, version)
+local profile = load_profile(domain_uuid, permission_uuid, version)
 
 if profile == nil then
-    log("WARNING", "No Class of Service profile found for extension. Failing open.")
+    log("WARNING", "No Call Permissions profile found for extension. Failing open.")
     return
 end
 
 if not evaluate_profile(profile, number) then
-    log("NOTICE", "Blocking outbound call to " .. number .. " for Class of Service " .. tostring(cos_uuid) .. ".")
+    log("NOTICE", "Blocking outbound call to " .. number .. " for Call Permissions " .. tostring(permission_uuid) .. ".")
     session:execute("playback", "ivr/ivr-call_cannot_be_completed_as_dialed.wav")
     session:hangup("OUTGOING_CALL_BARRED")
 end

@@ -335,7 +335,7 @@
 								user_record = row.user_record;
 								hold_music = row.hold_music;
 								toll_allow = row.toll_allow;
-								class_of_service_uuid = row.class_of_service_uuid;
+								call_permission_uuid = row.call_permission_uuid;
 								accountcode = row.accountcode;
 								user_context = row.user_context;
 								effective_caller_id_name = row.effective_caller_id_name;
@@ -580,8 +580,8 @@
 							if (toll_allow ~= nil) and (string.len(toll_allow) > 0) then
 								xml:append([[								<variable name="toll_allow" value="]] .. xml.sanitize(toll_allow) .. [["/>]]);
 							end
-							if (class_of_service_uuid ~= nil) and (string.len(class_of_service_uuid) > 0) then
-								xml:append([[								<variable name="class_of_service_uuid" value="]] .. xml.sanitize(class_of_service_uuid) .. [["/>]]);
+							if (call_permission_uuid ~= nil) and (string.len(call_permission_uuid) > 0) then
+								xml:append([[								<variable name="call_permission_uuid" value="]] .. xml.sanitize(call_permission_uuid) .. [["/>]]);
 							end
 							if (accountcode ~= nil) and (string.len(accountcode) > 0) then
 								xml:append([[								<variable name="accountcode" value="]] .. xml.sanitize(accountcode) .. [["/>]]);

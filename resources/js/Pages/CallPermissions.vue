@@ -3,7 +3,7 @@
 
     <div class="m-3">
         <DataTable @search-action="fetchData(1)" @reset-filters="resetFilters">
-            <template #title>Class of Service</template>
+            <template #title>Call Permissions</template>
 
             <template #subtitle>
                 Control which numbers extensions can call using toll allow tokens and destination rules.
@@ -86,10 +86,10 @@
                             :disabled="pageItems.length === 0"
                             class="h-4 w-4 rounded border-gray-300 text-indigo-600 disabled:cursor-not-allowed disabled:opacity-50"
                         />
-                        <button class="flex items-center" :class="{ 'ml-4': hasSelectableActions }" @click="setSort('cos_name')">
+                        <button class="flex items-center" :class="{ 'ml-4': hasSelectableActions }" @click="setSort('name')">
                             <span class="mr-2">Name</span>
-                            <ChevronUpIcon v-if="sortData.name === 'cos_name' && sortData.order === 'asc'" class="h-4 w-4 text-gray-500" />
-                            <ChevronDownIcon v-else-if="sortData.name === 'cos_name' && sortData.order === 'desc'" class="h-4 w-4 text-gray-500" />
+                            <ChevronUpIcon v-if="sortData.name === 'name' && sortData.order === 'asc'" class="h-4 w-4 text-gray-500" />
+                            <ChevronDownIcon v-else-if="sortData.name === 'name' && sortData.order === 'desc'" class="h-4 w-4 text-gray-500" />
                         </button>
                     </div>
                 </TableColumnHeader>
@@ -103,7 +103,7 @@
                 <TableColumnHeader header="Extensions" class="px-2 py-3.5 text-left text-sm font-semibold text-gray-900" />
                 <TableColumnHeader header="State" class="px-2 py-3.5 text-left text-sm font-semibold text-gray-900" />
                 <TableColumnHeader class="px-2 py-3.5 text-left text-sm font-semibold text-gray-900">
-                    <button class="flex items-center" @click="setSort('cos_description')">
+                    <button class="flex items-center" @click="setSort('description')">
                         <span class="mr-2">Description</span>
                     </button>
                 </TableColumnHeader>
@@ -133,24 +133,24 @@
             </template>
 
             <template #table-body>
-                <tr v-for="row in data.data" :key="row.class_of_service_uuid">
+                <tr v-for="row in data.data" :key="row.call_permission_uuid">
                     <TableField class="px-4 py-2 text-sm text-gray-500">
                         <div class="flex items-center">
                             <input
                                 v-if="hasSelectableActions"
                                 v-model="selectedItems"
                                 type="checkbox"
-                                :value="row.class_of_service_uuid"
+                                :value="row.call_permission_uuid"
                                 class="h-4 w-4 rounded border-gray-300 text-indigo-600"
                             />
                             <button
                                 type="button"
                                 class="min-w-0 text-left"
                                 :class="{ 'ml-4': hasSelectableActions, 'cursor-pointer': permissions.update }"
-                                @click="permissions.update && openEditModal(row.class_of_service_uuid)"
+                                @click="permissions.update && openEditModal(row.call_permission_uuid)"
                             >
                                 <span class="block font-medium text-gray-900" :class="{ 'hover:text-indigo-600': permissions.update }">
-                                    {{ row.cos_name }}
+                                    {{ row.name }}
                                 </span>
                             </button>
                         </div>
@@ -165,14 +165,14 @@
                     </TableField>
 
                     <TableField class="whitespace-nowrap px-2 py-2 text-sm text-gray-500">
-                        <button v-if="permissions.update" type="button" @click="confirmAction('toggle', [row.class_of_service_uuid])">
+                        <button v-if="permissions.update" type="button" @click="confirmAction('toggle', [row.call_permission_uuid])">
                             <Badge :text="row.enabled === 'true' ? 'Enabled' : 'Disabled'" v-bind="enabledBadge(row.enabled)" />
                         </button>
                         <Badge v-else :text="row.enabled === 'true' ? 'Enabled' : 'Disabled'" v-bind="enabledBadge(row.enabled)" />
                     </TableField>
 
                     <TableField class="max-w-xl px-2 py-2 text-sm text-gray-500">
-                        <span class="line-clamp-2">{{ row.cos_description || "No description" }}</span>
+                        <span class="line-clamp-2">{{ row.description || "No description" }}</span>
                     </TableField>
 
                     <TableField v-if="hasRowActions" class="whitespace-nowrap px-2 py-1 text-sm text-gray-500">
@@ -183,7 +183,7 @@
                                     type="button"
                                     class="rounded-full p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
                                     title="Edit"
-                                    @click="openEditModal(row.class_of_service_uuid)"
+                                    @click="openEditModal(row.call_permission_uuid)"
                                 >
                                     <PencilSquareIcon class="h-5 w-5" />
                                 </button>
@@ -192,7 +192,7 @@
                                     type="button"
                                     class="rounded-full p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
                                     title="Copy"
-                                    @click="confirmAction('copy', [row.class_of_service_uuid])"
+                                    @click="confirmAction('copy', [row.call_permission_uuid])"
                                 >
                                     <DocumentDuplicateIcon class="h-5 w-5" />
                                 </button>
@@ -201,7 +201,7 @@
                                     type="button"
                                     class="rounded-full p-2 text-gray-400 transition hover:bg-gray-100 hover:text-red-600"
                                     title="Delete"
-                                    @click="confirmAction('delete', [row.class_of_service_uuid])"
+                                    @click="confirmAction('delete', [row.call_permission_uuid])"
                                 >
                                     <TrashIcon class="h-5 w-5" />
                                 </button>
@@ -213,7 +213,7 @@
 
             <template #empty>
                 <div v-if="!loading && data.data.length === 0" class="px-6 py-8 text-center text-sm text-gray-500">
-                    No Class of Service profiles found.
+                    No Call Permission profiles found.
                 </div>
             </template>
 
@@ -237,7 +237,7 @@
         </DataTable>
     </div>
 
-    <ClassOfServiceForm
+    <CallPermissionForm
         :show="showForm"
         :header="formHeader"
         :mode="formMode"
@@ -275,7 +275,7 @@ import Paginator from "./components/general/Paginator.vue";
 import ConfirmationModal from "./components/modal/ConfirmationModal.vue";
 import Loading from "./components/general/Loading.vue";
 import Notification from "./components/notifications/Notification.vue";
-import ClassOfServiceForm from "./components/forms/ClassOfServiceForm.vue";
+import CallPermissionForm from "./components/forms/CallPermissionForm.vue";
 import Badge from "@generalComponents/Badge.vue";
 import {
     ArrowDownTrayIcon,
@@ -331,7 +331,7 @@ const filterData = ref({
 });
 
 const sortData = ref({
-    name: "cos_name",
+    name: "name",
     order: "asc",
 });
 
@@ -346,7 +346,7 @@ const confirmation = ref({
     color: "indigo",
 });
 
-const pageItems = computed(() => data.value.data.map((item) => item.class_of_service_uuid));
+const pageItems = computed(() => data.value.data.map((item) => item.call_permission_uuid));
 const hasSelectableActions = computed(() => permissions.copy || permissions.update || permissions.destroy);
 const hasRowActions = computed(() => permissions.copy || permissions.update || permissions.destroy);
 const columnCount = computed(() => hasRowActions.value ? 6 : 5);
@@ -371,10 +371,10 @@ const bulkActions = computed(() => {
 
 const formHeader = computed(() => {
     if (formMode.value === "create") {
-        return "Create Class of Service Profile";
+        return "Create Call Permission Profile";
     }
 
-    return `Update Class of Service - ${itemOptions.value?.item?.cos_name || "Loading..."}`;
+    return `Update Call Permission - ${itemOptions.value?.item?.name || "Loading..."}`;
 });
 
 onMounted(() => {

@@ -11,7 +11,7 @@
                 @response="handleResponse"
             >
                 <TextElement
-                    name="cos_name"
+                    name="name"
                     label="Name"
                     placeholder="e.g. International Staff"
                     :floating="false"
@@ -19,7 +19,7 @@
                 />
 
                 <TextareaElement
-                    name="cos_description"
+                    name="description"
                     label="Description"
                     :floating="false"
                     :rows="2"
@@ -71,7 +71,7 @@
                 >
                     <template #default="{ index }">
                         <ObjectElement :name="index">
-                            <HiddenElement name="class_of_service_destination_uuid" />
+                            <HiddenElement name="call_permission_destination_uuid" />
 
                             <TextElement
                                 name="destination_prefix"
@@ -127,7 +127,7 @@ const props = defineProps({
     loading: Boolean,
     header: {
         type: String,
-        default: "Class of Service",
+        default: "Call Permissions",
     },
     mode: {
         type: String,
@@ -150,13 +150,13 @@ const destinationActionOptions = [
 ];
 
 const defaultValues = computed(() => ({
-    cos_name: props.options?.item?.cos_name ?? null,
-    cos_description: props.options?.item?.cos_description ?? null,
+    name: props.options?.item?.name ?? null,
+    description: props.options?.item?.description ?? null,
     toll_allow: props.options?.item?.toll_allow ?? null,
     default_action: props.options?.item?.default_action ?? "allow",
     enabled: props.options?.item?.enabled ?? "true",
     destinations: (props.options?.item?.destinations ?? []).map((destination) => ({
-        class_of_service_destination_uuid: destination.class_of_service_destination_uuid ?? null,
+        call_permission_destination_uuid: destination.call_permission_destination_uuid ?? null,
         destination_prefix: destination.destination_prefix ?? null,
         destination_action: destination.destination_action ?? "deny",
         destination_description: destination.destination_description ?? null,

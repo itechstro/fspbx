@@ -111,7 +111,7 @@ class CreateFSPBXMenu extends Command
                     ['title' => 'Basic Queues', 'link' => '/basic-queues', 'groups' => ['superadmin', 'admin']],
                     ['title' => 'Bridges', 'link' => '/bridges', 'groups' => ['superadmin']],
                     ['title' => 'Call Block', 'link' => '/call-blocks', 'groups' => ['superadmin', 'admin', 'user']],
-                    ['title' => 'Class of Service', 'link' => '/class-of-service', 'groups' => ['superadmin', 'admin']],
+                    ['title' => 'Call Permissions', 'link' => '/call-permissions', 'groups' => ['superadmin', 'admin']],
                     ['title' => 'Call History', 'link' => '/call-detail-records', 'groups' => ['superadmin', 'admin', 'user']],
                     ['title' => 'Recorder', 'link' => '/recorder', 'groups' => ['superadmin', 'admin', 'user']],
                     ['title' => 'Call Flows', 'link' => '/call-flows', 'groups' => ['superadmin', 'admin']],

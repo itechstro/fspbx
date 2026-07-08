@@ -74,7 +74,7 @@
                                     limit_max: options.item.limit_max ?? '',
                                     limit_destination: options.item.limit_destination ?? '',
                                     toll_allow: options.item.toll_allow ?? '',
-                                    class_of_service_uuid: options.item.class_of_service_uuid ?? null,
+                                    call_permission_uuid: options.item.call_permission_uuid ?? null,
                                     call_group: options.item.call_group ?? '',
                                     hold_music: options.item.hold_music ?? '',
                                     auth_acl: options.item.auth_acl ?? '',
@@ -357,7 +357,7 @@
                                                     'max_registrations',
                                                     'limit_destination',
                                                     'toll_allow',
-                                                    'class_of_service_uuid',
+                                                    'call_permission_uuid',
                                                     'call_group',
                                                     'limit_max',
                                                     'hold_music',
@@ -1770,9 +1770,9 @@
                                                     :conditions="[() => options.permissions.extension_limit]" />
 
                                                 <SelectElement
-                                                    name="class_of_service_uuid"
-                                                    label="Class of Service"
-                                                    :items="options.class_of_service_options || []"
+                                                    name="call_permission_uuid"
+                                                    label="Call Permission"
+                                                    :items="options.call_permission_options || []"
                                                     :native="false"
                                                     :search="true"
                                                     :strict="false"
@@ -1783,7 +1783,7 @@
                                                             container: 6,
                                                         }
                                                     }"
-                                                    :conditions="[() => options.permissions.extension_class_of_service]"
+                                                    :conditions="[() => options.permissions.extension_call_permission]"
                                                 />
 
                                                 <TextElement name="toll_allow" label="Toll Allow" :columns="{

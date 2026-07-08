@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\StoreClassOfServiceRequest;
-use App\Http\Requests\UpdateClassOfServiceRequest;
-use App\Models\ClassOfService;
-use App\Services\ClassOfServiceService;
+use App\Http\Requests\StoreCallPermissionRequest;
+use App\Http\Requests\UpdateCallPermissionRequest;
+use App\Models\CallPermission;
+use App\Services\CallPermissionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -13,27 +13,27 @@ use Inertia\Inertia;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
-class ClassOfServiceController extends Controller
+class CallPermissionController extends Controller
 {
     protected int $perPage = 50;
 
     public function index()
     {
-        if (! userCheckPermission('class_of_service_view')) {
+        if (! userCheckPermission('call_permission_view')) {
             return redirect('/');
         }
 
-        return Inertia::render('ClassOfService', [
+        return Inertia::render('CallPermissions', [
             'routes' => [
-                'current_page' => route('class-of-service.index'),
-                'data_route' => route('class-of-service.data'),
-                'select_all' => route('class-of-service.select.all'),
-                'bulk_copy' => route('class-of-service.bulk.copy'),
-                'bulk_delete' => route('class-of-service.bulk.delete'),
-                'bulk_toggle' => route('class-of-service.bulk.toggle'),
-                'store' => route('class-of-service.store'),
-                'item_options' => route('class-of-service.item.options'),
-                'export' => route('class-of-service.export'),
+                'current_page' => route('call-permissions.index'),
+                'data_route' => route('call-permissions.data'),
+                'select_all' => route('call-permissions.select.all'),
+                'bulk_copy' => route('call-permissions.bulk.copy'),
+                'bulk_delete' => route('call-permissions.bulk.delete'),
+                'bulk_toggle' => route('call-permissions.bulk.toggle'),
+                'store' => route('call-permissions.store'),
+                'item_options' => route('call-permissions.item.options'),
+                'export' => route('call-permissions.export'),
             ],
             'permissions' => $this->permissions(),
         ]);
@@ -41,23 +41,23 @@ class ClassOfServiceController extends Controller
 
     public function export()
     {
-        if (! userCheckPermission('class_of_service_view')) {
+        if (! userCheckPermission('call_permission_view')) {
             abort(403);
         }
 
         $columns = [
-            'class_of_service_uuid',
+            'call_permission_uuid',
             'domain_uuid',
-            'cos_name',
-            'cos_description',
+            'name',
+            'description',
             'toll_allow',
             'default_action',
             'enabled',
         ];
 
-        $rows = ClassOfService::query()
+        $rows = CallPermission::query()
             ->where('domain_uuid', session('domain_uuid'))
-            ->orderBy('cos_name')
+            ->orderBy('name')
             ->get($columns);
 
         return response()->streamDownload(function () use ($columns, $rows) {
@@ -69,48 +69,48 @@ class ClassOfServiceController extends Controller
             }
 
             fclose($handle);
-        }, 'class_of_service_' . now()->format('Y-m-d') . '.csv', [
+        }, 'call_permissions_' . now()->format('Y-m-d') . '.csv', [
             'Content-Type' => 'text/csv',
         ]);
     }
 
-    public function store(StoreClassOfServiceRequest $request, ClassOfServiceService $service): JsonResponse
+    public function store(StoreCallPermissionRequest $request, CallPermissionService $service): JsonResponse
     {
         try {
             $profile = $service->save($request->validated());
 
             return response()->json([
-                'messages' => ['success' => ['Class of Service profile created successfully.']],
-                'class_of_service_uuid' => $profile->class_of_service_uuid,
+                'messages' => ['success' => ['Call Permission created successfully.']],
+                'call_permission_uuid' => $profile->call_permission_uuid,
             ], 201);
         } catch (\Throwable $e) {
-            logger('ClassOfServiceController@store error: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
+            logger('CallPermissionController@store error: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
 
             return response()->json([
-                'messages' => ['error' => ['Failed to create Class of Service profile.']],
+                'messages' => ['error' => ['Failed to create Call Permission.']],
             ], 500);
         }
     }
 
-    public function update(UpdateClassOfServiceRequest $request, ClassOfService $class_of_service, ClassOfServiceService $service): JsonResponse
+    public function update(UpdateCallPermissionRequest $request, CallPermission $call_permission, CallPermissionService $service): JsonResponse
     {
-        if ($class_of_service->domain_uuid !== session('domain_uuid')) {
+        if ($call_permission->domain_uuid !== session('domain_uuid')) {
             return response()->json([
                 'messages' => ['error' => ['Access denied.']],
             ], 403);
         }
 
         try {
-            $service->save($request->validated(), $class_of_service);
+            $service->save($request->validated(), $call_permission);
 
             return response()->json([
-                'messages' => ['success' => ['Class of Service profile updated successfully.']],
+                'messages' => ['success' => ['Call Permission updated successfully.']],
             ]);
         } catch (\Throwable $e) {
-            logger('ClassOfServiceController@update error: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
+            logger('CallPermissionController@update error: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
 
             return response()->json([
-                'messages' => ['error' => ['Failed to update Class of Service profile.']],
+                'messages' => ['error' => ['Failed to update Call Permission.']],
             ], 500);
         }
     }
@@ -119,26 +119,26 @@ class ClassOfServiceController extends Controller
     {
         $itemUuid = $request->input('itemUuid', $request->input('item_uuid'));
 
-        if ($itemUuid && ! userCheckPermission('class_of_service_edit')) {
+        if ($itemUuid && ! userCheckPermission('call_permission_edit')) {
             return response()->json([
                 'messages' => ['error' => ['Access denied.']],
             ], 403);
         }
 
-        if (! $itemUuid && ! userCheckPermission('class_of_service_add')) {
+        if (! $itemUuid && ! userCheckPermission('call_permission_add')) {
             return response()->json([
                 'messages' => ['error' => ['Access denied.']],
             ], 403);
         }
 
         if ($itemUuid) {
-            $item = ClassOfService::query()
+            $item = CallPermission::query()
                 ->where('domain_uuid', session('domain_uuid'))
                 ->with('destinations')
                 ->whereKey($itemUuid)
                 ->firstOrFail();
         } else {
-            $item = new ClassOfService();
+            $item = new CallPermission();
             $item->enabled = 'true';
             $item->default_action = 'allow';
             $item->setRelation('destinations', collect());
@@ -147,15 +147,15 @@ class ClassOfServiceController extends Controller
         return response()->json([
             'item' => $item,
             'routes' => [
-                'store_route' => route('class-of-service.store'),
-                'update_route' => $itemUuid ? route('class-of-service.update', ['class_of_service' => $item->class_of_service_uuid]) : null,
+                'store_route' => route('call-permissions.store'),
+                'update_route' => $itemUuid ? route('call-permissions.update', ['call_permission' => $item->call_permission_uuid]) : null,
             ],
         ]);
     }
 
     public function getData(Request $request)
     {
-        if (! userCheckPermission('class_of_service_view')) {
+        if (! userCheckPermission('call_permission_view')) {
             return response()->json([
                 'messages' => ['error' => ['Access denied.']],
             ], 403);
@@ -165,35 +165,35 @@ class ClassOfServiceController extends Controller
             ->withCount('extensions')
             ->select([
                 'domain_uuid',
-                'class_of_service_uuid',
-                'cos_name',
-                'cos_description',
+                'call_permission_uuid',
+                'name',
+                'description',
                 'toll_allow',
                 'default_action',
                 'enabled',
             ])
             ->allowedSorts([
-                'cos_name',
+                'name',
                 'toll_allow',
                 'default_action',
                 'enabled',
             ])
-            ->defaultSort('cos_name')
+            ->defaultSort('name')
             ->paginate($this->perPage);
     }
 
     public function selectAll(Request $request): JsonResponse
     {
-        if (! userCheckPermission('class_of_service_view')) {
+        if (! userCheckPermission('call_permission_view')) {
             return response()->json([
                 'messages' => ['error' => ['Access denied.']],
             ], 403);
         }
 
         $items = $this->scopedProfiles($request)
-            ->select(['class_of_service_uuid'])
-            ->defaultSort('cos_name')
-            ->pluck('class_of_service_uuid');
+            ->select(['call_permission_uuid'])
+            ->defaultSort('name')
+            ->pluck('call_permission_uuid');
 
         return response()->json([
             'items' => $items,
@@ -201,9 +201,9 @@ class ClassOfServiceController extends Controller
         ]);
     }
 
-    public function bulkCopy(Request $request, ClassOfServiceService $service): JsonResponse
+    public function bulkCopy(Request $request, CallPermissionService $service): JsonResponse
     {
-        if (! userCheckPermission('class_of_service_add')) {
+        if (! userCheckPermission('call_permission_add')) {
             return response()->json([
                 'messages' => ['error' => ['Access denied.']],
             ], 403);
@@ -223,9 +223,9 @@ class ClassOfServiceController extends Controller
         ]);
     }
 
-    public function bulkDelete(Request $request, ClassOfServiceService $service): JsonResponse
+    public function bulkDelete(Request $request, CallPermissionService $service): JsonResponse
     {
-        if (! userCheckPermission('class_of_service_delete')) {
+        if (! userCheckPermission('call_permission_delete')) {
             return response()->json([
                 'messages' => ['error' => ['Access denied.']],
             ], 403);
@@ -245,9 +245,9 @@ class ClassOfServiceController extends Controller
         ]);
     }
 
-    public function bulkToggle(Request $request, ClassOfServiceService $service): JsonResponse
+    public function bulkToggle(Request $request, CallPermissionService $service): JsonResponse
     {
-        if (! userCheckPermission('class_of_service_edit')) {
+        if (! userCheckPermission('call_permission_edit')) {
             return response()->json([
                 'messages' => ['error' => ['Access denied.']],
             ], 403);
@@ -269,7 +269,7 @@ class ClassOfServiceController extends Controller
 
     private function scopedProfiles(Request $request): QueryBuilder
     {
-        return QueryBuilder::for(ClassOfService::class)
+        return QueryBuilder::for(CallPermission::class)
             ->where('domain_uuid', session('domain_uuid'))
             ->allowedFilters([
                 AllowedFilter::callback('search', function ($query, $value) {
@@ -280,8 +280,8 @@ class ClassOfServiceController extends Controller
                     }
 
                     $query->where(function ($query) use ($needle) {
-                        $query->where('cos_name', 'ilike', "%{$needle}%")
-                            ->orWhere('cos_description', 'ilike', "%{$needle}%")
+                        $query->where('name', 'ilike', "%{$needle}%")
+                            ->orWhere('description', 'ilike', "%{$needle}%")
                             ->orWhere('toll_allow', 'ilike', "%{$needle}%")
                             ->orWhere('enabled', 'ilike', "%{$needle}%");
                     });
@@ -301,20 +301,20 @@ class ClassOfServiceController extends Controller
             return collect();
         }
 
-        return ClassOfService::query()
+        return CallPermission::query()
             ->where('domain_uuid', session('domain_uuid'))
-            ->whereIn('class_of_service_uuid', $uuids)
+            ->whereIn('call_permission_uuid', $uuids)
             ->get();
     }
 
     private function permissions(): array
     {
         return [
-            'create' => userCheckPermission('class_of_service_add'),
-            'update' => userCheckPermission('class_of_service_edit'),
-            'destroy' => userCheckPermission('class_of_service_delete'),
-            'copy' => userCheckPermission('class_of_service_add'),
-            'export' => userCheckPermission('class_of_service_view'),
+            'create' => userCheckPermission('call_permission_add'),
+            'update' => userCheckPermission('call_permission_edit'),
+            'destroy' => userCheckPermission('call_permission_delete'),
+            'copy' => userCheckPermission('call_permission_add'),
+            'export' => userCheckPermission('call_permission_view'),
         ];
     }
 }

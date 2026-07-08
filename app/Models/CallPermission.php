@@ -6,15 +6,15 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class ClassOfService extends Model
+class CallPermission extends Model
 {
     use \App\Models\Traits\TraitUuid;
 
-    protected $table = 'v_class_of_service';
+    protected $table = 'v_call_permissions';
 
     public $timestamps = false;
 
-    protected $primaryKey = 'class_of_service_uuid';
+    protected $primaryKey = 'call_permission_uuid';
 
     public $incrementing = false;
 
@@ -30,14 +30,14 @@ class ClassOfService extends Model
     public function destinations(): HasMany
     {
         return $this->hasMany(
-            ClassOfServiceDestination::class,
-            'class_of_service_uuid',
-            'class_of_service_uuid'
+            CallPermissionDestination::class,
+            'call_permission_uuid',
+            'call_permission_uuid'
         )->orderBy('destination_order');
     }
 
     public function extensions(): HasMany
     {
-        return $this->hasMany(Extensions::class, 'class_of_service_uuid', 'class_of_service_uuid');
+        return $this->hasMany(Extensions::class, 'call_permission_uuid', 'call_permission_uuid');
     }
 }
