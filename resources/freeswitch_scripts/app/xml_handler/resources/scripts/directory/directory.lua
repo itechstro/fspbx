@@ -155,9 +155,12 @@
 
 		-- get the cache. We can use cache only if we do not use `fs_path`
 		-- or we do not need dial-string. In other way we have to use database.
+		-- Key by auth user (user), not sip_from_user. SIPREC INVITEs often have
+		-- From=<original-caller> and Authorization username=<siprec>, and looking
+		-- up the From user returns the wrong directory XML.
 			if (continue) and (not USE_FS_PATH) then
 				if (cache.support() and domain_name) then
-					local key, err = "directory:" .. (from_user or user) .. "@" .. domain_name
+					local key, err = "directory:" .. user .. "@" .. domain_name
 					XML_STRING, err = cache.get(key);
 
 					if debug['cache'] then

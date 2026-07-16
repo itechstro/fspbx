@@ -7,6 +7,7 @@ use App\Models\ConferenceProfileParam;
 use App\Models\DialplanDetails;
 use App\Models\Dialplans;
 use App\Models\Domain;
+use App\Models\Extensions;
 use App\Models\FusionCache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -16,6 +17,9 @@ class SrsRecorderDialplanService
     public const SETTING_SUBCATEGORY = 'enable_recorder';
 
     public const CONFERENCE_PROFILE_NAME = 'recorder';
+
+    /** SIP auth user for SIPREC clients (alphanumeric; not a normal dialable extension). */
+    public const SIPREC_EXTENSION = 'siprec';
 
     public function __construct(private readonly DialplanService $dialplanService)
     {
@@ -71,6 +75,7 @@ class SrsRecorderDialplanService
         DB::transaction(function () use ($domain) {
             $this->removeRecorderCatchDialplan($domain);
             $this->upsertSrsRecorderDialplan($domain);
+            $this->upsertSiprecExtension($domain);
             $this->upsertRecorderConferenceProfile();
         });
 
@@ -81,6 +86,7 @@ class SrsRecorderDialplanService
     {
         DB::transaction(function () use ($domain) {
             $this->removeRecorderCatchDialplan($domain);
+            $this->disableSiprecExtension($domain);
 
             foreach ($this->recorderDialplansForDomain($domain) as $dialplan) {
                 $dialplan->dialplan_enabled = 'false';
@@ -162,6 +168,59 @@ class SrsRecorderDialplanService
         return $dialplan;
     }
 
+    protected function upsertSiprecExtension(Domain $domain): Extensions
+    {
+        $extension = Extensions::query()
+            ->where('domain_uuid', $domain->domain_uuid)
+            ->where('extension', self::SIPREC_EXTENSION)
+            ->first();
+
+        $isNew = ! $extension;
+        $extension ??= new Extensions();
+        $extensionUuid = $extension->extension_uuid ?: (string) Str::uuid();
+        $password = filled($extension->password) ? $extension->password : generate_password();
+
+        $extension->forceFill([
+            'extension_uuid' => $extensionUuid,
+            'domain_uuid' => $domain->domain_uuid,
+            'extension' => self::SIPREC_EXTENSION,
+            'password' => $password,
+            'accountcode' => $domain->domain_name,
+            'effective_caller_id_name' => 'SIPREC',
+            'effective_caller_id_number' => self::SIPREC_EXTENSION,
+            'directory_first_name' => 'SIPREC',
+            'directory_last_name' => 'User',
+            'directory_visible' => 'false',
+            'directory_exten_visible' => 'false',
+            'limit_max' => '100',
+            'limit_destination' => '!USER_BUSY',
+            'user_context' => $domain->domain_name,
+            'call_timeout' => 25,
+            'call_screen_enabled' => 'false',
+            'force_ping' => 'false',
+            'enabled' => 'true',
+            'description' => 'System SIPREC registration user',
+            'insert_date' => $isNew ? now() : ($extension->insert_date ?? now()),
+            'insert_user' => $isNew ? session('user_uuid') : $extension->insert_user,
+            'update_date' => $isNew ? null : now(),
+            'update_user' => $isNew ? null : session('user_uuid'),
+        ])->save();
+
+        return $extension;
+    }
+
+    protected function disableSiprecExtension(Domain $domain): void
+    {
+        Extensions::query()
+            ->where('domain_uuid', $domain->domain_uuid)
+            ->where('extension', self::SIPREC_EXTENSION)
+            ->update([
+                'enabled' => 'false',
+                'update_date' => now(),
+                'update_user' => session('user_uuid'),
+            ]);
+    }
+
     /**
      * @return array<int, array<string, mixed>>
      */
@@ -179,6 +238,8 @@ class SrsRecorderDialplanService
             ['dialplan_detail_tag' => 'action', 'dialplan_detail_type' => 'answer', 'dialplan_detail_data' => '', 'dialplan_detail_break' => null, 'dialplan_detail_inline' => null, 'dialplan_detail_group' => 0, 'dialplan_detail_order' => 70, 'dialplan_detail_enabled' => 'true'],
             ['dialplan_detail_tag' => 'action', 'dialplan_detail_type' => 'set', 'dialplan_detail_data' => 'domain_name=' . $domainName, 'dialplan_detail_break' => null, 'dialplan_detail_inline' => 'true', 'dialplan_detail_group' => 0, 'dialplan_detail_order' => 80, 'dialplan_detail_enabled' => 'true'],
             ['dialplan_detail_tag' => 'action', 'dialplan_detail_type' => 'set', 'dialplan_detail_data' => 'caller_destination=${sip_h_X-Original-Dialed}', 'dialplan_detail_break' => null, 'dialplan_detail_inline' => 'true', 'dialplan_detail_group' => 0, 'dialplan_detail_order' => 90, 'dialplan_detail_enabled' => 'true'],
+            ['dialplan_detail_tag' => 'action', 'dialplan_detail_type' => 'set', 'dialplan_detail_data' => 'effective_caller_id_name=${sip_h_X-Caller-Name}', 'dialplan_detail_break' => null, 'dialplan_detail_inline' => 'true', 'dialplan_detail_group' => 0, 'dialplan_detail_order' => 95, 'dialplan_detail_enabled' => 'true'],
+            ['dialplan_detail_tag' => 'action', 'dialplan_detail_type' => 'set', 'dialplan_detail_data' => 'effective_caller_id_number=${sip_h_X-Caller-Number}', 'dialplan_detail_break' => null, 'dialplan_detail_inline' => 'true', 'dialplan_detail_group' => 0, 'dialplan_detail_order' => 96, 'dialplan_detail_enabled' => 'true'],
             ['dialplan_detail_tag' => 'action', 'dialplan_detail_type' => 'set', 'dialplan_detail_data' => 'room_name=${sip_h_X-Room-Name}', 'dialplan_detail_break' => null, 'dialplan_detail_inline' => 'true', 'dialplan_detail_group' => 0, 'dialplan_detail_order' => 100, 'dialplan_detail_enabled' => 'true'],
             ['dialplan_detail_tag' => 'action', 'dialplan_detail_type' => 'set', 'dialplan_detail_data' => 'call_direction=recorder', 'dialplan_detail_break' => null, 'dialplan_detail_inline' => 'true', 'dialplan_detail_group' => 0, 'dialplan_detail_order' => 110, 'dialplan_detail_enabled' => 'true'],
             ['dialplan_detail_tag' => 'action', 'dialplan_detail_type' => 'set', 'dialplan_detail_data' => 'record_path=${recordings_dir}/${domain_name}/archive/${strftime(%Y)}/${strftime(%b)}/${strftime(%d)}', 'dialplan_detail_break' => null, 'dialplan_detail_inline' => 'true', 'dialplan_detail_group' => 0, 'dialplan_detail_order' => 120, 'dialplan_detail_enabled' => 'true'],
@@ -279,6 +340,8 @@ class SrsRecorderDialplanService
         FusionCache::clear('dialplan:' . $domainName);
         FusionCache::clear('dialplan:public');
         FusionCache::clear('configuration:conference.conf');
+        FusionCache::clear('directory:' . self::SIPREC_EXTENSION . '@' . $domainName);
+        FusionCache::clear('directory:siprec@' . $domainName);
         $this->dialplanService->clearDialplanCache('global');
         $this->dialplanService->clearDialplanCache('public');
     }

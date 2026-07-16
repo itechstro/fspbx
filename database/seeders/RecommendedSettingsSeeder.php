@@ -865,7 +865,7 @@ class RecommendedSettingsSeeder extends Seeder
                 'default_setting_name'          => 'boolean',
                 'default_setting_value'         => 'true',
                 'default_setting_enabled'       => true,
-                'default_setting_description'   => 'Enable the Recorder module and provision srs_recorder dialplans and the recorder conference profile.',
+                'default_setting_description'   => 'Enable the Recorder module and provision srs_recorder dialplans, the siprec SIP user, and the recorder conference profile.',
             ],
 
             // Add more settings here...
