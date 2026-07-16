@@ -170,10 +170,25 @@ class SrsRecorderDialplanService
 
     protected function upsertSiprecExtension(Domain $domain): Extensions
     {
-        $extension = Extensions::query()
+        // Keep a single siprec row per domain. Concurrent provision / updates can
+        // otherwise leave duplicates with different passwords and break digest auth.
+        $existing = Extensions::query()
             ->where('domain_uuid', $domain->domain_uuid)
             ->where('extension', self::SIPREC_EXTENSION)
-            ->first();
+            ->orderBy('insert_date')
+            ->orderBy('extension_uuid')
+            ->get();
+
+        $extension = $existing->first(fn (Extensions $row) => filled($row->password))
+            ?? $existing->first();
+
+        if ($existing->count() > 1 && $extension) {
+            Extensions::query()
+                ->where('domain_uuid', $domain->domain_uuid)
+                ->where('extension', self::SIPREC_EXTENSION)
+                ->where('extension_uuid', '!=', $extension->extension_uuid)
+                ->delete();
+        }
 
         $isNew = ! $extension;
         $extension ??= new Extensions();
