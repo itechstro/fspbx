@@ -23,7 +23,10 @@ class AccountSettingsController extends Controller
     public $model;
     protected $viewName = 'AccountSettings';
 
-    public function __construct(private readonly SettingsManagementService $settings)
+    public function __construct(
+        private readonly SettingsManagementService $settings,
+        private readonly DomainSettingsController $domainSettingsController,
+    )
     {
         $this->model = new Domain();
     }
@@ -79,6 +82,11 @@ class AccountSettingsController extends Controller
                     'assemblyai_store_route' => route('call-transcription.assemblyai.store'),
                     'pms_provider' => route('account-settings.pms-provider'),
                     'pms_provider_update' => route('account-settings.pms-provider.update'),
+                    'call_webhook_save' => route('call-webhooks.save'),
+                    'call_webhook_show' => route('call-webhooks.show'),
+                    'call_webhook_test' => route('call-webhooks.test'),
+                    'call_webhook_rotate_secret' => route('call-webhooks.rotate-secret'),
+                    'call_webhook_destroy' => route('call-webhooks.destroy'),
 
                     //'bulk_update' => route('devices.bulk.update'),
                 ],
@@ -86,7 +94,15 @@ class AccountSettingsController extends Controller
                 'permissions' => function () {
                     return $this->getUserPermissions();
                 },
+                'domainSettings' => function () {
+                    if (! userCheckPermission('domain_setting_view')) {
+                        return null;
+                    }
 
+                    $domain = Domain::query()->find(session('domain_uuid'));
+
+                    return $domain ? $this->domainSettingsController->pageProps($domain) : null;
+                },
             ]
         );
     }
@@ -286,6 +302,11 @@ class AccountSettingsController extends Controller
         $permissions['location_create'] = userCheckPermission('location_create');
         $permissions['location_update'] = userCheckPermission('location_update');
         $permissions['location_delete'] = userCheckPermission('location_delete');
+        $permissions['call_webhook_view'] = userCheckPermission('call_webhook_view');
+        $permissions['call_webhook_create'] = userCheckPermission('call_webhook_create');
+        $permissions['call_webhook_update'] = userCheckPermission('call_webhook_update');
+        $permissions['call_webhook_delete'] = userCheckPermission('call_webhook_delete');
+        $permissions['call_webhook_test'] = userCheckPermission('call_webhook_test');
 
         return $permissions;
     }

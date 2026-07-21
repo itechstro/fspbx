@@ -575,7 +575,6 @@ class AppsController extends Controller
             ], 400);
         }
 
-
         return response()->json([
             'users' => $users,
             'status' => 200,
@@ -707,8 +706,9 @@ class AppsController extends Controller
         try {
             $provider = $providerResolver->resolve();
             $mobile_app = QueryBuilder::for(MobileAppUsers::query())
-                ->select('mobile_app_user_uuid', 'org_id', 'conn_id', 'user_id', 'status')
+                ->select('mobile_app_user_uuid', 'extension_uuid', 'org_id', 'conn_id', 'user_id', 'status')
                 ->where('extension_uuid', request('extension_uuid'))
+                ->where('domain_uuid', session('domain_uuid'))
                 ->first();
 
             $org_id = DomainSettings::where('domain_uuid', session('domain_uuid'))
@@ -724,8 +724,7 @@ class AppsController extends Controller
             if ($provider->getProviderKey() === 'cloudplay') {
                 $credentials = app(CloudPlayApiService::class)->getCustomerCredentials(session('domain_uuid'));
                 if ($credentials['username'] === '') {
-                    throw new \Exception("Contact your administrator to enable mobile apps.");
-                }
+                    throw new \Exception("Contact your administrator to enable mobile apps.");                }
             }
 
             $profileId = null;
@@ -799,8 +798,7 @@ class AppsController extends Controller
                 }
             }
 
-            return response()->json($response);
-        } catch (\Throwable $e) {
+            return response()->json($response);        } catch (\Throwable $e) {
             logger('ExtensionsController@getMobileAppOptions error: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
             return response()->json([
                 'success'  => false,
@@ -932,6 +930,7 @@ class AppsController extends Controller
             $appUser->storeAppPassword($user['password'] ?? null);
             app(CloudPlayEnterpriseDirectorySync::class)->adoptExtensionEdId($extension, $appUser);
             $appUser->save();
+            $this->clearRingotelExtensionStatusCache(request('org_id'));
 
             if ((int) request('status') === 1) {
                 app(CloudPlayEnterpriseDirectorySync::class)->sync($provider, $extension, $appUser, true);
@@ -990,6 +989,7 @@ class AppsController extends Controller
             ];
 
             $response = $provider->deleteUser($params);
+            $this->clearRingotelExtensionStatusCache(request('org_id'));
 
             return response()->json([
                 'messages' => ['success' => ['Mobile app has been removed']]
@@ -1065,7 +1065,7 @@ class AppsController extends Controller
             if ($storedMobileApp) {
                 $storedMobileApp->storeAppPassword($user['password'] ?? null);
                 $storedMobileApp->save();
-            }
+            }            $this->clearRingotelExtensionStatusCache(request('org_id'));
 
             // If success and user is activated send user email with credentials
             if ($user) {
@@ -1436,6 +1436,8 @@ class AppsController extends Controller
             }
         }
 
+        $this->clearRingotelExtensionStatusCache($orgId);
+
         return response()->json([
             'messages' => [
                 'success' => [
@@ -1531,7 +1533,7 @@ class AppsController extends Controller
             $extension->mobile_app->storeAppPassword($user['password'] ?? null);
             $extension->mobile_app->status = 1;
             $extension->mobile_app->save();
-            app(CloudPlayEnterpriseDirectorySync::class)->sync($provider, $extension, $extension->mobile_app, true);
+            app(CloudPlayEnterpriseDirectorySync::class)->sync($provider, $extension, $extension->mobile_app, true);            $this->clearRingotelExtensionStatusCache(request('org_id'));
 
             // We don't show the password and QR code for the organisations that has dont_send_user_credentials=true
             $hidePassInEmail = get_domain_setting('dont_send_user_credentials');
@@ -1640,6 +1642,7 @@ class AppsController extends Controller
                 $mobile_app->status = -1;
                 $mobile_app->save();
             }
+            $this->clearRingotelExtensionStatusCache(request('org_id'));
 
             return response()->json([
                 'messages' => ['success' => ['Mobile app has been deactivated']]
@@ -1651,6 +1654,147 @@ class AppsController extends Controller
                 'errors' => ['error' => [$e->getMessage()]],
             ], 422);
         }
+    }
+
+    public function setUserState(Request $request, RingotelApiService $ringotelApiService)
+    {
+        $request->validate([
+            'mobile_app_user_uuid' => ['required', 'uuid'],
+            'dnd' => ['required', 'boolean'],
+        ]);
+
+        try {
+            $mobileApp = MobileAppUsers::query()
+                ->whereKey($request->input('mobile_app_user_uuid'))
+                ->where('domain_uuid', session('domain_uuid'))
+                ->where('status', 1)
+                ->firstOrFail();
+
+            $ringotelApiService->setUserState($mobileApp->org_id, $mobileApp->user_id, $request->boolean('dnd'));
+            $this->clearRingotelExtensionStatusCache($mobileApp->org_id);
+            $ringotelUser = $this->getMobileAppRingotelUser($ringotelApiService, $mobileApp);
+
+            return response()->json([
+                'ringotel_user' => $ringotelUser,
+                'messages' => [
+                    'success' => [$request->boolean('dnd') ? 'Mobile App DND has been enabled.' : 'Mobile App status changed to Available.'],
+                ],
+            ], 200);
+        } catch (\Throwable $e) {
+            logger('AppsController@setUserState error: ' . $e->getMessage() . " at " . $e->getFile() . ":" . $e->getLine());
+
+            return response()->json([
+                'errors' => [
+                    'error' => ['Unable to update Mobile App state.'],
+                ],
+            ], 500);
+        }
+    }
+
+    public function deleteDevice(Request $request, RingotelApiService $ringotelApiService)
+    {
+        $request->validate([
+            'mobile_app_user_uuid' => ['required', 'uuid'],
+            'termid' => ['required', 'string'],
+        ]);
+
+        try {
+            $mobileApp = MobileAppUsers::query()
+                ->whereKey($request->input('mobile_app_user_uuid'))
+                ->where('domain_uuid', session('domain_uuid'))
+                ->where('status', 1)
+                ->firstOrFail();
+
+            $ringotelApiService->deleteDevice($mobileApp->org_id, $mobileApp->user_id, $request->input('termid'));
+            $this->clearRingotelExtensionStatusCache($mobileApp->org_id);
+            usleep(500000);
+
+            $ringotelUser = $this->getMobileAppRingotelUser($ringotelApiService, $mobileApp, null, null, false);
+
+            return response()->json([
+                'ringotel_user' => $ringotelUser,
+                'messages' => [
+                    'success' => ['Mobile App device has been removed.'],
+                ],
+            ], 200);
+        } catch (\Throwable $e) {
+            logger('AppsController@deleteDevice error: ' . $e->getMessage() . " at " . $e->getFile() . ":" . $e->getLine());
+
+            return response()->json([
+                'errors' => [
+                    'error' => ['Unable to remove Mobile App device.'],
+                ],
+            ], 500);
+        }
+    }
+
+    private function clearRingotelExtensionStatusCache(?string $orgId): void
+    {
+        if (empty($orgId)) {
+            return;
+        }
+
+        Cache::forget('ringotel:extension-status:' . session('domain_uuid') . ':' . $orgId);
+    }
+
+    private function getMobileAppRingotelUser(
+        RingotelApiService $ringotelApiService,
+        MobileAppUsers $mobileApp,
+        ?string $fallbackOrgId = null,
+        ?string $extensionUuid = null,
+        bool $includeHistoryFallback = true
+    ): array {
+        $ringotelOrgId = $mobileApp->org_id ?: $fallbackOrgId;
+
+        if (empty($ringotelOrgId) || empty($mobileApp->user_id)) {
+            return [];
+        }
+
+        $extensionUuid = $extensionUuid ?: $mobileApp->extension_uuid;
+        $extension = $extensionUuid
+            ? Extensions::query()
+                ->whereKey($extensionUuid)
+                ->where('domain_uuid', session('domain_uuid'))
+                ->first(['extension_uuid', 'extension'])
+            : null;
+
+        $user = $ringotelApiService->getUser($ringotelOrgId, $mobileApp->user_id);
+
+        if (empty($user->devices) && $extension) {
+            $users = $ringotelApiService->getUsersByOrgId($ringotelOrgId);
+            $matchedUser = $users->first(function ($item) use ($mobileApp, $extension) {
+                $authNames = is_array($item->authName) ? $item->authName : [$item->authName];
+
+                return (string) $item->id === (string) $mobileApp->user_id
+                    || (string) $item->extension === (string) $extension->extension
+                    || (string) $item->username === (string) $extension->extension
+                    || in_array((string) $extension->extension, array_map('strval', $authNames), true);
+            });
+
+            if ($matchedUser) {
+                $user = $matchedUser;
+            }
+        }
+
+        $ringotelUser = $ringotelApiService->normalizeUserPresence($user);
+
+        if ($includeHistoryFallback && empty($ringotelUser['devices'])) {
+            $history = $ringotelApiService->getUserRegistrationsHistory(
+                $ringotelOrgId,
+                $user->id,
+                now()->subDays(30)->timestamp * 1000,
+                now()->timestamp * 1000
+            );
+
+            $ringotelUser['devices'] = $ringotelApiService->normalizeRegistrationHistoryDevices($history);
+            $historyLastSeen = collect($ringotelUser['devices'])->pluck('last_login_ts')->filter()->max();
+
+            if ($historyLastSeen && empty($ringotelUser['last_login_ts'])) {
+                $ringotelUser['last_login_ts'] = $historyLastSeen;
+            }
+        }
+
+        return $ringotelUser;
     }
 
     public function emailUser()

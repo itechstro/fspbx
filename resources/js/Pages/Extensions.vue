@@ -195,18 +195,44 @@
 
                             <template #action-buttons>
                                 <div class="flex items-center whitespace-nowrap">
-                                    <ejs-tooltip v-if="String(row.mobile_app?.status) === '1'"
-                                        :content="'Mobile App (Activated)'" position='TopCenter'>
-                                        <DevicePhoneMobileSolidIcon
-                                            class="h-5 w-5 text-blue-400 hover:text-blue-600 active:bg-blue-300"
-                                            aria-label="Mobile App (Activated)" />
-                                    </ejs-tooltip>
-                                    <ejs-tooltip v-if="String(row.mobile_app?.status) === '-1'"
-                                        :content="'Mobile App (Phonebook Only)'" position='TopCenter'>
+                                    <div v-if="String(row.mobile_app?.status) === '1'"
+                                        class="group relative inline-block cursor-help focus:outline-none"
+                                        tabindex="0">
+                                        <span class="relative inline-flex">
+                                            <DevicePhoneMobileSolidIcon
+                                                class="h-5 w-5 text-blue-400 hover:text-blue-600 active:bg-blue-300"
+                                                aria-label="Mobile App (Activated)" />
+                                            <span v-if="ringotelStatusFor(row)"
+                                                :class="ringotelDotClass(ringotelStatusFor(row))"
+                                                class="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 shadow-sm">
+                                            </span>
+                                        </span>
+                                        <div
+                                            class="invisible opacity-0 group-hover:visible group-hover:opacity-100 group-focus:visible group-focus:opacity-100 transition-opacity duration-300 absolute z-50 bottom-full left-1/2 -translate-x-1/2 pb-2">
+                                            <div class="relative w-64 max-w-xs px-3 py-2 text-xs leading-relaxed text-white bg-gray-900 rounded shadow-lg whitespace-normal cursor-text select-text">
+                                                {{ mobileAppTooltip(row) }}
+                                                <div
+                                                    class="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div v-if="String(row.mobile_app?.status) === '-1'"
+                                        class="group relative inline-block cursor-help focus:outline-none"
+                                        tabindex="0">
                                         <DevicePhoneMobileIcon
                                             class="h-5 w-5 text-gray-400 hover:text-gray-600 active:bg-gray-300"
                                             aria-label="Mobile App (Phonebook Only)" />
-                                    </ejs-tooltip>
+                                        <div
+                                            class="invisible opacity-0 group-hover:visible group-hover:opacity-100 group-focus:visible group-focus:opacity-100 transition-opacity duration-300 absolute z-50 bottom-full left-1/2 -translate-x-1/2 pb-2">
+                                            <div class="relative w-64 max-w-xs px-3 py-2 text-xs leading-relaxed text-white bg-gray-900 rounded shadow-lg whitespace-normal cursor-text select-text">
+                                                Mobile App (Phonebook Only)
+                                                <div
+                                                    class="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                     <ejs-tooltip v-if="!!row.user_record" :content="'Record Calls'"
                                         position='TopCenter'>
                                         <MicrophoneIcon
@@ -405,6 +431,7 @@ const showCreateContactsConfirmationModal = ref(false);
 const isBulkCreateContactsLoading = ref(false);
 const confirmCreateContactsAction = ref(null);
 const isRegsLoading = ref(false)
+const isRingotelLoading = ref(false)
 const showUploadModal = ref(false);
 const isUploadingFile = ref(null);
 const uploadErrors = ref(null);
@@ -446,6 +473,7 @@ const sortData = ref({
 
 const itemOptions = ref({})
 const registrations = ref({})
+const ringotelStatuses = ref({})
 const expandedExtension = ref(null)
 
 
@@ -543,8 +571,71 @@ onMounted(async () => {
         handleErrorResponse(error);
     } finally {
         isRegsLoading.value = false
+        getRingotelStatuses()
     }
 })
+
+const getRingotelStatuses = async () => {
+    if (!props.routes?.ringotel_status) {
+        return
+    }
+
+    isRingotelLoading.value = true
+
+    try {
+        const response = await axios.get(props.routes.ringotel_status)
+        ringotelStatuses.value = response.data.data || {}
+    } catch (error) {
+        ringotelStatuses.value = {}
+    } finally {
+        isRingotelLoading.value = false
+    }
+}
+
+const ringotelStatusFor = (row) => {
+    return ringotelStatuses.value?.[row.extension_uuid] ?? null
+}
+
+const ringotelDotClass = (status) => {
+    if (Number(status?.state) === 0) {
+        return 'bg-white border-gray-400'
+    }
+
+    return {
+        green: 'bg-green-500 border-white',
+        blue: 'bg-blue-700 border-white',
+        yellow: 'bg-amber-400 border-white',
+        red: 'bg-rose-600 border-white',
+        gray: 'bg-gray-300 border-white',
+    }[status?.state_color] ?? 'bg-gray-300 border-white'
+}
+
+const formatRingotelTimestamp = (timestamp) => {
+    if (!timestamp) {
+        return 'Never'
+    }
+
+    const normalized = Number(timestamp) > 9999999999 ? Number(timestamp) : Number(timestamp) * 1000
+
+    return new Intl.DateTimeFormat(undefined, {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+    }).format(new Date(normalized))
+}
+
+const mobileAppTooltip = (row) => {
+    const status = ringotelStatusFor(row)
+
+    if (isRingotelLoading.value && !status) {
+        return 'Mobile App (Activated). Mobile App status is loading.'
+    }
+
+    if (!status) {
+        return 'Mobile App (Activated). Mobile App status unavailable.'
+    }
+
+    return `Mobile App (Activated). State: ${status.state_label}. Last Seen: ${formatRingotelTimestamp(status.last_login_ts)}.`
+}
 
 
 const handleImportButtonClick = () => {
@@ -795,7 +886,7 @@ const getData = (page = 1) => {
     }
 
 
-    axios.get(props.routes.data_route, {
+    return axios.get(props.routes.data_route, {
         params: {
             filter: filterData.value,
             page: currentPage.value,
@@ -820,8 +911,9 @@ const handleSearchButtonClick = () => {
     getData(1)
 };
 
-const refreshCurrentPage = () => {
-    getData(currentPage.value)
+const refreshCurrentPage = async () => {
+    await getData(currentPage.value)
+    await getRingotelStatuses()
 
     if (showUpdateModal.value && itemOptions.value?.item?.extension_uuid) {
         getItemOptions(itemOptions.value.item.extension_uuid);

@@ -67,6 +67,18 @@
                     @edit-item="handleUpdateLocationButtonClick" @delete-item="handleDeleteLocationButtonClick" />
             </section>
 
+            <!-- ADVANCED -->
+            <section v-if="selectedMenuOption === 'advanced' && props.domainSettings">
+                <DomainSettingsPanel v-bind="props.domainSettings" embedded />
+            </section>
+
+            <!-- CALL WEBHOOKS -->
+            <section v-if="permissions?.call_webhook_view" v-show="selectedMenuOption === 'call_webhooks'">
+                <CallWebhookSettingsForm :trigger="callWebhookTrigger" :routes="routes"
+                    :permissions="permissions" @success="messages => showNotification('success', messages)"
+                    @error="handleErrorResponse" />
+            </section>
+
             <!-- AUTO PROVISIONING -->
             <section v-show="selectedMenuOption === 'auto_provisioning'">
                 <Vueform>
@@ -179,6 +191,7 @@ import EmergencyCalls from "./components/EmergencyCalls.vue";
 import AutoProvisioning from "./components/AutoProvisioning.vue";
 import RoomManagement from "./components/RoomManagement.vue";
 import RoomStatus from "./components/RoomStatus.vue";
+import DomainSettingsPanel from "./DomainSettings.vue";
 import EmergencyServiceStatus from "./components/EmergencyServiceStatus.vue";
 import Locations from "./components/Locations.vue";
 import CreateLocationModal from "./components/modal/CreateLocationModal.vue"
@@ -187,6 +200,7 @@ import ConfirmationModal from "./components/modal/ConfirmationModal.vue";
 import GraphicEqIcon from "@icons/GraphicEqIcon.vue"
 import CallTranscriptionOptionsForm from "./components/forms/CallTranscriptionOptionsForm.vue"
 import AssemblyAiForm from "./components/forms/AssemblyAiForm.vue"
+import CallWebhookSettingsForm from "./components/forms/CallWebhookSettingsForm.vue"
 import {
     Cog6ToothIcon,
     MapPinIcon,
@@ -195,7 +209,9 @@ import {
     KeyIcon,
     BellAlertIcon,
     ClipboardDocumentCheckIcon,
+    AdjustmentsHorizontalIcon,
     AdjustmentsVerticalIcon,
+    ArrowPathRoundedSquareIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -210,7 +226,10 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
-
+    domainSettings: {
+        type: Object,
+        default: null,
+    },
 })
 
 const pages = [
@@ -235,6 +254,7 @@ const confirmDeleteLocationAction = ref(null);
 const autoProvisioningTrigger = ref(false)
 const roomManagementTrigger = ref(false)
 const roomStatusTrigger = ref(false)
+const callWebhookTrigger = ref(false)
 const pmsProviderOptions = props.pms_provider_options?.length
     ? props.pms_provider_options
     : [
@@ -250,12 +270,16 @@ const handleUpdateSelectedMenuOption = (key) => {
         getPmsProvider()
     }
     if (key === 'room_status') roomStatusTrigger.value = !roomStatusTrigger.value
+    if (key === 'call_webhooks') callWebhookTrigger.value = !callWebhookTrigger.value
 }
 
 const navigation = [
     { key: 'general', name: 'General', icon: Cog6ToothIcon },
     { key: 'locations', name: 'Locations', icon: MapPinIcon },
     { key: 'auto_provisioning', name: 'Auto Provisioning', icon: WrenchScrewdriverIcon },
+    ...(props.permissions?.call_webhook_view
+        ? [{ key: 'call_webhooks', name: 'Call Webhooks', icon: ArrowPathRoundedSquareIcon }]
+        : []),
     // { key: 'billing', name: 'Billing', icon: CreditCardIcon },
     {
         key: 'call_transcription',
@@ -277,6 +301,7 @@ const navigation = [
 
         ],
     },
+    ...(props.domainSettings ? [{ key: 'advanced', name: 'Advanced', icon: AdjustmentsHorizontalIcon }] : []),
 ]
 
 
@@ -564,7 +589,7 @@ const handleErrorResponse = (error) => {
         // The request was made and the server responded with a status code
         // that falls out of the range of 2xx
         // console.log(error.response.data);
-        showNotification('error', error.response.data.errors || { request: [error.message] });
+        showNotification('error', error.response.data.errors || error.response.data.messages || { request: [error.message] });
     } else if (error.request) {
         // The request was made but no response was received
         // `error.request` is an instance of XMLHttpRequest in the browser and an instance of

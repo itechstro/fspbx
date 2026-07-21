@@ -11,6 +11,8 @@ use App\Http\Controllers\Api\V1\RingGroupController;
 use App\Http\Controllers\Api\V1\VoicemailController;
 use App\Http\Controllers\Api\V1\PhoneNumberController;
 use App\Http\Controllers\Api\V1\CdrController;
+use App\Http\Controllers\Api\V1\ClickToDialController;
+use App\Http\Controllers\Api\V1\PhoneControlController;
 
 /*
 |--------------------------------------------------------------------------
@@ -158,6 +160,26 @@ Route::middleware(['auth:sanctum', 'api.token.auth', 'throttle:api'])->group(fun
 
     Route::post('/domains/{domain_uuid}/registrations/{call_id}/sync', [RegistrationController::class, 'sync'])
         ->middleware('user.authorize:domain_view');
+
+    /*
+    |--------------------------------------------------------------------------
+    | PhoneControl (domain-scoped)
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/domains/{domain_uuid}/click-to-dial/targets', [ClickToDialController::class, 'targets'])
+        ->middleware('user.authorize:phone_control_view');
+
+    Route::post('/domains/{domain_uuid}/click-to-dial', [ClickToDialController::class, 'store'])
+        ->middleware('user.authorize:phone_control_call');
+
+    Route::get('/domains/{domain_uuid}/phone-control/targets', [PhoneControlController::class, 'targets'])
+        ->middleware('user.authorize:phone_control_view');
+
+    Route::get('/domains/{domain_uuid}/phone-control/calls', [PhoneControlController::class, 'calls'])
+        ->middleware('user.authorize:phone_control_view');
+
+    Route::post('/domains/{domain_uuid}/phone-control/actions', [PhoneControlController::class, 'store'])
+        ->middleware('user.authorize:phone_control_call');
 
     /*
     |--------------------------------------------------------------------------

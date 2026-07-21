@@ -5,6 +5,7 @@ namespace App\Services;
 use Throwable;
 use ESLconnection;
 use App\Models\SipProfiles;
+use Illuminate\Support\Collection;
 
 class FreeswitchEslService
 {
@@ -81,6 +82,47 @@ class FreeswitchEslService
             return (null);
         } finally {
             // Disconnect only if the flag is set to true
+            if ($disconnect) {
+                $this->disconnect();
+            }
+        }
+    }
+
+    public function sendEvent(string $eventName, array $headers = [], ?string $body = null, bool $disconnect = true): ?string
+    {
+        try {
+            if (! $this->isConnected()) {
+                $this->reconnect();
+            }
+
+            if (! class_exists('\ESLevent')) {
+                throw new \Exception("FreeSWITCH PHP ESL event class is not available.");
+            }
+
+            $event = new \ESLevent($eventName);
+
+            foreach ($headers as $name => $value) {
+                $event->addHeader((string) $name, (string) $value);
+            }
+
+            if ($body !== null) {
+                $event->addBody($body);
+            }
+
+            $response = $this->conn->sendEvent($event);
+            $reply = $response ? trim((string) $response->getHeader('Reply-Text')) : '';
+
+            if (! preg_match('/^\+OK\b/i', $reply)) {
+                logger("FreeSWITCH ESL rejected event [{$eventName}]: " . ($reply !== '' ? $reply : 'no reply from server'));
+
+                return null;
+            }
+
+            return $reply;
+        } catch (Throwable $e) {
+            logger($e->getMessage());
+            return null;
+        } finally {
             if ($disconnect) {
                 $this->disconnect();
             }
@@ -219,7 +261,17 @@ class FreeswitchEslService
         return collect($registrations);
     }
 
-    function getAllChannels()
+    /**
+     * Channels belonging to one extension's presence (e.g. "101@example.com").
+     */
+    public function channelsForPresenceId(string $presenceId, bool $disconnect = false): Collection
+    {
+        return $this->getAllChannels($disconnect)
+            ->filter(fn (array $channel) => (string) ($channel['presence_id'] ?? '') === $presenceId)
+            ->values();
+    }
+
+    function getAllChannels($disconnect = true)
     {
         // Check if the 'esl' extension is loaded
         if (!extension_loaded('esl')) {
@@ -228,7 +280,7 @@ class FreeswitchEslService
 
         $cmd = "show channels as json";
         // $cmd = "show channels";
-        $result = $this->executeCommand($cmd);
+        $result = $this->executeCommand($cmd, $disconnect);
 
         // Initialize an array to hold channel information
         $channels = [];

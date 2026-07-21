@@ -335,6 +335,8 @@ class UpdateApp extends Command
             '1.9.3.13' => Update272::class,
             '1.9.3.14' => Update273::class,
             '1.9.3.15' => Update274::class,
+            '1.9.4' => Update194::class,
+            '1.9.5' => Update195::class,
             // Add more versions as needed
         ];
 
