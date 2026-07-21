@@ -2,19 +2,17 @@
 
 namespace App\Console\Commands\Updates;
 
-use Illuminate\Support\Facades\File;
-use Symfony\Component\Process\Process;
+use App\Models\MenuItem;
 use Throwable;
 
 class Update195
 {
-    private const VERSION = '1.9.5';
-    private const PROGRAM = 'fs-esl-listener-call-webhooks';
+    private const VERSION = '1.8.8.3';
 
     public function apply(): bool
     {
         try {
-            $this->installSupervisorConfiguration();
+            $this->moveMobileAppsMenuItem();
             echo 'Update ' . self::VERSION . " completed successfully.\n";
 
             return true;
@@ -25,35 +23,49 @@ class Update195
         }
     }
 
-    private function installSupervisorConfiguration(): void
+    private function moveMobileAppsMenuItem(): void
     {
-        $source = base_path('install/' . self::PROGRAM . '.conf');
-        $destination = '/etc/supervisor/conf.d/' . self::PROGRAM . '.conf';
+        $items = MenuItem::query()
+            ->where('menu_item_link', '/apps')
+            ->get();
 
-        if (! File::exists($source)) {
-            echo "WARNING: Supervisor source file not found at {$source}; listener was not installed.\n";
+        if ($items->isEmpty()) {
+            echo "No /apps menu item found; skipping menu move.\n";
+
             return;
         }
 
-        try {
-            if (! File::copy($source, $destination)) {
-                echo "WARNING: Unable to copy the Supervisor configuration to {$destination}.\n";
-                return;
+        $moved = 0;
+
+        foreach ($items as $item) {
+            $applicationsParent = MenuItem::query()
+                ->where('menu_uuid', $item->menu_uuid)
+                ->where('menu_item_title', 'Applications')
+                ->whereNull('menu_item_parent_uuid')
+                ->first();
+
+            if (! $applicationsParent) {
+                echo "Applications parent not found for menu {$item->menu_uuid}; skipping.\n";
+
+                continue;
             }
-            echo "Installed call webhook Supervisor configuration at {$destination}; the listener is disabled by default.\n";
-        } catch (Throwable $exception) {
-            echo "WARNING: Unable to install {$destination}: {$exception->getMessage()}\n";
-            return;
+
+            if ($item->menu_item_parent_uuid === $applicationsParent->menu_item_uuid) {
+                continue;
+            }
+
+            $maxOrder = (int) MenuItem::query()
+                ->where('menu_item_parent_uuid', $applicationsParent->menu_item_uuid)
+                ->max('menu_item_order');
+
+            $item->update([
+                'menu_item_parent_uuid' => $applicationsParent->menu_item_uuid,
+                'menu_item_order' => $maxOrder + 1,
+            ]);
+
+            $moved++;
         }
 
-        foreach ([['supervisorctl', 'reread'], ['supervisorctl', 'update']] as $command) {
-            $process = new Process($command);
-            $process->setTimeout(30);
-            $process->run();
-
-            if (! $process->isSuccessful()) {
-                echo 'WARNING: ' . implode(' ', $command) . ' failed: ' . trim($process->getErrorOutput()) . "\n";
-            }
-        }
+        echo "Moved {$moved} Mobile Apps menu item(s) to Applications.\n";
     }
 }
