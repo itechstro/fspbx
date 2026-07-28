@@ -1,3 +1,13 @@
+{{-- email-template
+version: 1.0.0
+language: en-us
+category: domain-usage
+subcategory: ai-limit-alert
+format: html
+layout: none
+subject: {{ $email_subject }}
+description: Tenant AI usage approaching or reached limit alert
+--}}
 <!DOCTYPE html>
 <html>
 <head>
@@ -16,14 +26,8 @@
         · {{ $data['period_label'] ?? $data['period'] ?? '' }}
     </p>
 
-    @php
-        $isReached = ($data['alert_level'] ?? '') === 'reached';
-        $badgeColor = $isReached ? '#b91c1c' : '#b45309';
-        $badgeBg = $isReached ? '#fef2f2' : '#fffbeb';
-    @endphp
-
-    <p style="display: inline-block; padding: 0.35rem 0.75rem; border-radius: 9999px; background: {{ $badgeBg }}; color: {{ $badgeColor }}; font-weight: 600;">
-        {{ $isReached ? 'Limit reached' : 'Approaching limit' }}
+    <p style="display: inline-block; padding: 0.35rem 0.75rem; border-radius: 9999px; background: {{ $data['badge_bg'] }}; color: {{ $data['badge_color'] }}; font-weight: 600;">
+        {{ $data['badge_label'] }}
     </p>
 
     <table style="margin-top: 1rem; border-collapse: collapse; width: 100%; max-width: 520px;">
@@ -34,27 +38,27 @@
         <tr>
             <td style="padding: 0.5rem 0; color: #6b7280;">Usage</td>
             <td style="padding: 0.5rem 0;">
-                {{ number_format((float) ($data['usage'] ?? 0), 2) }}
+                {{ $data['usage_formatted'] }}
                 /
-                {{ number_format((float) ($data['limit'] ?? 0), 2) }}
+                {{ $data['limit_formatted'] }}
                 {{ $data['unit'] ?? '' }}
             </td>
         </tr>
         <tr>
             <td style="padding: 0.5rem 0; color: #6b7280;">Remaining</td>
             <td style="padding: 0.5rem 0;">
-                {{ number_format((float) ($data['remaining'] ?? 0), 2) }}
+                {{ $data['remaining_formatted'] }}
                 {{ $data['unit'] ?? '' }}
             </td>
         </tr>
         <tr>
             <td style="padding: 0.5rem 0; color: #6b7280;">Used</td>
-            <td style="padding: 0.5rem 0;">{{ number_format((float) ($data['percent_used'] ?? 0), 1) }}%</td>
+            <td style="padding: 0.5rem 0;">{{ $data['percent_used_formatted'] }}%</td>
         </tr>
     </table>
 
     <p style="margin-top: 1.25rem;">
-        @if($isReached)
+        @if(!empty($data['is_reached']))
             New AI requests for this service may be blocked until usage resets or the limit is increased.
         @else
             Usage is nearing the monthly limit. Consider raising the tenant limit or reviewing AI activity.

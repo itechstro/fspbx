@@ -1,3 +1,13 @@
+{{-- email-template
+version: 1.0.0
+language: en-us
+category: call-history
+subcategory: analytics-report
+format: html
+layout: none
+subject: {{ $email_subject }}
+description: Call History analytics email report
+--}}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -30,20 +40,19 @@
         <div class="meta">Generated {{ $data['generated_at'] ?? '' }}</div>
     </div>
 
-    @php($summary = $data['summary'] ?? [])
     <table class="cards">
         <tr>
             <td>
                 <div class="label">Total Calls</div>
-                <div class="value">{{ $summary['total_calls'] ?? 0 }}</div>
+                <div class="value">{{ $data['summary']['total_calls'] ?? 0 }}</div>
             </td>
             <td>
                 <div class="label">Total Duration</div>
-                <div class="value">{{ $summary['total_duration'] ?? '00:00:00' }}</div>
+                <div class="value">{{ $data['summary']['total_duration'] ?? '00:00:00' }}</div>
             </td>
             <td>
                 <div class="label">Average Duration</div>
-                <div class="value">{{ $summary['average_duration'] ?? '00:00:00' }}</div>
+                <div class="value">{{ $data['summary']['average_duration'] ?? '00:00:00' }}</div>
             </td>
         </tr>
     </table>
@@ -52,27 +61,25 @@
         <tr>
             <td>
                 <div class="label">Transcribed</div>
-                <div class="value">{{ $summary['transcribed_count'] ?? 0 }}</div>
+                <div class="value">{{ $data['summary']['transcribed_count'] ?? 0 }}</div>
             </td>
             <td>
                 <div class="label">Summarized</div>
-                <div class="value">{{ $summary['summarized_count'] ?? 0 }}</div>
+                <div class="value">{{ $data['summary']['summarized_count'] ?? 0 }}</div>
             </td>
             <td>
                 <div class="label">Sentiment</div>
                 <div class="sentiment" style="margin-top:8px;">
-                    @php($sentiment = $summary['sentiment'] ?? [])
-                    <span>Positive: {{ $sentiment['positive'] ?? 0 }}</span>
-                    <span>Neutral: {{ $sentiment['neutral'] ?? 0 }}</span>
-                    <span>Negative: {{ $sentiment['negative'] ?? 0 }}</span>
-                    <span>Unknown: {{ $sentiment['unknown'] ?? 0 }}</span>
+                    <span>Positive: {{ $data['summary']['sentiment']['positive'] ?? 0 }}</span>
+                    <span>Neutral: {{ $data['summary']['sentiment']['neutral'] ?? 0 }}</span>
+                    <span>Negative: {{ $data['summary']['sentiment']['negative'] ?? 0 }}</span>
+                    <span>Unknown: {{ $data['summary']['sentiment']['unknown'] ?? 0 }}</span>
                 </div>
             </td>
         </tr>
     </table>
 
-    @php($callsByDay = $data['calls_by_day'] ?? [])
-    @if(!empty($callsByDay))
+    @if(!empty($data['calls_by_day']))
         <div class="section-title">Calls Per Day</div>
         <table class="calls">
             <thead>
@@ -82,7 +89,7 @@
             </tr>
             </thead>
             <tbody>
-            @foreach($callsByDay as $row)
+            @foreach($data['calls_by_day'] as $row)
                 <tr>
                     <td>{{ $row['date'] ?? '' }}</td>
                     <td>{{ $row['count'] ?? 0 }}</td>
@@ -92,92 +99,85 @@
         </table>
     @endif
 
-    @php($directionBreakdown = $data['direction_breakdown'] ?? [])
-    @if(!empty($directionBreakdown))
+    @if(!empty($data['direction_breakdown']))
         <div class="section-title">Call Direction</div>
         <div class="sentiment">
-            @foreach($directionBreakdown as $row)
-                <span>{{ ucfirst($row['status'] ?? 'unknown') }}: {{ $row['count'] ?? 0 }}</span>
+            @foreach($data['direction_breakdown'] as $row)
+                <span>{{ $row['label'] ?? '' }}: {{ $row['count'] ?? 0 }}</span>
             @endforeach
         </div>
     @endif
 
-    @php($statusBreakdown = $data['status_breakdown'] ?? [])
-    @if(!empty($statusBreakdown))
+    @if(!empty($data['status_breakdown']))
         <div class="section-title">Call Status</div>
         <div class="sentiment">
-            @foreach($statusBreakdown as $row)
-                <span>{{ ucwords(str_replace('_', ' ', $row['status'] ?? 'unknown')) }}: {{ $row['count'] ?? 0 }}</span>
+            @foreach($data['status_breakdown'] as $row)
+                <span>{{ $row['label'] ?? '' }}: {{ $row['count'] ?? 0 }}</span>
             @endforeach
         </div>
     @endif
 
-    @php($recordingStatusBreakdown = $data['recording_status_breakdown'] ?? [])
-    @if(!empty($recordingStatusBreakdown))
+    @if(!empty($data['recording_status_breakdown']))
         <div class="section-title">Recording Availability</div>
         <div class="sentiment">
-            @foreach($recordingStatusBreakdown as $row)
+            @foreach($data['recording_status_breakdown'] as $row)
                 <span>{{ $row['label'] ?? '' }}: {{ $row['count'] ?? 0 }}</span>
             @endforeach
         </div>
     @endif
 
-    @php($transcriptionStatusBreakdown = $data['transcription_status_breakdown'] ?? [])
-    @if(!empty($transcriptionStatusBreakdown))
+    @if(!empty($data['transcription_status_breakdown']))
         <div class="section-title">Transcription Status</div>
         <div class="sentiment">
-            @foreach($transcriptionStatusBreakdown as $row)
+            @foreach($data['transcription_status_breakdown'] as $row)
                 <span>{{ $row['label'] ?? '' }}: {{ $row['count'] ?? 0 }}</span>
             @endforeach
         </div>
     @endif
 
-    @php($summaryStatusBreakdown = $data['summary_status_breakdown'] ?? [])
-    @if(!empty($summaryStatusBreakdown))
+    @if(!empty($data['summary_status_breakdown']))
         <div class="section-title">Summary Status</div>
         <div class="sentiment">
-            @foreach($summaryStatusBreakdown as $row)
+            @foreach($data['summary_status_breakdown'] as $row)
                 <span>{{ $row['label'] ?? '' }}: {{ $row['count'] ?? 0 }}</span>
             @endforeach
         </div>
     @endif
 
-    @php($topTopics = $data['top_topics'] ?? [])
-    @if(!empty($topTopics))
+    @if(!empty($data['top_topics']))
         <div class="section-title">Top Topics</div>
         <ol style="margin:0; padding-left:20px;">
-            @foreach($topTopics as $topic)
+            @foreach($data['top_topics'] as $topic)
                 <li>{{ $topic['label'] ?? '' }} ({{ $topic['count'] ?? 0 }})</li>
             @endforeach
         </ol>
     @endif
 
-    @php($executiveSummary = $data['executive_summary'] ?? null)
-    @if(!empty($executiveSummary))
+    @if(!empty($data['executive_summary']))
         <div class="section-title">AI Executive Summary</div>
-        @if(!empty($executiveSummary['overview']))
-            <p>{{ $executiveSummary['overview'] }}</p>
+        @if(!empty($data['executive_summary']['overview']))
+            <p>{{ $data['executive_summary']['overview'] }}</p>
         @endif
-        @if(!empty($executiveSummary['highlights']))
+        @if(!empty($data['executive_summary']['highlights']))
             <p><strong>Highlights</strong></p>
             <ul style="margin-top:0; padding-left:20px;">
-                @foreach($executiveSummary['highlights'] as $item)
+                @foreach($data['executive_summary']['highlights'] as $item)
                     <li>{{ $item }}</li>
                 @endforeach
             </ul>
         @endif
-        @if(!empty($executiveSummary['concerns']))
+        @if(!empty($data['executive_summary']['concerns']))
             <p><strong>Concerns</strong></p>
             <ul style="margin-top:0; padding-left:20px;">
-                @foreach($executiveSummary['concerns'] as $item)
+                @foreach($data['executive_summary']['concerns'] as $item)
                     <li>{{ $item }}</li>
                 @endforeach
             </ul>
         @endif
-        @if(!empty($executiveSummary['recommendations']))
+        @if(!empty($data['executive_summary']['recommendations']))
             <p><strong>Recommendations</strong></p>
             <ul style="margin-top:0; padding-left:20px;">
-                @foreach($executiveSummary['recommendations'] as $item)
+                @foreach($data['executive_summary']['recommendations'] as $item)
                     <li>{{ $item }}</li>
                 @endforeach
             </ul>
@@ -188,8 +188,7 @@
     @endif
 
     <div class="section-title">Calls</div>
-    @php($emailCalls = array_slice($data['calls'] ?? [], 0, 25))
-    @if(empty($emailCalls))
+    @if(empty($data['template_calls']))
         <p class="muted">No calls were found for this period.</p>
     @else
         <p class="muted">Showing up to 25 calls below. The attached CSV includes the full list.</p>
@@ -207,10 +206,10 @@
             </tr>
             </thead>
             <tbody>
-            @foreach($emailCalls as $call)
+            @foreach($data['template_calls'] as $call)
                 <tr>
                     <td>{{ $call['date'] ?? '' }}<br><span class="muted">{{ $call['time'] ?? '' }}</span></td>
-                    <td>{{ ucfirst($call['direction'] ?? '—') }}</td>
+                    <td>{{ $call['direction_label'] ?? '—' }}</td>
                     <td>{{ $call['caller'] ?? '—' }}</td>
                     <td>{{ $call['dialed'] ?? '—' }}</td>
                     <td>{{ $call['duration'] ?? '—' }}</td>
@@ -224,7 +223,7 @@
     @endif
 
     <div class="footer">
-        <a href="{{ $data['call_history_url'] ?? url('/call-detail-records') }}">Open Call History</a>
+        <a href="{{ $data['call_history_url'] ?? '#' }}">Open Call History</a>
     </div>
 </div>
 </body>

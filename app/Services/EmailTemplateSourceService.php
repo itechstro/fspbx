@@ -30,22 +30,27 @@ class EmailTemplateSourceService
                 continue;
             }
 
-            $metadata = $this->parseFrontMatter($source);
-            $format = Str::lower((string) ($metadata['format'] ?? ''));
-            if ($format === 'text') {
-                continue;
-            }
-            if ($format !== 'html') {
-                throw new RuntimeException("Unsupported or missing format metadata in {$path}");
-            }
+            try {
+                $metadata = $this->parseFrontMatter($source);
+                $format = Str::lower((string) ($metadata['format'] ?? ''));
+                if ($format === 'text') {
+                    continue;
+                }
+                if ($format !== 'html') {
+                    throw new RuntimeException("Unsupported or missing format metadata in {$path}");
+                }
 
-            $definition = $this->parse($path, $source, $metadata);
-            $key = $definition['template_key'].'|'.$definition['template_language'];
-            if (isset($definitions[$key])) {
-                throw new RuntimeException("Duplicate default email template source: {$key}");
-            }
+                $definition = $this->parse($path, $source, $metadata);
+                $key = $definition['template_key'].'|'.$definition['template_language'];
+                if (isset($definitions[$key])) {
+                    throw new RuntimeException("Duplicate default email template source: {$key}");
+                }
 
-            $definitions[$key] = $definition;
+                $definitions[$key] = $definition;
+            } catch (\Throwable $exception) {
+                // One bad local/custom blade should not blank the whole catalog.
+                report($exception);
+            }
         }
 
         return $this->definitions = $definitions;

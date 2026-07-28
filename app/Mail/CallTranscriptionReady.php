@@ -3,6 +3,7 @@
 namespace App\Mail;
 
 use Illuminate\Mail\Mailables\Content;
+use Illuminate\Support\Collection;
 
 class CallTranscriptionReady extends BaseMailable
 {
@@ -16,18 +17,16 @@ class CallTranscriptionReady extends BaseMailable
         };
         $speakerMap = $data['speaker_map'] ?? [];
         $agentLabel = $data['agent_label'] ?? null;
-        $data['template_utterances'] = collect($data['utterances'] ?? [])
-            ->map(function (array $line) use ($speakerMap, $agentLabel) {
-                $speakerLabel = $line['speaker'] ?? '';
-
-                return [
-                    'speaker_name' => $speakerMap[$speakerLabel] ?? 'Speaker '.$speakerLabel,
-                    'row_class' => $speakerLabel === $agentLabel ? 'is-agent' : 'is-customer',
-                    'time' => gmdate('i:s', (int) (($line['start'] ?? 0) / 1000)),
-                    'text' => $line['text'] ?? '',
-                ];
-            })
-            ->all();
+        $data['template_utterances'] = $this->mapUtterances(
+            $data['utterances'] ?? [],
+            $speakerMap,
+            $agentLabel
+        );
+        $data['template_translation_utterances'] = $this->mapUtterances(
+            $data['translation_utterances'] ?? [],
+            $speakerMap,
+            $agentLabel
+        );
 
         $data['email_subject'] = $data['email_subject'] ?? 'Call transcription ready';
         $this->data = $data;
@@ -42,5 +41,26 @@ class CallTranscriptionReady extends BaseMailable
             view: 'emails.transcription.call-ready',
             text: 'emails.transcription.call-ready-text',
         ));
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $utterances
+     * @param  array<string, string>  $speakerMap
+     * @return array<int, array{speaker_name: string, row_class: string, time: string, text: string}>
+     */
+    private function mapUtterances(array $utterances, array $speakerMap, mixed $agentLabel): array
+    {
+        return Collection::make($utterances)
+            ->map(function (array $line) use ($speakerMap, $agentLabel) {
+                $speakerLabel = $line['speaker'] ?? '';
+
+                return [
+                    'speaker_name' => $speakerMap[$speakerLabel] ?? 'Speaker '.$speakerLabel,
+                    'row_class' => $speakerLabel === $agentLabel ? 'is-agent' : 'is-customer',
+                    'time' => gmdate('i:s', (int) (($line['start'] ?? 0) / 1000)),
+                    'text' => $line['text'] ?? '',
+                ];
+            })
+            ->all();
     }
 }

@@ -25,19 +25,19 @@ ACTION ITEMS & NEXT STEPS
 
 FULL TRANSCRIPTION
 ------------------
-@foreach($data['utterances'] as $line)
-{{ $data['speaker_map'][$line['speaker']] ?? "Speaker ".$line['speaker'] }} [{{ gmdate("i:s", intval(($line['start'] ?? 0) / 1000)) }}]:
-{{ $line['text'] ?? '' }}
+@foreach($data['template_utterances'] as $line)
+{{ $line['speaker_name'] }} [{{ $line['time'] }}]:
+{{ $line['text'] }}
 
 @endforeach
 
-@if(!empty($data['translation_utterances']) || !empty($data['translation_text']))
+@if(!empty($data['template_translation_utterances']) || !empty($data['translation_text']))
 TRANSLATION @if(!empty($data['translation_target_language']))({{ $data['translation_target_language'] }})@endif
 --------------------------------------------------------------------
-@if(!empty($data['translation_utterances']))
-@foreach($data['translation_utterances'] as $line)
-{{ $data['speaker_map'][$line['speaker']] ?? "Speaker ".$line['speaker'] }} [{{ gmdate("i:s", intval(($line['start'] ?? 0) / 1000)) }}]:
-{{ $line['text'] ?? '' }}
+@if(!empty($data['template_translation_utterances']))
+@foreach($data['template_translation_utterances'] as $line)
+{{ $line['speaker_name'] }} [{{ $line['time'] }}]:
+{{ $line['text'] }}
 
 @endforeach
 @else

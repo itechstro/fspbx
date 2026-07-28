@@ -1,5 +1,5 @@
 {{-- email-template
-version: 1.1.0
+version: 1.1.1
 language: en-us
 category: transcription
 subcategory: call-ready
@@ -121,7 +121,7 @@ description: Completed call transcription report
         @endforeach
     </div>
 
-    @if(!empty($data['translation_utterances']) || !empty($data['translation_text']))
+    @if(!empty($data['template_translation_utterances']) || !empty($data['translation_text']))
     <div class="section">
         <div class="section-title">
             Translation
@@ -130,21 +130,13 @@ description: Completed call transcription report
             @endif
         </div>
 
-        @if(!empty($data['translation_utterances']))
+        @if(!empty($data['template_translation_utterances']))
             <div class="script-container">
-                @foreach($data['translation_utterances'] as $line)
-                    @php
-                        $speakerLabel = $line['speaker'];
-                        $speakerName = $data['speaker_map'][$speakerLabel] ?? "Speaker $speakerLabel";
-                        $isAgent = ($speakerLabel === $data['agent_label']);
-                        $rowClass = $isAgent ? 'is-agent' : 'is-customer';
-                        $time = gmdate("i:s", intval(($line['start'] ?? 0) / 1000));
-                    @endphp
-
-                    <div class="script-line {{ $rowClass }}">
+                @foreach($data['template_translation_utterances'] as $line)
+                    <div class="script-line {{ $line['row_class'] }}">
                         <span class="speaker-name">
-                            {{ $speakerName }}
-                            <span class="timestamp">{{ $time }}</span>
+                            {{ $line['speaker_name'] }}
+                            <span class="timestamp">{{ $line['time'] }}</span>
                         </span>
                         <div class="text">
                             {{ $line['text'] }}

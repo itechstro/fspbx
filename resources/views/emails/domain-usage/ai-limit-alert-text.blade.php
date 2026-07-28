@@ -1,3 +1,7 @@
+{{-- email-template
+format: text
+layout: none
+--}}
 @if(!empty($data['is_test']))
 This is a test alert. Usage numbers below are sample data only.
 
@@ -5,18 +9,14 @@ This is a test alert. Usage numbers below are sample data only.
 AI usage alert for {{ $data['domain_name'] ?? 'tenant' }}
 Period: {{ $data['period_label'] ?? $data['period'] ?? '' }}
 
-@if(($data['alert_level'] ?? '') === 'reached')
-LIMIT REACHED
-@else
-APPROACHING LIMIT
-@endif
+{{ $data['badge_label'] }}
 
 Service: {{ $data['limit_label'] ?? '' }}
-Usage: {{ number_format((float) ($data['usage'] ?? 0), 2) }} / {{ number_format((float) ($data['limit'] ?? 0), 2) }} {{ $data['unit'] ?? '' }}
-Remaining: {{ number_format((float) ($data['remaining'] ?? 0), 2) }} {{ $data['unit'] ?? '' }}
-Used: {{ number_format((float) ($data['percent_used'] ?? 0), 1) }}%
+Usage: {{ $data['usage_formatted'] }} / {{ $data['limit_formatted'] }} {{ $data['unit'] ?? '' }}
+Remaining: {{ $data['remaining_formatted'] }} {{ $data['unit'] ?? '' }}
+Used: {{ $data['percent_used_formatted'] }}%
 
-@if(($data['alert_level'] ?? '') === 'reached')
+@if(!empty($data['is_reached']))
 New AI requests for this service may be blocked until usage resets or the limit is increased.
 @else
 Usage is nearing the monthly limit. Consider raising the tenant limit or reviewing AI activity.
