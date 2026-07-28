@@ -368,6 +368,7 @@ class UpdateApp extends Command
 
                 // If the update is successful, call the version:set command
                 $this->call('version:set', ['version' => $version, '--force' => true]);
+                $currentVersion = $version;
                 $this->info("Version successfully updated to $version.");
             }
         }
