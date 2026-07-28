@@ -128,6 +128,8 @@ class ExtensionsController extends Controller
                     'export' => route('extensions.export'),
                     'duplicate' => route('extensions.duplicate'),
                     'bulk_create_contacts' => route('phonebook-contacts.bulk-from-extensions'),
+                    'welcome_email_options' => route('extensions.welcome-email.options'),
+                    'welcome_email_send' => route('extensions.welcome-email.send'),
                 ]
             ]
         );
@@ -1039,7 +1041,7 @@ class ExtensionsController extends Controller
             return response()->json([
                 'status' => 401,
                 'error' => [
-                    'message' => 'Invalid extension. Please, contact administrator'
+                    'message' => __('Invalid extension. Please, contact administrator')
                 ]
             ], 401);
         }
@@ -1050,7 +1052,7 @@ class ExtensionsController extends Controller
             return response()->json([
                 'status' => 401,
                 'error' => [
-                    'message' => 'Invalid phone number ID submitted. Please, contact your administrator'
+                    'message' => __('Invalid phone number ID submitted. Please, contact your administrator')
                 ]
             ], 401);
         }
@@ -1077,7 +1079,7 @@ class ExtensionsController extends Controller
             return response()->json([
                 'status' => 200,
                 'success' => [
-                    'message' => 'The caller ID was successfully updated'
+                    'message' => __('The caller ID was successfully updated')
                 ]
             ]);
         } catch (\Exception $e) {
@@ -1086,7 +1088,7 @@ class ExtensionsController extends Controller
             return response()->json([
                 'status' => 500,
                 'error' => [
-                    'message' => 'There was an error updating the caller ID'
+                    'message' => __('There was an error updating the caller ID')
                 ]
             ], 500);
         }
@@ -2506,6 +2508,7 @@ public function store(StoreExtensionRequest $request)
 
         $permissions['create_user'] = userCheckPermission('extension_create_user');
         $permissions['create_admin'] = userCheckPermission('extension_create_admin');
+        $permissions['welcome_email_send'] = userCheckPermission('extension_welcome_email_send');
 
 
         $permissions['extension_export'] = userCheckPermission('extension_export');

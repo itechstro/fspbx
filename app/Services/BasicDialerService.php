@@ -436,7 +436,8 @@ class BasicDialerService
             return null;
         }
 
-        $recipientEndpoint = $routes[0];
+        $routeDestination = $routeResult['route_destination'] ?? $recipient->phone_number;
+        $recipientEndpoint = "loopback/{$routeDestination}/{$domainName}/XML";
         $application = $this->answeredApplication($campaign, $domainName);
         $vars = [
             'origination_uuid' => $attempt->call_uuid,
@@ -445,6 +446,8 @@ class BasicDialerService
             'basic_dialer_campaign_attempt_uuid' => $attempt->basic_dialer_campaign_attempt_uuid,
             'domain_uuid' => $campaign->domain_uuid,
             'domain_name' => $domainName,
+            'sip_h_X-accountcode' => $domainName,
+            'sip_h_X-customacc' => $domainName,
             'call_direction' => 'outbound',
             'originate_timeout' => (string) $campaign->originate_timeout,
             'outbound_caller_id_name' => $callerIdName,
@@ -454,6 +457,7 @@ class BasicDialerService
             'effective_caller_id_name' => $callerIdName,
             'effective_caller_id_number' => $callerIdNumber,
             'caller_destination' => $recipient->phone_number,
+            'loopback_bowout' => 'false',
             'ignore_early_media' => 'true',
             'hangup_after_bridge' => 'true',
             'continue_on_fail' => 'true',

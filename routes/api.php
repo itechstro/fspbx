@@ -44,7 +44,9 @@ use App\Http\Controllers\DomainLicenseController;
 use App\Http\Controllers\DomainUsageController;
 use App\Http\Controllers\EmailLogsController;
 use App\Http\Controllers\EmailQueueController;
+use App\Http\Controllers\EmailTemplateController;
 use App\Http\Controllers\ExtensionsController;
+use App\Http\Controllers\ExtensionWelcomeEmailController;
 use App\Http\Controllers\ExtensionStatisticsController;
 use App\Http\Controllers\FaxesController;
 use App\Http\Controllers\FaxInboxController;
@@ -135,6 +137,17 @@ Route::group(['middleware' => ['auth:sanctum', 'api.cookie.auth']], function () 
     Route::post('/email-logs/retry', [EmailLogsController::class, 'retry'])->name('email-logs.retry');
     Route::get('/email-logs/{uuid}/delivery-details', [EmailLogsController::class, 'deliveryDetails'])->name('email-logs.delivery-details');
     Route::post('/test-email-send', [TestEmailController::class, 'store'])->name('test-email-send.store');
+
+    // Email templates
+    Route::get('/email-templates/data', [EmailTemplateController::class, 'getData'])->name('email-templates.data');
+    Route::post('/email-templates', [EmailTemplateController::class, 'store'])->name('email-templates.store');
+    Route::put('/email-templates/{email_template}', [EmailTemplateController::class, 'update'])->name('email-templates.update');
+    Route::post('/email-templates/item-options', [EmailTemplateController::class, 'getItemOptions'])->name('email-templates.item.options');
+    Route::post('/email-templates/preview', [EmailTemplateController::class, 'preview'])->name('email-templates.preview');
+    Route::post('/email-templates/select-all', [EmailTemplateController::class, 'selectAll'])->name('email-templates.select.all');
+    Route::post('/email-templates/copy', [EmailTemplateController::class, 'copy'])->name('email-templates.copy');
+    Route::post('/email-templates/bulk-toggle', [EmailTemplateController::class, 'bulkToggle'])->name('email-templates.bulk.toggle');
+    Route::post('/email-templates/bulk-delete', [EmailTemplateController::class, 'bulkDelete'])->name('email-templates.bulk.delete');
 
     // TigerTMS logs
     Route::get('/tigertms-logs', [TigerTmsLogsController::class, 'index'])->name('tigertms-logs.index');
@@ -339,6 +352,8 @@ Route::group(['middleware' => ['auth:sanctum', 'api.cookie.auth']], function () 
     Route::post('/extensions/import', [ExtensionsController::class, 'import'])->name('extensions.import');
     Route::post('/extensions/make-user', [ExtensionsController::class, 'makeUser'])->name('extensions.make.user');
     Route::post('/extensions/password', [ExtensionsController::class, 'updatePassword'])->name('extensions.password.update');
+    Route::post('/extensions/welcome-email/options', [ExtensionWelcomeEmailController::class, 'options'])->name('extensions.welcome-email.options');
+    Route::post('/extensions/welcome-email/send', [ExtensionWelcomeEmailController::class, 'send'])->name('extensions.welcome-email.send');
 
     // Mobile Apps
     Route::post('/apps/users/bulk-action', [AppsController::class, 'bulkUserAction'])->name('apps.users.bulk-action');
@@ -411,6 +426,7 @@ Route::group(['middleware' => ['auth:sanctum', 'api.cookie.auth']], function () 
     Route::post('/devices/bulk-update', [DeviceController::class, 'bulkUpdate'])->name('devices.bulk.update');
     Route::post('/devices/bulk-delete', [DeviceController::class, 'bulkDelete'])->name('devices.bulk.delete');
     Route::post('/devices/restart', [DeviceController::class, 'restart'])->name('devices.restart');
+    Route::post('/devices/sync', [DeviceController::class, 'sync'])->name('devices.sync');
     Route::get('/devices/{device}/provisioning-preview', [ProvisioningController::class, 'previewDevice'])->name('devices.provisioning-preview');
     Route::post('/devices/select-all', [DeviceController::class, 'selectAll'])->name('devices.select.all');
     Route::post('devices/item-options', [DeviceController::class, 'getItemOptions'])->name('devices.item.options');

@@ -38,6 +38,7 @@ use App\Http\Controllers\DialplanController;
 use App\Http\Controllers\DomainController;
 use App\Http\Controllers\DomainGroupsController;
 use App\Http\Controllers\EmailQueueController;
+use App\Http\Controllers\EmailTemplateController;
 use App\Http\Controllers\ExtensionsController;
 use App\Http\Controllers\ExtensionStatisticsController;
 use App\Http\Controllers\FaxesController;
@@ -117,6 +118,7 @@ Route::webhooks('webhook/clicksend/sms', 'clicksend_messaging');
 Route::webhooks('webhook/apidaze/sms', 'apidaze_messaging');
 Route::webhooks('webhook/bulkvs/sms', 'bulkvs_messaging');
 Route::webhooks('webhook/voipms/sms', 'voipms_messaging');
+Route::webhooks('webhook/fibernetics/sms', 'fibernetics_messaging', 'get');
 Route::webhooks('/sms/ringotelwebhook', 'ringotel_messaging');
 Route::webhooks('/webhook/freeswitch', 'freeswitch');
 Route::webhooks('/webhook/stripe', 'stripe');
@@ -265,6 +267,9 @@ Route::group(['middleware' => 'auth'], function () {
     // Phone Firmware
     Route::get('phone-firmware', [PhoneFirmwareController::class, 'index'])->name('phone-firmware.index');
     Route::get('phone-firmware/download', [PhoneFirmwareController::class, 'download'])->name('phone-firmware.download');
+
+    // Email Templates
+    Route::get('email-templates', [EmailTemplateController::class, 'index'])->name('email-templates.index');
 
     // Modules
     Route::get('modules', [SwitchModuleController::class, 'index'])->name('modules.index');

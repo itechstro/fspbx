@@ -23,6 +23,20 @@ This repo is a Laravel, Vue/Inertia, VueForm, and FreeSWITCH application. Before
 - Use VueForm for create/update modals.
 - Keep forms clear and operational. Avoid marketing-style UI.
 
+## Email Templates
+
+- Native email templates live in the `email_templates` table. Do not restore the legacy `v_email_templates` schema, legacy template-population blocks, install-time cleanup scripts, or `LegacyEmailTemplateCleaner`.
+- Default email template sources use `resources/views/emails/{category}/{subcategory}.blade.php` and a required `{subcategory}-text.blade.php` companion.
+- The HTML file owns shared `email-template` metadata, including `version`, language, category, subcategory, subject, and description. Its plain-text companion carries only `format: text` and `layout: none`; bump the version once in the HTML file when either body changes.
+- Bump the template version whenever seeded subject, HTML, text, or layout content changes. Updates overwrite versioned defaults but never custom overrides.
+- The email template create-table migration runs `email:templates:seed` immediately after creating the table, so manually running migrations after `app:update` populates defaults even when the earlier update-time seed skipped a missing table.
+- Runtime resolution order is current-account custom, global custom, then shipped default, with the requested language preferred before `en-us`. The database is the source of truth once a matching row exists.
+- Application mailables extend `BaseMailable`, prepare trusted data in the constructor, call `useEmailTemplate(category, subcategory)`, and declare an explicit Laravel `content(): Content` method showing the HTML/text view pair. The base class owns shared `Envelope`, headers, and database-override wrapping.
+- Editable templates support Blade directives but reject `@php`, raw PHP tags, and scripts. Superadmin access is still the trust boundary because Blade expressions are executable.
+- Email template previews must render through `SafeEmailTemplateRenderer` with representative sample variables; never send raw Blade source directly to an iframe. Read-only rows preview stored content, while authorized editable rows may preview unsaved content.
+- Email Template visibility is fixed to shipped defaults, global custom overrides, and custom overrides for `session('domain_uuid')`; never add an all-accounts view. `email_templates_manage_global` controls global-custom mutations only and does not broaden record visibility.
+- This feature is a breaking change for installations that edited legacy email templates: legacy customizations are not imported or used. Release notes must tell administrators to save those changes before upgrading and recreate them as custom templates afterward.
+
 ## Extensions And Voicemail
 
 - Extension numbers and voicemail IDs are only unique inside a domain. Any lookup, relationship use, eager load, listener, observer, job, or response reload that connects `v_extensions.extension` to `v_voicemails.voicemail_id` must also constrain `domain_uuid`.
@@ -170,6 +184,7 @@ This repo is a Laravel, Vue/Inertia, VueForm, and FreeSWITCH application. Before
 
 - If an update version has shipped, do not keep editing it for new behavior. Create the next update.
 - An update should be best-effort when touching host services. App updates should not fail just because a FreeSWITCH module cannot be compiled.
+- Update classes can expose `getSupervisorProgramsToRestart()` for `UpdateApp` to restart long-running processes after code, templates, assets, and ownership are updated. Do not include the opt-in `fs-esl-listener-call-webhooks` program in unconditional restarts because its Supervisor config intentionally uses `autostart=false`; Horizon is already recycled with `horizon:terminate`.
 - When updates change generated dialplan XML or dialplan details, clear only the affected dialplan cache contexts.
 - Keep update console output truthful. Do not claim a module, file, or cache was refreshed unless it actually was.
 - When replacing untracked legacy files under `public/app/...`, follow the existing update pattern: download from the canonical GitHub raw URL, ensure the destination directory exists, reject empty downloads, and register the update step in `UpdateApp.php`.
@@ -201,6 +216,18 @@ This repo is a Laravel, Vue/Inertia, VueForm, and FreeSWITCH application. Before
 - Debug logs should be plain English and explain the important runtime decision.
 - Preserve call routing safety: avoid blocking calls from unsupported or malformed rules unless behavior is explicit.
 - Use atomic SQL for counters where concurrent calls can update the same row.
+
+## Localization
+
+- Backend and frontend share one translation catalog: `resources/lang/{locale}.json`, keyed by the literal English source string, not an invented dot-namespaced key. Wrap new UI copy with `__()`/`trans()`/`@lang()` in PHP/Blade or `$t()`/`$tChoice()`/`trans()` in Vue, then run `php artisan lang:sync` to add it to `resources/lang/en-us.json`. User-facing docs (for translators and admins, not engineering detail) live at `documentation/docs/tutorials/10-additional-information/05-translations.md`.
+- `resources/lang/en-us.json` is the source manifest everything else (including Crowdin) is translated against. `config('app.locale')`/`fallback_locale` are `en-us`, matching the FusionPBX `domain_setting_category=domain, subcategory=language, name=code` convention that already existed (seeded, and already read by legacy `get_domain_setting('language')`). Laravel's own framework translation files live at `resources/lang/en-us/*.php`, not `resources/lang/en/` -- don't recreate an `en/` directory.
+- Locale is a per-domain setting, not a per-user preference. `App\Http\Middleware\SetApplicationLocale` (registered in the `web` group, after `CheckFusionPBXLogin` and before `HandleInertiaRequests`) resolves it from `session('domain.language.code')`, falling back to `get_domain_setting('language')` for guests, and calls `App::setLocale()`. Like every other domain setting, a change takes effect on next login or an explicit "Reload Settings" action, not mid-session.
+- Dialects fall back to a parent locale instead of requiring a full retranslation. `config/locales.php` registers each locale's `fallback`; `App\Support\Localization\LocaleFileLoader` (bound over Laravel's `translation.loader` in `AppServiceProvider`) merges a locale's JSON over its whole fallback chain (e.g. `es-mx` -> `es-419` -> `es-es` -> `en-us`) via `LocaleRegistry::chain()`. A new dialect only needs to override the handful of strings that differ from its parent -- don't require a full retranslation to add one. Only the Spanish family chains today; every other registered locale falls back straight to `en-us`.
+- Locale codes are Crowdin's own locale IDs, lowercased (from `https://api.crowdin.com/api/v2/languages`), not invented codes -- Crowdin has no bare `es`; its generic "Spanish" target language IS `es-ES`. Look up the exact ID before registering a new locale in `config/locales.php` and `languages_mapping` in `crowdin.yml`; a mismatch means Crowdin downloads into a file this app never reads.
+- A locale only appears in a domain's language picker once `LocaleRegistry::available()` reports its own keys (not inherited ones) at or above `config('locales.minimum_completion')` coverage of `en-us.json`. Below that it still renders correctly via fallback and can still be worked on across multiple PRs -- don't block partial translation work on this threshold, only picker visibility.
+- `.github/workflows/validate-translations.yml` fails a PR only for invalid JSON, a key not present in `en-us.json`, or a `:placeholder` mismatch between a source string and its translation -- never for incomplete coverage.
+- Crowdin sync (`crowdin.yml`, `.github/workflows/crowdin.yml`) needs `CROWDIN_PROJECT_ID`, `CROWDIN_PERSONAL_TOKEN`, and `GH_TOKEN` repo secrets before it does anything; both jobs skip quietly until those exist rather than failing CI.
+- Modules under `Modules/` and legacy `/public/app/...` pages (which have their own older FusionPBX-native translation system) are out of scope for this catalog.
 
 ## Verification
 
