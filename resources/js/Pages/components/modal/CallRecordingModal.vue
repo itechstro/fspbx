@@ -83,7 +83,23 @@
                                             <div class="flex gap-2">
                                                 <dt class="font-medium text-gray-500 w-12">To:</dt>
                                                 <dd class="flex-1">
-                                                    <span v-if="recordingOptions?.item?.direction === 'outbound'">
+                                                    <span v-if="recordingOptions?.item?.direction === 'recorder'">
+                                                        <!-- SIPREC CDRs link to the siprec extension; show the real dialed party -->
+                                                        <template
+                                                            v-if="recordingOptions?.item?.caller_destination_name_formatted">
+                                                            {{ recordingOptions.item.caller_destination_name_formatted }}
+                                                            <span
+                                                                v-if="recordingOptions.item?.caller_destination_formatted"
+                                                                class="text-gray-500">
+                                                                - {{ recordingOptions.item.caller_destination_formatted }}
+                                                            </span>
+                                                        </template>
+                                                        <template v-else>
+                                                            {{ recordingOptions?.item?.caller_destination_formatted
+                                                                || recordingOptions?.item?.caller_destination }}
+                                                        </template>
+                                                    </span>
+                                                    <span v-else-if="recordingOptions?.item?.direction === 'outbound'">
                                                         {{ recordingOptions.item?.caller_destination_formatted }}
                                                     </span>
                                                     <span v-else>

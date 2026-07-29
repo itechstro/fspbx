@@ -223,6 +223,9 @@ class CdrsController extends Controller
 
             RecorderPermissionService::assertCanOpenRecording($item);
 
+            app(\App\Services\Contacts\ContactCallerIdResolver::class)
+                ->enrichCollection(collect([$item]));
+
             // Add a temporary URL for the audio file (S3 or Local)
             $urls = $urlService->urlsForCdr($item->xml_cdr_uuid, 600); // 10 minutes
 
