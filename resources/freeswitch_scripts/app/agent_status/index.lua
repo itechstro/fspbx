@@ -44,13 +44,9 @@
 		agent_name = session:getVariable("agent_name");
 		agent_password = session:getVariable("agent_password");
 
-		--set the sounds path for the language, dialect and voice
-		default_language = session:getVariable("default_language");
-		default_dialect = session:getVariable("default_dialect");
-		default_voice = session:getVariable("default_voice");
-		if (not default_language) then default_language = 'en'; end
-		if (not default_dialect) then default_dialect = 'us'; end
-		if (not default_voice) then default_voice = 'callie'; end
+		-- Note: We rely on FreeSWITCH's internal sounds path resolution
+		-- for streaming prompts (e.g. "ivr/ivr-you_are_now_logged_in.wav").
+		-- This avoids building potentially-wrong absolute paths.
 	end
 
 	--set default as access denied
@@ -58,9 +54,7 @@
 		agent_authorized = 'false';
 	end
 
-	--define the sounds directory
-	sounds_dir = session:getVariable("sounds_dir");
-	sounds_dir = sounds_dir.."/"..default_language.."/"..default_dialect.."/"..default_voice;
+	-- Keep `sounds_dir` usage out of playback/streaming logic below.
 
 	--get the agent_id from the caller
 	if (agent_id == nil and agent_name == nil) then
@@ -244,20 +238,20 @@
 
 	--unauthorized
 	if (agent_authorized == 'false') then
-		result = session:streamFile(sounds_dir.."/voicemail/vm-fail_auth.wav");
+		result = session:streamFile("phrase:voicemail_fail_auth:#");
 		status = "Invalid ID or Password";
 	end
 
 	--set the status and presence
 	if (session:ready()) then
 		if (action == "login") then
-			session:execute("playback", sounds_dir.."/ivr/ivr-you_are_now_logged_in.wav");
+			session:streamFile("ivr/ivr-you_are_now_logged_in.wav");
 		end
 		if (action == "logout") then
-			session:execute("playback", sounds_dir.."/ivr/ivr-you_are_now_logged_out.wav");
+			session:streamFile("ivr/ivr-you_are_now_logged_out.wav");
 		end
 		if (action == "break") then
-			session:execute("playback", sounds_dir.."/ivr/ivr-thank_you.wav");
+			session:streamFile("ivr/ivr-thank_you.wav");
 		end
 	end
 

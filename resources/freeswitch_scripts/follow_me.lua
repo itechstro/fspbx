@@ -48,12 +48,6 @@
 	local domain_name = session:getVariable("domain_name");
 	local extension_uuid = session:getVariable("extension_uuid");
 
---set the sounds path for the language, dialect and voice
-	local sounds_dir = session:getVariable("sounds_dir");
-	local default_language = session:getVariable("default_language") or 'en';
-	local default_dialect = session:getVariable("default_dialect") or 'us';
-	local default_voice = session:getVariable("default_voice") or 'callie';
-
 --a moment to sleep
 	session:sleep(1000);
 
@@ -87,8 +81,7 @@
 		--update the display and play a message
 		channel_display(session:get_uuid(), "Activated")
 		session:execute("sleep", "2000");
-		--session:execute("playback", "ivr/ivr-call_forwarding_has_been_set.wav");
-		session:streamFile(sounds_dir.."/"..default_language.."/"..default_dialect.."/"..default_voice.."/ivr/ivr-call_forwarding_has_been_set.wav");
+		session:streamFile("ivr/ivr-call_forwarding_has_been_set.wav");
 	end
 
 --unset follow me
@@ -96,8 +89,7 @@
 		--update the display and play a message
 		channel_display(session:get_uuid(), "Cancelled")
 		session:execute("sleep", "2000");
-		--session:execute("playback", "ivr/ivr-call_forwarding_has_been_cancelled.wav");
-		session:streamFile(sounds_dir.."/"..default_language.."/"..default_dialect.."/"..default_voice.."/ivr/ivr-call_forwarding_has_been_cancelled.wav");
+		session:streamFile("ivr/ivr-call_forwarding_has_been_cancelled.wav");
 	end
 
 --enable or disable follow me

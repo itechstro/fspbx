@@ -119,10 +119,6 @@
 		--set the sounds path for the language, dialect and voice
 			session:setVariable("instant_ringback", "true");
 			session:setVariable("ignore_early_media", "true");
-
-		--define the sounds directory
-			sounds_dir = session:getVariable("sounds_dir");
-			sounds_dir = sounds_dir.."/"..default_language.."/"..default_dialect.."/"..default_voice;
 	end
 
 --set the voicemail_dir
@@ -194,31 +190,31 @@
 		digit_timeout = "500";
 		max_digits = 1;
 		max_tries = 1;
-		dtmf_digits = session:playAndGetDigits(min_digits, max_digits, max_tries, digit_timeout, "#", sounds_dir.."/directory/dir-to_select_entry.wav", "", "\\d+|\\*");
+		dtmf_digits = session:playAndGetDigits(min_digits, max_digits, max_tries, digit_timeout, "#", "directory/dir-to_select_entry.wav", "", "\\d+|\\*");
 		if (string.len(dtmf_digits) == 0 and dtmf_digits~="*") then
-			dtmf_digits = session:playAndGetDigits(min_digits, max_digits, max_tries, digit_timeout, "#", sounds_dir.."/voicemail/vm-press.wav", "", "\\d+|\\*");
+			dtmf_digits = session:playAndGetDigits(min_digits, max_digits, max_tries, digit_timeout, "#", "voicemail/vm-press.wav", "", "\\d+|\\*");
 		end
 		if (string.len(dtmf_digits) == 0 and dtmf_digits~="*") then
-			dtmf_digits = session:playAndGetDigits(min_digits, max_digits, max_tries, digit_timeout, "#", sounds_dir.."/digits/1.wav", "", "\\d+|\\*");
+			dtmf_digits = session:playAndGetDigits(min_digits, max_digits, max_tries, digit_timeout, "#", "digits/1.wav", "", "\\d+|\\*");
 		end
 		if (string.len(dtmf_digits) == 0 and dtmf_digits~="*") then
-			dtmf_digits = session:playAndGetDigits(min_digits, max_digits, max_tries, digit_timeout, "#", sounds_dir.."/directory/dir-for_next.wav", "", "\\d+|\\*");
+			dtmf_digits = session:playAndGetDigits(min_digits, max_digits, max_tries, digit_timeout, "#", "directory/dir-for_next.wav", "", "\\d+|\\*");
 		end
 		if (string.len(dtmf_digits) == 0 and dtmf_digits~="*") then
-			dtmf_digits = session:playAndGetDigits(min_digits, max_digits, max_tries, digit_timeout, "#", sounds_dir.."/voicemail/vm-press.wav", "", "\\d+|\\*");
+			dtmf_digits = session:playAndGetDigits(min_digits, max_digits, max_tries, digit_timeout, "#", "voicemail/vm-press.wav", "", "\\d+|\\*");
 		end
 		if (string.len(dtmf_digits) == 0 and dtmf_digits~="*") then
-			dtmf_digits = session:playAndGetDigits(min_digits, max_digits, max_tries, digit_timeout, "#", sounds_dir.."/digits/6.wav", "", "\\d+|\\*");
+			dtmf_digits = session:playAndGetDigits(min_digits, max_digits, max_tries, digit_timeout, "#", "digits/6.wav", "", "\\d+|\\*");
 		end
 		if (string.len(dtmf_digits) == 0 and dtmf_digits~="*") then
-			dtmf_digits = session:playAndGetDigits(min_digits, max_digits, max_tries, digit_timeout, "#", sounds_dir.."/ivr/ivr-to_return_to_previous_menu.wav", "", "\\d+|\\*");
+			dtmf_digits = session:playAndGetDigits(min_digits, max_digits, max_tries, digit_timeout, "#", "ivr/ivr-to_return_to_previous_menu.wav", "", "\\d+|\\*");
 		end
 		if (string.len(dtmf_digits) == 0 and dtmf_digits~="*") then
-			dtmf_digits = session:playAndGetDigits(min_digits, max_digits, max_tries, digit_timeout, "#", sounds_dir.."/voicemail/vm-press.wav", "", "\\d+|\\*");
+			dtmf_digits = session:playAndGetDigits(min_digits, max_digits, max_tries, digit_timeout, "#", "voicemail/vm-press.wav", "", "\\d+|\\*");
 		end
 		if (string.len(dtmf_digits) == 0 and dtmf_digits~="*") then
 			digit_timeout = "5000";
-			dtmf_digits = session:playAndGetDigits(min_digits, max_digits, max_tries, digit_timeout, "#", sounds_dir.."/digits/star.wav", "", "\\d+|\\*");
+			dtmf_digits = session:playAndGetDigits(min_digits, max_digits, max_tries, digit_timeout, "#", "digits/star.wav", "", "\\d+|\\*");
 		end
 		return dtmf_digits;
 	end
@@ -227,7 +223,7 @@
 	function prompt_for_name()
 		dtmf_digits = "";
 		min_digits=0; max_digits=3; max_tries=3; digit_timeout = "5000";
-		directory_prompt = directory_prompt or sounds_dir.."/directory/dir-enter_person_first_or_last.wav";
+		directory_prompt = directory_prompt or "directory/dir-enter_person_first_or_last.wav";
 		session:setVariable("read_terminator_used", "");
 		
 		dtmf_digits = session:read(min_digits, max_digits, directory_prompt, digit_timeout, "#*");
@@ -347,7 +343,7 @@
 							--if (row.directory_exten_visible == "false") then
 								--invisible extension number
 							if (row.extension ~= nil and row.extension ~= '' and row.directory_exten_visible == "true") then
-								session:streamFile(sounds_dir.."/directory/dir-at_extension.wav");
+								session:streamFile("directory/dir-at_extension.wav");
 								session:execute("say", default_language.." NAME_SPELLED iterated "..row.extension);
 							end
 
@@ -368,7 +364,7 @@
 				end
 			end
 			if (found ~= true) then
-				session:streamFile(sounds_dir.."/directory/dir-no_matching_results.wav");
+				session:streamFile("directory/dir-no_matching_results.wav");
 			end
 			search_count = search_count + 1;
 			if (search_count < search_limit) then
@@ -433,7 +429,7 @@
 
 --timeout action
 	if (timeout_destination == nil) then
-		session:streamFile(sounds_dir.."/voicemail/vm-goodbye.wav");
+		session:streamFile("voicemail/vm-goodbye.wav");
 	else
 		session:execute("transfer", timeout_destination.." XML "..row.context);
 	end

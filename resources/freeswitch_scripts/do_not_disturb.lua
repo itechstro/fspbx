@@ -54,20 +54,9 @@
 	if (session:ready()) then
 		enabled = session:getVariable("enabled");
 		pin_number = session:getVariable("pin_number");
-		sounds_dir = session:getVariable("sounds_dir");
 		domain_uuid = session:getVariable("domain_uuid");
 		domain_name = session:getVariable("domain_name");
 		extension_uuid = session:getVariable("extension_uuid");
-	end
-
---set the sounds path for the language, dialect and voice
-	if (session:ready()) then
-		default_language = session:getVariable("default_language");
-		default_dialect = session:getVariable("default_dialect");
-		default_voice = session:getVariable("default_voice");
-		if (not default_language) then default_language = 'en'; end
-		if (not default_dialect) then default_dialect = 'us'; end
-		if (not default_voice) then default_voice = 'callie'; end
 	end
 
 --wait a moment to sleep
@@ -139,7 +128,7 @@
 			do_not_disturb_enabled = "true";
 		--notify the caller
 			if (session:ready()) then
-				session:streamFile(sounds_dir.."/"..default_language.."/"..default_dialect.."/"..default_voice.."/ivr/ivr-dnd_activated.wav");
+				session:streamFile("ivr/ivr-dnd_activated.wav");
 			end
 	end
 
@@ -149,7 +138,7 @@
 			do_not_disturb_enabled = "false";
 		--notify the caller
 			if (session:ready()) then
-				session:streamFile(sounds_dir.."/"..default_language.."/"..default_dialect.."/"..default_voice.."/ivr/ivr-dnd_cancelled.wav");
+				session:streamFile("ivr/ivr-dnd_cancelled.wav");
 			end
 	end
 

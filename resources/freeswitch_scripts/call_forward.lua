@@ -63,7 +63,6 @@
 --get the variables
 	local enabled = session:getVariable("enabled");
 	local pin_number = session:getVariable("pin_number");
-	local sounds_dir = session:getVariable("sounds_dir");
 	local domain_uuid = session:getVariable("domain_uuid");
 	local domain_name = session:getVariable("domain_name");
 	local extension_uuid = session:getVariable("extension_uuid");
@@ -173,7 +172,7 @@
 	
 --get the forward destination by IVR if destination has not been passed by argument
 	if enabled == "true" and empty(forward_all_destination) and not destination_by_arg then
-		forward_all_destination = session:playAndGetDigits(min_digits, max_digits, max_tries, digit_timeout, "#", sounds_dir.."/"..default_language.."/"..default_dialect.."/"..default_voice.."/ivr/ivr-enter_destination_telephone_number.wav", "", "\\d+");
+		forward_all_destination = session:playAndGetDigits(min_digits, max_digits, max_tries, digit_timeout, "#", "ivr/ivr-enter_destination_telephone_number.wav", "", "\\d+");
 		if empty(forward_all_destination) then return end
 	end
 
@@ -185,7 +184,7 @@
 		--say the destination number
 			session:say(forward_all_destination, default_language, "number", "iterated");
 		--notify the caller
-			session:streamFile(sounds_dir.."/"..default_language.."/"..default_dialect.."/"..default_voice.."/ivr/ivr-call_forwarding_has_been_set.wav");
+			session:streamFile("ivr/ivr-call_forwarding_has_been_set.wav");
 	end
 
 --get default caller_id for outbound call
@@ -208,7 +207,7 @@
 			forward_all_enabled = "false";
 			channel_display(session:get_uuid(), "Cancelled")
 		--notify the caller
-			session:streamFile(sounds_dir.."/"..default_language.."/"..default_dialect.."/"..default_voice.."/ivr/ivr-call_forwarding_has_been_cancelled.wav");
+			session:streamFile("ivr/ivr-call_forwarding_has_been_cancelled.wav");
 	end
 
 --check the destination

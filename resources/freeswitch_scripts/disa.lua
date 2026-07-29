@@ -23,14 +23,25 @@
 --	Mark J Crane <markjcrane@fusionpbx.com>
 
 --predefined variables
-	predefined_destination = '';
-	fallback_destination = '';
+	predefined_destination = nil;
+	fallback_destination = nil;
 
 --define the trim function
 	require "resources.functions.trim";
 
 --define the explode function
 	require "resources.functions.explode";
+
+--ignore blank channel variables so disabled dialplan set actions do not block prompts
+	local function non_empty(value)
+		if (value == nil) then
+			return nil;
+		end
+		if (type(value) == 'string' and string.match(value, '^%s*$')) then
+			return nil;
+		end
+		return value;
+	end
 
 --prepare the api object
 	api = freeswitch.API();
@@ -45,10 +56,9 @@
 		sound_greeting = session:getVariable("sound_greeting");
 		sound_pin = session:getVariable("sound_pin");
 		sound_extension = session:getVariable("sound_extension");
-		pin_number = session:getVariable("pin_number");
-		sounds_dir = session:getVariable("sounds_dir");
-		predefined_destination = session:getVariable("predefined_destination");
-		fallback_destination = session:getVariable("fallback_destination");
+		pin_number = non_empty(session:getVariable("pin_number"));
+		predefined_destination = non_empty(session:getVariable("predefined_destination"));
+		fallback_destination = non_empty(session:getVariable("fallback_destination"));
 		digit_min_length = session:getVariable("digit_min_length");
 		digit_max_length = session:getVariable("digit_max_length");
 		digit_timeout = session:getVariable("digit_timeout");
@@ -57,16 +67,6 @@
 		max_tries = session:getVariable("max_tries");
 		pin_tries = session:getVariable("pin_tries");
 		extension_tries = session:getVariable("extension_tries");
-	end
-
---set the sounds path for the language, dialect and voice
-	if (session:ready()) then
-		default_language = session:getVariable("default_language");
-		default_dialect = session:getVariable("default_dialect");
-		default_voice = session:getVariable("default_voice");
-		if (not default_language) then default_language = 'en'; end
-		if (not default_dialect) then default_dialect = 'us'; end
-		if (not default_voice) then default_voice = 'callie'; end
 	end
 
 --set defaults
@@ -85,11 +85,11 @@
 	session:sleep(1500);
 
 	if (not sound_pin) then
-		sound_pin = sounds_dir.."/"..default_language.."/"..default_dialect.."/"..default_voice.."/ivr/ivr-please_enter_pin_followed_by_pound.wav";
+		sound_pin = "phrase:voicemail_enter_pass:#";
 	end
 
 	if (not sound_extension) then
-		sound_extension = sounds_dir.."/"..default_language.."/"..default_dialect.."/"..default_voice.."/ivr/ivr-enter_destination_telephone_number.wav";
+		sound_extension = "ivr/ivr-enter_destination_telephone_number.wav";
 	end
 
 	if (not max_tries) then
@@ -118,9 +118,9 @@
 		if (digits == pin_number) then
 			--pin is correct
 		else
-			session:streamFile(sounds_dir.."/"..default_language.."/"..default_dialect.."/"..default_voice.."/ivr/ivr-pin_or_extension_is-invalid.wav");
-			session:streamFile(sounds_dir.."/"..default_language.."/"..default_dialect.."/"..default_voice.."/ivr/ivr-im_sorry.wav");
-			session:streamFile(sounds_dir.."/"..default_language.."/"..default_dialect.."/"..default_voice.."/voicemail/vm-goodbye.wav");
+			session:streamFile("ivr/ivr-pin_or_extension_is-invalid.wav");
+			session:streamFile("ivr/ivr-im_sorry.wav");
+			session:streamFile("voicemail/vm-goodbye.wav");
 			session:hangup("NORMAL_CLEARING");
 			return;
 		end
