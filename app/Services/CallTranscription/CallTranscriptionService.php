@@ -5,7 +5,6 @@ namespace App\Services\CallTranscription;
 use RuntimeException;
 use App\Jobs\SendTranscriptionEmail;
 use App\Models\CallTranscription;
-use App\Models\CDR;
 use Illuminate\Support\Facades\Cache;
 use App\Services\CallRecordingUrlService;
 use App\Services\CallTranscriptionConfigService;
@@ -41,14 +40,6 @@ class CallTranscriptionService
             }
 
             $provider = $this->registry->make($providerKey, $providerCfg);
-
-            $cdr = CDR::query()
-                ->where('xml_cdr_uuid', $xmlCdrUuid)
-                ->value('direction');
-
-            if ($cdr === 'recorder') {
-                $overrides = array_merge($this->recorderTranscriptionOverrides(), $overrides);
-            }
 
             // Resolve recording URL (signed, expiring)
             $urls = $this->recordingUrlService->urlsForCdr($xmlCdrUuid, 600);
@@ -298,20 +289,6 @@ class CallTranscriptionService
         }
 
         return (bool) ($cfg['auto_translate'] ?? false);
-    }
-
-    /**
-     * SIPREC recorder calls are mono mixes. Prefer speaker diarization over multichannel.
-     *
-     * @return array<string, mixed>
-     */
-    private function recorderTranscriptionOverrides(): array
-    {
-        return [
-            'multichannel' => false,
-            'speaker_labels' => true,
-            'speakers_expected' => 2,
-        ];
     }
 
 }
