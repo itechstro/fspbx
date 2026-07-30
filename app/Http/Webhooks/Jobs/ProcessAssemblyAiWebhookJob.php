@@ -61,7 +61,9 @@ class ProcessAssemblyAiWebhookJob extends SpatieProcessWebhookJob
             $row->update($updates);
             $costService->applyTranscriptionCompletion($row->refresh(), $full ?: []);
 
-            if ($service->shouldAutoTranslate($row->domain_uuid, $direction)) {
+            if ($service->shouldAutoSummarize($row->domain_uuid, $direction)) {
+                dispatch(new \App\Jobs\SummarizeCallTranscription($row->uuid))->onQueue('transcriptions');
+            } elseif ($service->shouldAutoTranslate($row->domain_uuid, $direction)) {
                 dispatch(new \App\Jobs\TranslateCallTranscription($row->uuid))->onQueue('transcriptions');
             } else {
                 $service->maybeDispatchTranscriptionEmail($row);

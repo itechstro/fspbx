@@ -14,6 +14,11 @@ class AssemblyAiUtteranceNormalizer
     {
         $utterances = (array) ($full['utterances'] ?? []);
         $words = (array) ($full['words'] ?? []);
+
+        if ($utterances === [] && $words !== []) {
+            return $this->fromWords($words);
+        }
+
         $channels = (int) ($full['audio_channels'] ?? 0);
 
         if ($channels < 2 && empty($full['multichannel'])) {

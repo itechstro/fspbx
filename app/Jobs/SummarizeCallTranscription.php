@@ -67,19 +67,9 @@ class SummarizeCallTranscription implements ShouldQueue
 
             $full = (array) $row->result_payload;
 
-            // Build compact utterance lines (trim long calls if needed)
-            $utterances = (array) data_get($full, 'utterances', []);
-            $lines = [];
-            foreach ($utterances as $u) {
-                $speaker = data_get($u, 'speaker');
-                $text    = trim((string) data_get($u, 'text', ''));
-                if ($speaker && $text !== '') {
-                    $lines[] = "{$speaker}: {$text}";
-                }
-            }
+            $lines = $this->summaryLinesFromPayload($full);
 
-            if (!$lines) {
-                // nothing to summarize
+            if ($lines === []) {
                 $row->update([
                     'summary_status' => 'failed',
                     'summary_error'  => 'No utterances available for summarization.',
@@ -125,6 +115,36 @@ class SummarizeCallTranscription implements ShouldQueue
         }, function () {
             return $this->release(30); // If locked, retry in 30 seconds
         });
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<int, string>
+     */
+    private function summaryLinesFromPayload(array $payload): array
+    {
+        $lines = [];
+
+        foreach ((array) data_get($payload, 'utterances', []) as $utterance) {
+            $text = trim((string) data_get($utterance, 'text', ''));
+            if ($text === '') {
+                continue;
+            }
+
+            $speaker = data_get($utterance, 'speaker') ?? data_get($utterance, 'channel') ?? 'Transcript';
+            $lines[] = "{$speaker}: {$text}";
+        }
+
+        if ($lines !== []) {
+            return $lines;
+        }
+
+        $text = trim((string) data_get($payload, 'text', ''));
+        if ($text !== '') {
+            return ["Transcript: {$text}"];
+        }
+
+        return [];
     }
 
 
