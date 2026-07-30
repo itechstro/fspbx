@@ -21,7 +21,7 @@ class AssemblyAiUtteranceNormalizer
 
         $channels = (int) ($full['audio_channels'] ?? 0);
 
-        if ($channels < 2 && empty($full['multichannel'])) {
+        if ($channels < 2 && empty($full['multichannel']) && ! $this->wordsHaveMultipleChannels($words)) {
             return $utterances;
         }
 
@@ -173,5 +173,27 @@ class AssemblyAiUtteranceNormalizer
         $parts = array_values(array_filter(array_map('trim', $parts)));
 
         return $parts !== [] ? $parts : [$text];
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $words
+     */
+    private function wordsHaveMultipleChannels(array $words): bool
+    {
+        $channels = [];
+
+        foreach ($words as $word) {
+            $channel = $word['channel'] ?? $word['speaker'] ?? null;
+            if ($channel === null || $channel === '') {
+                continue;
+            }
+
+            $channels[(string) $channel] = true;
+            if (count($channels) > 1) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
