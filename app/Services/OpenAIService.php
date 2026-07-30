@@ -155,6 +155,7 @@ class OpenAIService
             '- If a field is unknown, use null.',
             '- If you can guess the participants name, use that name in your responses.',
             '- If the name is unknown, use the guessed role instead (e.g., "Agent", "Customer").',
+            '- Every natural-language JSON field must use the same output language.',
             $this->outputLanguageRule($outputLanguage),
             '- Return ONLY valid JSON matching the schema below—no prose.',
             '',
@@ -569,7 +570,7 @@ class OpenAIService
     private function outputLanguageRule(?string $languageCode): ?string
     {
         $code = strtolower(trim((string) $languageCode));
-        if ($code === '' || in_array($code, ['en', 'en-us', 'en-gb'], true)) {
+        if ($code === '') {
             return null;
         }
 

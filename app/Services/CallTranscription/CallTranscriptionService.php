@@ -147,7 +147,7 @@ class CallTranscriptionService
         }
 
         if (in_array($code, ['en', 'en-us', 'en-gb'], true)) {
-            return null;
+            return 'en-us';
         }
 
         if (in_array($code, ['zh-hant', 'zh_hant', 'zh-hk', 'zh-mo', 'traditional'], true)) {
