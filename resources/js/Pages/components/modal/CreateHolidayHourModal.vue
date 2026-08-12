@@ -144,35 +144,20 @@
 
                                 </StaticElement>
 
-                                <SelectElement name="us_holiday" :search="true" :native="false" :label="$t('US Holiday')"
-                                    :submit="false" :items="usHolidays" input-type="search" autocomplete="off" :object="true"
-                                    @change="handleUSHolidayUpdate" :placeholder="$t('Select US Holiday')" :floating="false"
-                                    :conditions="[
-                                        [
-                                            'holiday_type',
-                                            'in',
-                                            [
-                                                'us_holiday',
-                                            ],
-                                        ],
-                                    ]" />
-
-                                <SelectElement name="ca_holiday" :search="true" :native="false" :label="$t('Canadian Holiday')"
-                                    :submit="false" :items="caHolidays" input-type="search" autocomplete="off" :object="true"
-                                    @change="handleCAHolidayUpdate" :placeholder="$t('Select Canadian Holiday')" :floating="false"
-                                    :conditions="[
-                                        [
-                                            'holiday_type',
-                                            'in',
-                                            [
-                                                'ca_holiday',
-                                            ],
-                                        ],
-                                    ]" />
-
-                                <SelectElement name="uk_holiday" :search="true" :native="false" :label="$t('UK Holiday')"
-                                    :submit="false" :items="ukHolidays" input-type="search" autocomplete="off" :object="true"
-                                    @change="handleUKHolidayUpdate" :placeholder="$t('Select UK Holiday')" :floating="false"
+                                <SelectElement
+                                    v-for="country in holidayTemplateCountries"
+                                    :key="country.fieldName"
+                                    :name="country.fieldName"
+                                    :search="true"
+                                    :native="false"
+                                    :label="$t(country.label)"
+                                    :submit="false"
+                                    :items="country.holidays"
+                                    input-type="search"
+                                    autocomplete="off"
+                                    :object="true"
+                                    :placeholder="$t('Select :label', { label: country.label })"
+                                    :floating="false"
                                     :conditions="[
                                         [
                                             'holiday_type',

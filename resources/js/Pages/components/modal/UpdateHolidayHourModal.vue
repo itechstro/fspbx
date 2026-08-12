@@ -148,42 +148,30 @@
 
                                 </StaticElement>
 
-                                <SelectElement name="us_holiday" :search="true" :native="false" :label="$t('US Holiday')"
-                                    :items="usHolidays" input-type="search" autocomplete="off" :object="true"
-                                    @change="handleUSHolidayUpdate" :placeholder="$t('Select US Holiday')" :floating="false"
+                                <SelectElement
+                                    v-for="country in holidayTemplateCountries"
+                                    :key="country.fieldName"
+                                    :name="country.fieldName"
+                                    :search="true"
+                                    :native="false"
+                                    :label="$t(country.label)"
+                                    :submit="false"
+                                    :items="country.holidays"
+                                    input-type="search"
+                                    autocomplete="off"
+                                    :object="true"
+                                    :placeholder="$t('Select :label', { label: country.label })"
+                                    :floating="false"
                                     :conditions="[
                                         [
                                             'holiday_type',
                                             'in',
                                             [country.value],
                                         ],
-                                    ]" />
-
-                                <SelectElement name="ca_holiday" :search="true" :native="false" :label="$t('Canadian Holiday')"
-                                    :submit="false" :items="caHolidays" input-type="search" autocomplete="off"
-                                    :object="true" @change="handleCAHolidayUpdate" :placeholder="$t('Select Canadian Holiday')"
-                                    :floating="false" :conditions="[
-                                        [
-                                            'holiday_type',
-                                            'in',
-                                            [
-                                                'ca_holiday',
-                                            ],
-                                        ],
-                                    ]" />
-
-                                <SelectElement name="uk_holiday" :search="true" :native="false" :label="$t('UK Holiday')"
-                                    :submit="false" :items="ukHolidays" input-type="search" autocomplete="off"
-                                    :object="true" @change="handleUKHolidayUpdate" :placeholder="$t('Select UK Holiday')"
-                                    :floating="false" :conditions="[
-                                        [
-                                            'holiday_type',
-                                            'in',
-                                            [
-                                                'uk_holiday',
-                                            ],
-                                        ],
-                                    ]" />
+                                    ]"
+                                    @change="(newValue, oldValue, el$) => handleTemplateHolidayUpdate(country.holidays, newValue, oldValue, el$)"
+                                    @select="(newValue, oldValue, el$) => handleTemplateHolidayUpdate(country.holidays, newValue, oldValue, el$)"
+                                />
 
                                 <TextElement name="description" :label="$t('Holiday Description')"
                                     :description="$t('Enter a clear, descriptive name for this holiday (e.g. ‘Company Annual Picnic’).')"
