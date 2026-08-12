@@ -211,6 +211,51 @@
                                                 }}</span>
 
                                             </button>
+
+                                            <!-- Re-transcribe / Summarize / Translate actions (when transcript already exists) -->
+                                            <button
+                                                v-if="showReTranscribeBtn"
+                                                type="button"
+                                                @click="retranscribe"
+                                                :disabled="isRegenerating"
+                                                class="inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-500 disabled:opacity-50">
+                                                <ArrowPathIcon :class="['h-4 w-4', isRegenerating ? 'animate-spin' : '']" />
+                                                <span class="ml-1">
+                                                    {{ isRegenerating ? $t('Re-transcribing...') : $t('Re-transcribe') }}
+                                                </span>
+                                            </button>
+
+                                            <button
+                                                v-if="(showSummarizeBtn || showReSummarizeBtn) && recordingOptions?.permissions?.transcription_summary"
+                                                type="button"
+                                                @click="requestSummary"
+                                                :disabled="isRegeneratingSummary"
+                                                class="inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-500 disabled:opacity-50">
+                                                <ArrowPathIcon :class="['h-4 w-4', isRegeneratingSummary ? 'animate-spin' : '']" />
+                                                <span class="ml-1">
+                                                    {{
+                                                        isRegeneratingSummary
+                                                            ? $t('Requesting...')
+                                                            : (showReSummarizeBtn ? $t('Re-summarize') : $t('Summarize'))
+                                                    }}
+                                                </span>
+                                            </button>
+
+                                            <button
+                                                v-if="(showTranslateBtn || showReTranslateBtn) && recordingOptions?.permissions?.transcription_summary"
+                                                type="button"
+                                                @click="requestTranslation"
+                                                :disabled="isRequestingTranslation"
+                                                class="inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-500 disabled:opacity-50">
+                                                <ArrowPathIcon :class="['h-4 w-4', isRequestingTranslation ? 'animate-spin' : '']" />
+                                                <span class="ml-1">
+                                                    {{
+                                                        isRequestingTranslation
+                                                            ? $t('Requesting...')
+                                                            : (showReTranslateBtn ? $t('Re-translate') : $t('Translate'))
+                                                    }}
+                                                </span>
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
