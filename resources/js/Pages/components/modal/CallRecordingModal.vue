@@ -20,7 +20,7 @@
                                 <button type="button"
                                     class="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
                                     @click="emit('close')">
-                                    <span class="sr-only">Close</span>
+                                    <span class="sr-only">{{ $t('Close') }}</span>
                                     <XMarkIcon class="h-6 w-6" aria-hidden="true" />
                                 </button>
                             </div>
@@ -38,7 +38,7 @@
                                             </path>
                                         </svg>
                                     </div>
-                                    <div class="text-lg text-blue-600 m-auto">Loading...</div>
+                                    <div class="text-lg text-blue-600 m-auto">{{ $t('Loading...') }}</div>
                                 </div>
                             </div>
 
@@ -47,19 +47,18 @@
                                     <div class="space-y-1">
                                         <!-- Title -->
                                         <h1 class="text-2xl font-bold text-gray-600">
-                                            {{ capitalizeFirstLetter(recordingOptions?.item?.direction) }} Call
+                                            {{ directionHeading(recordingOptions?.item?.direction) }}
                                         </h1>
 
                                         <!-- When -->
                                         <p class="text-sm text-gray-500">
-                                            On {{ recordingOptions?.item?.start_date }} at {{
-                                                recordingOptions?.item?.start_time }}
+                                            {{ $t('On :date at :time', { date: recordingOptions?.item?.start_date ?? '', time: recordingOptions?.item?.start_time ?? '' }) }}
                                         </p>
 
                                         <!-- Parties -->
                                         <dl class="text-sm text-gray-700">
                                             <div class="flex gap-2">
-                                                <dt class="font-medium text-gray-500 w-12">From:</dt>
+                                                <dt class="font-medium text-gray-500 w-12">{{ $t('From:') }}</dt>
                                                 <dd class="flex-1">
                                                     <span v-if="recordingOptions?.item?.direction === 'outbound'">
                                                         <!-- extension name if present, else caller name -->
@@ -81,7 +80,7 @@
                                             </div>
 
                                             <div class="flex gap-2">
-                                                <dt class="font-medium text-gray-500 w-12">To:</dt>
+                                                <dt class="font-medium text-gray-500 w-12">{{ $t('To:') }}</dt>
                                                 <dd class="flex-1">
                                                     <span v-if="recordingOptions?.item?.direction === 'recorder'">
                                                         <!-- SIPREC CDRs link to the siprec extension; show the real dialed party -->
@@ -131,15 +130,13 @@
                                             </svg>
                                         </div>
                                         <div class="flex-1">
-                                            <h3 class="text-base font-semibold text-blue-800">Unlock AI-Powered Insights
+                                            <h3 class="text-base font-semibold text-blue-800">{{ $t('Unlock AI-Powered Insights') }}
                                             </h3>
                                             <p class="mt-1 text-sm text-blue-700">
-                                                Enhance your call analysis with automated transcripts and summaries.
-                                                This feature is not currently active for your account.
+                                                {{ $t('Enhance your call analysis with automated transcripts and summaries. This feature is not currently active for your account.') }}
                                             </p>
-                                            <p class="mt-3 text-sm">
-                                                <span class="font-medium">Want to activate it?</span> Please contact
-                                                your account administrator or support.
+                                            <p class="mt-3 text-sm"
+                                                v-html="$t('<span class=\'font-medium\'>Want to activate it?</span> Please contact your account administrator or support.')">
                                             </p>
                                         </div>
                                     </div>
@@ -155,35 +152,47 @@
                                                 <SparklesIcon class="h-6 w-6 text-indigo-600" />
                                             </div>
                                             <div>
-                                                <h3 class="text-base font-semibold text-gray-800">AI Call Insights</h3>
-                                                <p class="text-sm text-gray-500">Transcribe, summarize, and translate this recording.</p>
+                                                <h3 class="text-base font-semibold text-gray-800">{{ $t('AI Voice Transcription') }}
+                                                </h3>
+                                                <p class="text-sm text-gray-500">{{ $t('Generate a searchable text version of this audio.') }}</p>
                                             </div>
                                         </div>
 
-                                        <button
-                                            v-if="showRefreshBtn"
-                                            type="button"
-                                            @click="refreshStatus"
-                                            :disabled="!canRefresh"
-                                            class="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">
-                                            <ArrowPathIcon class="-ml-0.5 mr-1.5 h-5 w-5 text-gray-400"
-                                                :class="{ 'animate-spin': !canRefresh }" />
-                                            <span v-if="canRefresh">Refresh Status</span>
-                                            <span v-else>Refresh in {{ cooldownSeconds }}s</span>
-                                        </button>
-                                    </div>
+                                        <!-- Right Side: Action Button and Status Pills -->
+                                        <div class="flex items-center gap-4 pl-14 sm:pl-0">
+                                            <!-- Transcribe Button -->
+                                            <button
+                                                v-if="showTranscribeBtn && recordingOptions?.permissions?.transcription_create"
+                                                type="button" @click="requestTranscription"
+                                                :disabled="isRequestingTranscription"
+                                                class="inline-flex items-center justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:cursor-not-allowed disabled:opacity-50">
+                                                <svg v-if="isRequestingTranscription" class="mr-2 h-5 w-5 animate-spin"
+                                                    xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10"
+                                                        stroke="currentColor" stroke-width="4"></circle>
+                                                    <path class="opacity-75" fill="currentColor"
+                                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                                    </path>
+                                                </svg>
+                                                <span>{{ isRequestingTranscription ? $t('Requesting...') : $t('Transcribe')
+                                                }}</span>
+                                            </button>
 
-                                    <div class="mt-4 space-y-3 border-t border-slate-200 pt-4">
-                                        <!-- Transcription -->
-                                        <div class="flex flex-wrap items-center justify-between gap-3">
-                                            <div class="flex min-w-0 items-center gap-3">
-                                                <span class="w-28 shrink-0 text-sm font-medium text-gray-700">Transcription</span>
-                                                <span
-                                                    class="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ring-1"
-                                                    :class="statusPillClasses(transcriptionPillStatus)">
-                                                    <span class="h-2 w-2 rounded-full" :class="statusDotClasses(transcriptionPillStatus)"></span>
-                                                    {{ statusPillLabel(transcriptionPillStatus) }}
-                                                </span>
+                                            <!-- Status pill shows after request OR if API already returns a status -->
+                                            <div v-else-if="displayStatus"
+                                                class="inline-flex items-center gap-2 rounded-full px-3 ring-1" :class="{
+                                                    'bg-yellow-50 text-yellow-600 ring-yellow-200': displayStatus === 'pending' || displayStatus === 'queued',
+                                                    'bg-sky-50 text-sky-600 ring-sky-200': displayStatus === 'processing',
+                                                    'bg-emerald-50 text-emerald-600 ring-emerald-200': displayStatus === 'completed',
+                                                    'bg-rose-50 text-rose-600 ring-rose-200': displayStatus === 'failed'
+                                                }">
+                                                <span class="h-2 w-2 rounded-full" :class="{
+                                                    'bg-yellow-500': displayStatus === 'pending' || displayStatus === 'queued',
+                                                    'bg-sky-500': displayStatus === 'processing',
+                                                    'bg-emerald-500': displayStatus === 'completed',
+                                                    'bg-rose-500': displayStatus === 'failed'
+                                                }"></span>
+                                                <span class="font-medium capitalize">{{ transcriptionStatusLabel(displayStatus) }}</span>
                                             </div>
                                             <div class="flex flex-wrap items-center gap-2">
                                                 <button
@@ -254,37 +263,20 @@
                                             </div>
                                         </div>
 
-                                        <!-- Translation -->
-                                        <div v-if="showTranslationRow" class="flex flex-wrap items-center justify-between gap-3">
-                                            <div class="flex min-w-0 items-center gap-3">
-                                                <span class="w-28 shrink-0 text-sm font-medium text-gray-700">Translation</span>
-                                                <span
-                                                    class="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ring-1"
-                                                    :class="statusPillClasses(translationPillStatus)">
-                                                    <span class="h-2 w-2 rounded-full" :class="statusDotClasses(translationPillStatus)"></span>
-                                                    {{ statusPillLabel(translationPillStatus) }}
-                                                </span>
-                                            </div>
-                                            <div class="flex flex-wrap items-center gap-2">
-                                                <button
-                                                    v-if="showTranslateBtn"
-                                                    type="button"
-                                                    @click="requestTranslation"
-                                                    :disabled="isRequestingTranslation"
-                                                    class="inline-flex items-center justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50">
-                                                    <ArrowPathIcon :class="['mr-1 h-4 w-4', isRequestingTranslation ? 'animate-spin' : '']" />
-                                                    <span>{{ isRequestingTranslation ? 'Requesting...' : 'Translate' }}</span>
-                                                </button>
-                                                <button
-                                                    v-if="showReTranslateBtn"
-                                                    type="button"
-                                                    @click="requestTranslation"
-                                                    :disabled="isRequestingTranslation || isTranslationInProgress"
-                                                    class="inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-500 disabled:opacity-50">
-                                                    <ArrowPathIcon :class="['h-4 w-4', isRequestingTranslation ? 'animate-spin' : '']" />
-                                                    <span class="ml-1">{{ isRequestingTranslation ? 'Translating…' : 'Re-translate' }}</span>
-                                                </button>
-                                            </div>
+
+                                            <!-- Regenerate (only when failed) -->
+
+                                            <button
+                                                v-if="showRegenerateBtn && recordingOptions?.permissions?.transcription_create"
+                                                type="button" @click="regenerateTranscription"
+                                                :disabled="isRegenerating"
+                                                class="inline-flex items-center text-sm/6 font-medium text-indigo-600 hover:text-indigo-500">
+                                                <ArrowPathIcon
+                                                    :class="['h-4 w-4', isRegenerating ? 'animate-spin' : '']" />
+                                                <span class="ml-1">{{ isRegenerating ? $t('Regenerating…') : $t('Regenerate')
+                                                }}</span>
+
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -295,11 +287,10 @@
                                     <div v-if="recordingOptions?.isCallTranscriptionServiceEnabled && !hasTranscript && !transcriptRequested"
                                         class="mt-6 rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
                                         <ClipboardDocumentListIcon class="mx-auto h-12 w-12 text-gray-400" />
-                                        <h3 class="mt-2 text-sm font-semibold text-gray-900">Transcript not yet
-                                            generated</h3>
+                                        <h3 class="mt-2 text-sm font-semibold text-gray-900">{{ $t('Transcript not yet generated') }}</h3>
                                         <p v-if="recordingOptions?.permissions?.transcription_create"
                                             class="mt-1 text-sm text-gray-500">
-                                            Use the Transcribe action in AI Call Insights above.
+                                            {{ $t('Click the "Transcribe" button above to generate the transcript.') }}
                                         </p>
                                     </div>
 
@@ -315,8 +306,17 @@
                                                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
                                             </path>
                                         </svg> -->
-                                        <p class="mt-4 text-sm font-semibold text-indigo-600">Transcription in progress.</p>
-                                        <p class="mt-1 text-sm text-gray-500">Use Refresh Status in AI Call Insights to check progress.</p>
+                                        <p class="mt-4 text-sm font-semibold text-indigo-600">{{ $t('Transcription in progress. Click Refresh to check status.') }}</p>
+
+                                        <!-- START: REFRESH BUTTON -->
+                                        <button type="button" @click="refreshStatus" :disabled="!canRefresh"
+                                            class="mt-6 inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">
+                                            <ArrowPathIcon class="-ml-0.5 mr-1.5 h-5 w-5 text-gray-400"
+                                                :class="{ 'animate-spin': !canRefresh }" />
+                                            <span v-if="canRefresh">{{ $t('Refresh Status') }}</span>
+                                            <span v-else>{{ $t('Refresh in :seconds', { seconds: cooldownSeconds }) }}s</span>
+                                        </button>
+                                        <!-- END: REFRESH BUTTON -->
 
                                     </div>
 
@@ -328,7 +328,7 @@
                                             <!-- Mobile-friendly Select Menu -->
                                             <div class="sm:hidden">
                                                 <div class="relative">
-                                                    <select v-model="selectedTabIndex" aria-label="Select a tab"
+                                                    <select v-model="selectedTabIndex" :aria-label="$t('Select a tab')"
                                                         class="block w-full appearance-none rounded-md border border-gray-300 bg-white py-2 pl-3 pr-10 text-base text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-indigo-500">
                                                         <option v-for="(tab, index) in TABS" :key="tab.key"
                                                             :value="index">
@@ -346,7 +346,7 @@
                                             <!-- Desktop Tab Pills -->
                                             <div class="hidden sm:block">
                                                 <TabList as="nav" class="flex space-x-4 border-b-2 pb-1"
-                                                    aria-label="Tabs">
+                                                    :aria-label="$t('Tabs')">
                                                     <Tab v-for="tab in TABS" :key="tab.key" v-slot="{ selected }"
                                                         as="template">
                                                         <button :class="[
@@ -379,7 +379,7 @@
                                                                 <div class="flex items-center gap-2">
                                                                     <p class="font-semibold"
                                                                         :class="speakerClasses(g.speaker).name">
-                                                                        Speaker {{ g.speaker }}
+                                                                        {{ $t('Speaker :speaker', { speaker: g.speaker }) }}
                                                                     </p>
                                                                 </div>
                                                                 <p class="mt-1 leading-relaxed text-gray-700">
@@ -405,7 +405,7 @@
                                                             <h3
                                                                 class="flex items-center gap-2 text-base font-semibold text-gray-800">
                                                                 <DocumentTextIcon class="h-6 w-6 text-gray-500" />
-                                                                <span>Call Summary</span>
+                                                                <span>{{ $t('Call Summary') }}</span>
                                                             </h3>
                                                             <p class="text-gray-700 leading-relaxed">
                                                                 {{ recordingOptions?.transcription?.summary }}
@@ -417,7 +417,7 @@
                                                             <h3
                                                                 class="flex items-center gap-2 text-base font-semibold text-gray-800">
                                                                 <LightBulbIcon class="h-6 w-6 text-yellow-500" />
-                                                                <span>Key Points</span>
+                                                                <span>{{ $t('Key Points') }}</span>
                                                             </h3>
                                                             <ul
                                                                 class="list-disc space-y-2 pl-6 text-gray-700 marker:text-gray-400">
@@ -431,7 +431,7 @@
                                                             <h3
                                                                 class="flex items-center gap-2 text-base font-semibold text-gray-800">
                                                                 <CheckCircleIcon class="h-6 w-6 text-green-500" />
-                                                                <span>Action Items</span>
+                                                                <span>{{ $t('Action Items') }}</span>
                                                             </h3>
                                                             <ul class="space-y-2 text-gray-700">
                                                                 <li v-for="(item, i) in recordingOptions?.transcription?.action_items"
@@ -440,8 +440,7 @@
                                                                     <p class="font-medium text-gray-800">{{
                                                                         item.description }}</p>
                                                                     <p v-if="item.owner" class="text-xs text-gray-500">
-                                                                        Owner: {{
-                                                                            item.owner }}</p>
+                                                                        {{ $t('Owner: :owner', { owner: item.owner }) }}</p>
                                                                 </li>
                                                             </ul>
                                                         </div>
@@ -451,7 +450,7 @@
                                                             <h3
                                                                 class="flex items-center gap-2 text-base font-semibold text-gray-800">
                                                                 <ScaleIcon class="h-6 w-6 text-blue-500" />
-                                                                <span>Decisions Made</span>
+                                                                <span>{{ $t('Decisions Made') }}</span>
                                                             </h3>
                                                             <ul
                                                                 class="list-disc space-y-2 pl-6 text-gray-700 marker:text-gray-400">
@@ -466,7 +465,7 @@
                                                                 class="flex items-center gap-2 text-base font-semibold text-gray-800">
                                                                 <ChatBubbleBottomCenterTextIcon
                                                                     class="h-6 w-6 text-sky-500" />
-                                                                <span>Overall Sentiment</span>
+                                                                <span>{{ $t('Overall Sentiment') }}</span>
                                                             </h3>
                                                             <p
                                                                 class="inline-flex items-center rounded-full bg-sky-100 px-3 py-1 text-sm font-medium capitalize text-sky-800">
@@ -489,11 +488,23 @@
                                                             </path>
                                                         </svg> -->
                                                         <p class="mt-4 text-sm font-semibold text-indigo-600">
-                                                            Generating AI summary...
+                                                            {{ $t('Generating AI summary...') }}
                                                         </p>
                                                         <p class="mt-1 text-sm text-gray-500">
-                                                            Use Refresh Status in AI Call Insights to check progress.
+                                                            {{ $t('You can check the progress by clicking Refresh.') }}
                                                         </p>
+
+                                                        <!-- START: REFRESH BUTTON -->
+                                                        <button type="button" @click="refreshStatus"
+                                                            :disabled="!canRefresh"
+                                                            class="mt-6 inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">
+                                                            <ArrowPathIcon
+                                                                class="-ml-0.5 mr-1.5 h-5 w-5 text-gray-400"
+                                                                :class="{ 'animate-spin': !canRefresh }" />
+                                                            <span v-if="canRefresh">{{ $t('Refresh Status') }}</span>
+                                                            <span v-else>{{ $t('Refresh in :seconds', { seconds: cooldownSeconds }) }}s</span>
+                                                        </button>
+                                                        <!-- END: REFRESH BUTTON -->
                                                     </div>
 
                                                     <!-- Summary State: Failed -->
@@ -502,15 +513,18 @@
                                                         <ExclamationTriangleIcon
                                                             class="mx-auto h-12 w-12 text-rose-400" />
                                                         <h3 class="mt-2 text-sm font-semibold text-rose-900">
-                                                            Summary Generation Failed
+                                                            {{ $t('Summary Generation Failed') }}
                                                         </h3>
                                                         <p class="mt-1 text-sm text-rose-700">
-                                                            {{ recordingOptions?.transcription?.summary_error || 'We were unable to generate a summary for this call.' }}
+                                                            {{ $t('We were unable to generate a summary for this call.') }}
                                                         </p>
-                                                        <p v-if="recordingOptions?.permissions?.transcription_summary"
-                                                            class="mt-3 text-sm text-rose-700">
-                                                            Use Re-summarize in AI Call Insights to try again.
-                                                        </p>
+                                                        <button type="button" @click="regenerateSummary"
+                                                            :disabled="isRegeneratingSummary"
+                                                            class="mt-4 inline-flex items-center rounded-md bg-rose-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rose-500 disabled:opacity-50">
+                                                            <ArrowPathIcon class="-ml-0.5 mr-1.5 h-5 w-5"
+                                                                :class="{ 'animate-spin': isRegeneratingSummary }" />
+                                                            {{ isRegeneratingSummary ? $t('Retrying...') : $t('Retry') }}
+                                                        </button>
                                                     </div>
 
                                                     <!-- Summary State: Not Yet Generated -->
@@ -518,11 +532,10 @@
                                                         class="rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
                                                         <SparklesIcon class="mx-auto h-12 w-12 text-gray-400" />
                                                         <h3 class="mt-2 text-sm font-semibold text-gray-900">
-                                                            Summary not yet generated
+                                                            {{ $t('AI Summary is available') }}
                                                         </h3>
-                                                        <p v-if="recordingOptions?.permissions?.transcription_summary"
-                                                            class="mt-1 text-sm text-gray-500">
-                                                            Use the Summarize action in AI Call Insights above.
+                                                        <p class="mt-1 text-sm text-gray-500">
+                                                            {{ $t('Summary generation is part of the transcription process.') }}
                                                         </p>
                                                     </div>
                                                 </TabPanel>
@@ -609,8 +622,7 @@
                                     </div>
                                     <div v-else-if="recordingOptions?.isCallTranscriptionServiceEnabled && !recordingOptions?.permissions?.transcription_read"
                                         class="mt-6 rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
-                                        <p class="text-sm font-medium text-gray-700">You do not have permission to view
-                                            transcript content.</p>
+                                        <p class="text-sm font-medium text-gray-700">{{ $t('You do not have permission to view transcript content.') }}</p>
                                     </div>
 
                                 </div>
@@ -635,6 +647,7 @@
 
 <script setup>
 import { ref, computed, watch, onUnmounted } from 'vue'
+import { trans } from "@i18n";
 
 import { Dialog, DialogPanel, TransitionChild, TransitionRoot, TabGroup, TabList, Tab, TabPanels, TabPanel } from '@headlessui/vue'
 import AudioPlayer from "@generalComponents/AudioPlayer.vue"
@@ -983,6 +996,36 @@ function capitalizeFirstLetter(string) {
     return string.charAt(0).toUpperCase() + string.slice(1);
 }
 
+const directionHeading = (direction) => {
+    switch (direction) {
+        case 'outbound':
+            return trans('Outbound Call');
+        case 'inbound':
+            return trans('Inbound Call');
+        case 'local':
+            return trans('Local Call');
+        default:
+            return capitalizeFirstLetter(direction) + ' Call';
+    }
+};
+
+const transcriptionStatusLabel = (status) => {
+    switch (status) {
+        case 'pending':
+            return trans('Pending');
+        case 'queued':
+            return trans('Queued');
+        case 'processing':
+            return trans('Processing');
+        case 'completed':
+            return trans('Completed');
+        case 'failed':
+            return trans('Failed');
+        default:
+            return status;
+    }
+};
+
 function msToClock(ms) {
     const s = Math.max(0, Math.round(ms / 1000))
     const m = Math.floor(s / 60), r = s % 60
@@ -1090,9 +1133,8 @@ const DEFAULT_PALETTE = {
 }
 
 const TABS = [
-    { key: 'transcript', label: 'Transcript' },
-    { key: 'summary', label: 'Summary' },
-    { key: 'translation', label: 'Translation' },
+    { key: 'transcript', label: trans('Transcript') },
+    { key: 'summary', label: trans('Summary') },
 ]
 
 

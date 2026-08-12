@@ -47,6 +47,16 @@ async function getConfig() {
                 usePolling: true,
                 interval: 1000,
             },
+            fs: {
+                strict: true,
+                deny: [
+                    '.env',
+                    '.env.*',
+                    '*.{crt,pem}',
+                    '**/.git/**',
+                    '**/.DS_Store',
+                ],
+            },
             cors: {
                 origin: VITE_ORIGIN,
             },
@@ -108,6 +118,7 @@ async function getConfig() {
                 '@layouts': path.resolve(__dirname, 'resources/js/Layouts'),
                 '@icons': path.resolve(__dirname, 'resources/js/Pages/components/icons'),
                 '@generalComponents': path.resolve(__dirname, 'resources/js/Pages/components/general'),
+                '@i18n': path.resolve(__dirname, 'resources/js/i18n.mjs'),
             }
         }
     });

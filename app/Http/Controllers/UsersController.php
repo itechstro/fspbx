@@ -238,7 +238,7 @@ class UsersController extends Controller
         } else {
             if (! userCheckPermission('user_add')) {
                 return response()->json([
-                    'messages' => ['error' => ['Access denied.']]
+                    'messages' => ['error' => [__('Access denied.')]]
                 ], 403);
             }
 
@@ -376,7 +376,7 @@ class UsersController extends Controller
     {
         if (! userCheckPermission('user_add')) {
             return response()->json([
-                'messages' => ['error' => ['Access denied.']]
+                'messages' => ['error' => [__('Access denied.')]]
             ], 403);
         }
 
@@ -465,7 +465,7 @@ class UsersController extends Controller
             $this->contactUserLinkService->syncCloudPlayForUser($freshUser);
 
             return response()->json([
-                'messages' => ['success' => ['User created']],
+                'messages' => ['success' => [__('User created')]],
                 'user_uuid' => $user->user_uuid,
             ], 201);
         } catch (\Throwable $e) {
@@ -473,7 +473,7 @@ class UsersController extends Controller
             logger('User create error: ' . $e->getMessage() . " at " . $e->getFile() . ":" . $e->getLine());
 
             return response()->json([
-                'messages' => ['error' => ['Something went wrong while creating the user.']]
+                'messages' => ['error' => [__('Something went wrong while creating the user.')]]
             ], 500);
         }
     }
@@ -490,7 +490,7 @@ class UsersController extends Controller
     {
         if (! userCheckPermission('user_edit')) {
             return response()->json([
-                'messages' => ['error' => ['Access denied.']]
+                'messages' => ['error' => [__('Access denied.')]]
             ], 403);
         }
 
@@ -639,14 +639,14 @@ class UsersController extends Controller
             }
 
             return response()->json([
-                'messages' => ['success' => ['User updated']]
+                'messages' => ['success' => [__('User updated')]]
             ]);
         } catch (\Throwable $e) {
             DB::rollBack();
             logger('User update error: ' . $e->getMessage() . " at " . $e->getFile() . ":" . $e->getLine());
 
             return response()->json([
-                'messages' => ['error' => ['Something went wrong while updating.']]
+                'messages' => ['error' => [__('Something went wrong while updating.')]]
             ], 500);
         }
     }
@@ -663,7 +663,7 @@ class UsersController extends Controller
     {
         if (! userCheckPermission('user_delete')) {
             return response()->json([
-                'messages' => ['error' => ['Access denied.']]
+                'messages' => ['error' => [__('Access denied.')]]
             ], 403);
         }
 
@@ -700,14 +700,14 @@ class UsersController extends Controller
             app(UserSessionInvalidationService::class)->invalidateByUserUuids($users->pluck('user_uuid'));
 
             return response()->json([
-                'messages' => ['success' => ['Selected user(s) were deleted successfully.']]
+                'messages' => ['success' => [__('Selected user(s) were deleted successfully.')]]
             ]);
         } catch (\Throwable $e) {
             DB::rollBack();
             logger('User bulkDelete error: ' . $e->getMessage() . " at " . $e->getFile() . ":" . $e->getLine());
 
             return response()->json([
-                'messages' => ['error' => ['An error occurred while deleting the selected user(s).']]
+                'messages' => ['error' => [__('An error occurred while deleting the selected user(s).')]]
             ], 500);
         }
     }
@@ -752,7 +752,7 @@ class UsersController extends Controller
     protected function ensureCanManageTarget(User $user): void
     {
         if (! $this->canManageTarget($user)) {
-            abort(403, 'You are not allowed to manage this user.');
+            abort(403, __('You are not allowed to manage this user.'));
         }
     }
 
@@ -774,11 +774,11 @@ class UsersController extends Controller
             ]);
 
         if ($groups->count() !== count(array_unique($groupUuids))) {
-            abort(403, 'One or more selected groups are not allowed.');
+            abort(403, __('One or more selected groups are not allowed.'));
         }
 
         if (! isSuperAdmin() && $groups->contains(fn($group) => strtolower($group->group_name) === 'superadmin')) {
-            abort(403, 'You are not allowed to assign the superadmin group.');
+            abort(403, __('You are not allowed to assign the superadmin group.'));
         }
 
         return $groups->keyBy('group_uuid');

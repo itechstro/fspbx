@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\BridgeRuntimeDestination;
 use App\Models\{Bridge, BusinessHour, CallCenterQueues, CallFlows, Conferences, Dialplans, Domain, Extensions, Faxes, IvrMenus, Recordings, RingGroups, Voicemails};
 use App\Models\ConferenceCenter;
 
@@ -30,19 +31,7 @@ class CallRoutingOptionsService
         // ['value' => 'other', 'name' => 'Other']
     ];
 
-    public array $forwardingTypes = [
-        ['value' => 'extensions', 'label' => 'Extension'],
-        ['value' => 'voicemails', 'label' => 'Voicemail'],
-        ['value' => 'ring_groups', 'label' => 'Ring Group'],
-        ['value' => 'ivrs', 'label' => 'Virtual Receptionist'],
-        ['value' => 'business_hours', 'label' => 'Business Hours'],
-        ['value' => 'time_conditions', 'label' => 'Schedule'],
-        ['value' => 'contact_centers', 'label' => 'Contact Center'],
-        ['value' => 'faxes', 'label' => 'Fax'],
-        ['value' => 'call_flows', 'label' => 'Call Flow'],
-        // ['value' => 'recordings', 'label' => 'Play Greeting'],
-        ['value' => 'external', 'label' => 'External Number'],
-    ];
+    public array $forwardingTypes;
 
     /**
      * Map of slot-action keys to their Eloquent model classes.
@@ -69,6 +58,19 @@ class CallRoutingOptionsService
     {
         $this->domainUuid = $domainUuid ?? session('domain_uuid');
         $this->domainName = session('domain_name');
+
+        $this->forwardingTypes = [
+            ['value' => 'extensions', 'label' => __('Extension')],
+            ['value' => 'voicemails', 'label' => __('Voicemail')],
+            ['value' => 'ring_groups', 'label' => __('Ring Group')],
+            ['value' => 'ivrs', 'label' => __('Virtual Receptionist')],
+            ['value' => 'business_hours', 'label' => __('Business Hours')],
+            ['value' => 'time_conditions', 'label' => __('Schedule')],
+            ['value' => 'contact_centers', 'label' => __('Contact Center')],
+            ['value' => 'faxes', 'label' => __('Fax')],
+            ['value' => 'call_flows', 'label' => __('Call Flow')],
+            ['value' => 'external', 'label' => __('External Number')],
+        ];
     }
 
 
@@ -180,7 +182,8 @@ class CallRoutingOptionsService
             ->get(['bridge_uuid', 'bridge_name', 'bridge_destination'])
             ->map(fn (Bridge $bridge) => [
                 'value' => $bridge->bridge_uuid,
-                'extension' => $bridge->bridge_destination,
+                'bridge_uuid' => $bridge->bridge_uuid,
+                'extension' => $bridge->bridge_uuid,
                 'name' => $bridge->bridge_name ?: $bridge->bridge_destination,
             ])
             ->values()
@@ -233,12 +236,19 @@ class CallRoutingOptionsService
                             break;
 
                         case 'lua':
-                            // Handle recordings
-                            $routing_options[] =  $this->extractRecordingUuidFromData($action['destination_data']);
+                            $bridgeUuid = BridgeRuntimeDestination::uuidFromScriptData(
+                                $action['destination_data'] ?? null
+                            );
+                            $routing_options[] = $bridgeUuid
+                                ? $this->reverseEngineerBridgeAction(null, $bridgeUuid)
+                                : $this->extractRecordingUuidFromData($action['destination_data']);
                             break;
 
                         case 'bridge':
-                            $routing_options[] = $this->reverseEngineerBridgeAction($action['destination_data'] ?? null);
+                            $routing_options[] = $this->reverseEngineerBridgeAction(
+                                $action['destination_data'] ?? null,
+                                $action['bridge_uuid'] ?? null
+                            );
                             break;
 
                         case 'hangup':
@@ -328,8 +338,12 @@ class CallRoutingOptionsService
                     return $this->reverseEngineerTransferAction("$destination $context $domain_name");
                     break;
                 case 'lua':
-                    return $this->extractRecordingUuidFromData("$destination $context $domain_name");
-                    break;
+                    $scriptData = implode(' ', array_slice($parts, 1));
+                    $bridgeUuid = BridgeRuntimeDestination::uuidFromScriptData($scriptData);
+
+                    return $bridgeUuid
+                        ? $this->reverseEngineerBridgeAction(null, $bridgeUuid)
+                        : $this->extractRecordingUuidFromData($scriptData);
 
                 case 'hangup':
                     return array(
@@ -643,11 +657,13 @@ class CallRoutingOptionsService
         }
     }
 
-    protected function reverseEngineerBridgeAction(?string $destinationData): array
+    protected function reverseEngineerBridgeAction(?string $destinationData, ?string $bridgeUuid = null): array
     {
         $destination = trim((string) $destinationData);
 
-        if ($destination === '') {
+        $bridgeUuid ??= BridgeRuntimeDestination::uuid($destination);
+
+        if ($destination === '' && blank($bridgeUuid)) {
             return [
                 'type' => 'bridges',
                 'extension' => null,
@@ -656,14 +672,23 @@ class CallRoutingOptionsService
             ];
         }
 
-        $bridge = Bridge::where('domain_uuid', $this->domainUuid)
+        $bridge = null;
+
+        if (filled($bridgeUuid)) {
+            $bridge = Bridge::where('domain_uuid', $this->domainUuid)
+                ->whereKey($bridgeUuid)
+                ->first(['bridge_uuid', 'bridge_name', 'bridge_destination']);
+        }
+
+        $bridge ??= Bridge::where('domain_uuid', $this->domainUuid)
             ->where('bridge_destination', $destination)
             ->first(['bridge_uuid', 'bridge_name', 'bridge_destination']);
 
         return [
             'type' => 'bridges',
-            'extension' => $destination,
+            'extension' => $bridge?->bridge_uuid ?? $destination,
             'option' => $bridge?->bridge_uuid,
+            'bridge_uuid' => $bridge?->bridge_uuid,
             'name' => $bridge?->bridge_name ?? $destination,
         ];
     }

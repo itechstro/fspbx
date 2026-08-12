@@ -1047,11 +1047,12 @@ if (!function_exists('generate_password')) {
     /**
      * Generate a secure password
      *
+     * @param string $special_characters
      * @return string
      */
-    function generate_password()
+    function generate_password(string $special_characters = '!^$%*?.')
     {
-        $characters = str_split('!^$%*?.');
+        $characters = str_split($special_characters);
         $random_keys = array_rand($characters, 3);
         $random_characters = array();
 
@@ -1065,6 +1066,19 @@ if (!function_exists('generate_password')) {
 
         $password = $random_string;
         return $password;
+    }
+}
+
+if (!function_exists('generate_sip_password')) {
+    /**
+     * Generate a SIP password compatible with supported phone vendors.
+     *
+     * Grandstream authenticated reboot NOTIFY requests fail when the SIP
+     * password contains a dollar sign.
+     */
+    function generate_sip_password(): string
+    {
+        return generate_password('!^%*?.');
     }
 }
 
@@ -1763,9 +1777,15 @@ if (!function_exists('buildDestinationAction')) {
                 ];
 
             case 'bridges':
+                $bridgeUuid = $option['bridge_uuid'] ?? $option['option'] ?? null;
+                if (blank($bridgeUuid) && \Illuminate\Support\Str::isUuid($option['extension'] ?? null)) {
+                    $bridgeUuid = $option['extension'];
+                }
+
                 return [
-                    'destination_app' => 'bridge',
-                    'destination_data' => $option['extension'],
+                    'destination_app' => 'lua',
+                    'destination_data' => 'bridge.lua ' . $bridgeUuid,
+                    'bridge_uuid' => $bridgeUuid,
                 ];
 
             case 'voicemails':
@@ -1892,7 +1912,7 @@ if (!function_exists('buildDestinationAction')) {
                     'speed_dial' => '13',
                     'dtmf' => '11',
                     'blf', 'check_voicemail' => '16',
-                    'park' => '16',
+                    'park' => '10',
                     '' => '0',
                     default => '0',
                 };

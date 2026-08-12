@@ -12,7 +12,9 @@ use App\Jobs\DeleteOldVoicemails;
 use App\Jobs\DeleteOldCallRecordings;
 use App\Jobs\DeleteOldTranscriptions;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Console\Scheduling\Schedule;
 use Spatie\WebhookClient\Models\WebhookCall;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
@@ -172,6 +174,15 @@ class Kernel extends ConsoleKernel
 
         $schedule->command('recorder:send-analytics-reports')->hourly();
         $schedule->command('cdr:send-analytics-reports')->hourly();
+
+        // Delete cached CNAM records older than six months when the optional table exists.
+        $schedule->call(function () {
+            if (Schema::hasTable('v_cnam')) {
+                DB::table('v_cnam')
+                    ->where('date', '<', now()->subMonthsNoOverflow(6))
+                    ->delete();
+            }
+        })->daily();
     }
 
     /**

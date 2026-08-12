@@ -308,8 +308,8 @@ class BasicQueueService
                 'data' => ($validated['timeout_target'] ?? '') . ' XML ' . $domainName,
             ],
             'bridges' => [
-                'action' => 'bridge',
-                'data' => $validated['timeout_target'] ?? '',
+                'action' => 'lua',
+                'data' => 'bridge.lua ' . ($validated['timeout_target'] ?? ''),
             ],
             'voicemails' => [
                 'action' => 'transfer',
@@ -626,8 +626,8 @@ class BasicQueueService
             }
 
             $template = collect([
-                public_path('app/switch/resources/conf/autoload_configs/callcenter.conf.xml.noload'),
-                public_path('app/switch/resources/conf/autoload_configs/callcenter.conf.xml'),
+                resource_path('autoload_configs/callcenter.conf.xml.noload'),
+                resource_path('autoload_configs/callcenter.conf.xml'),
             ])->first(fn (string $path) => is_readable($path));
 
             if (! $template || ! is_readable($template)) {
