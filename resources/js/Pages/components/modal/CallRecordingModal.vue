@@ -1070,6 +1070,7 @@ const DEFAULT_PALETTE = {
 const TABS = [
     { key: 'transcript', label: trans('Transcript') },
     { key: 'summary', label: trans('Summary') },
+    { key: 'translation', label: trans('Translation') },
 ]
 
 

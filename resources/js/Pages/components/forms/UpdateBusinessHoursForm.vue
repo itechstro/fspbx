@@ -320,6 +320,7 @@
 <script setup>
 import { ref } from "vue";
 import { trans } from "@i18n";
+import axios from "axios";
 import HolidayTable from "./../HolidayTable.vue";
 import CreateHolidayHourModal from "./../modal/CreateHolidayHourModal.vue"
 import UpdateHolidayHourModal from "./../modal/UpdateHolidayHourModal.vue"
