@@ -408,7 +408,7 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import { trans } from "@i18n";
 import { Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot } from '@headlessui/vue'
 import { InformationCircleIcon } from '@heroicons/vue/20/solid'
