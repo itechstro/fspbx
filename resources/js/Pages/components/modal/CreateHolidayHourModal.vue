@@ -533,6 +533,29 @@ const handleHolidayTypeChange = (newValue, oldValue, el$) => {
 
 }
 
+// Vue template handlers for US/CA/UK holiday selects.
+// These are wrappers around the shared holiday template helper.
+const handleUSHolidayUpdate = (newValue, oldValue, el$) => handleTemplateHolidayUpdate(
+    usHolidays,
+    newValue,
+    oldValue,
+    el$
+)
+
+const handleCAHolidayUpdate = (newValue, oldValue, el$) => handleTemplateHolidayUpdate(
+    caHolidays,
+    newValue,
+    oldValue,
+    el$
+)
+
+const handleUKHolidayUpdate = (newValue, oldValue, el$) => handleTemplateHolidayUpdate(
+    ukHolidays,
+    newValue,
+    oldValue,
+    el$
+)
+
 // Month (1=Jan … 12=Dec)
 const monthOptions = [
   { value: '1',  label: trans('January') },

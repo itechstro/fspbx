@@ -582,6 +582,7 @@
 <script setup>
 import { ref, computed, watch, onUnmounted } from 'vue'
 import { trans } from "@i18n";
+import axios from 'axios'
 
 import { Dialog, DialogPanel, TransitionChild, TransitionRoot, TabGroup, TabList, Tab, TabPanels, TabPanel } from '@headlessui/vue'
 import AudioPlayer from "@generalComponents/AudioPlayer.vue"
