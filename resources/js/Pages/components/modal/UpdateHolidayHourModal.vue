@@ -437,23 +437,34 @@ const props = defineProps({
 
 const form$ = ref(null)
 
-const formDefaults = computed(() => ({
-    holiday_type: props.options.item.holiday_type,
-    description: props.options.item.description,
-    start_date: props.options.item.start_date,
-    start_time: props.options.item.start_time,
-    end_date: props.options.item.end_date,
-    end_time: props.options.item.end_time,
-    mday: props.options.item.mday,
-    mon: props.options.item.mon,
-    mweek: props.options.item.mweek,
-    wday: props.options.item.wday,
-    week: props.options.item.week,
-    action: props.options.item.action,
-    target: { value: props.options.item.target_id },
-    template_date_mode: isManualTemplateHolidayItem(props.options.item) ? 'yes' : 'no',
-    ...buildTemplateHolidayDefaults(props.options.item),
-}))
+const formDefaults = computed(() => {
+    // `props.options` is initially `null` in the parent while the API call loads.
+    // Vue still evaluates `<script setup>` even when the modal is hidden, so we
+    // must guard against null to avoid crashing the whole page.
+    const item = props.options?.item
+
+    if (!item) {
+        return {}
+    }
+
+    return {
+        holiday_type: item.holiday_type,
+        description: item.description,
+        start_date: item.start_date,
+        start_time: item.start_time,
+        end_date: item.end_date,
+        end_time: item.end_time,
+        mday: item.mday,
+        mon: item.mon,
+        mweek: item.mweek,
+        wday: item.wday,
+        week: item.week,
+        action: item.action,
+        target: { value: item.target_id },
+        template_date_mode: isManualTemplateHolidayItem(item) ? 'yes' : 'no',
+        ...buildTemplateHolidayDefaults(item),
+    }
+})
 
 const submitForm = async (FormData, form$) => {
     // Using form$.requestData will EXCLUDE conditional elements and it 
