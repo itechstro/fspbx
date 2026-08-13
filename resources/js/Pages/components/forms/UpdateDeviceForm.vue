@@ -1403,7 +1403,7 @@ import {
     keyLabelDisabledConditions,
     normalizeKeyForSubmit as normalizeDeviceKeyForSubmit,
 } from "./deviceKeyTypes.js";
-import { trans } from 'laravel-vue-i18n';
+import { trans } from '@i18n';
 
 
 const props = defineProps({
