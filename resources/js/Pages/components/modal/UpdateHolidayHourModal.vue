@@ -19,33 +19,9 @@
                             <Vueform ref="form$" :endpoint="submitForm" @success="handleSuccess" @error="handleError"
                                 @response="handleResponse" :display-errors="false" :default="formDefaults">
                                 <HiddenElement name="business_hour_uuid" :meta="true" />
+                                <HiddenElement name="template_date_mode" default="no" />
                                 <StaticElement name="h4" tag="h4" :content="$t('Update Holiday')" />
-                                <SelectElement name="holiday_type" :items="[
-                                    {
-                                        value: 'us_holiday',
-                                        label: trans('US Holiday'),
-                                    },
-                                    {
-                                        value: 'ca_holiday',
-                                        label: trans('Canadian Holiday'),
-                                    },
-                                    {
-                                        value: 'uk_holiday',
-                                        label: trans('UK Holiday'),
-                                    },
-                                    {
-                                        value: 'single_date',
-                                        label: trans('Single Date'),
-                                    },
-                                    {
-                                        value: 'date_range',
-                                        label: trans('Date Range'),
-                                    },
-                                    {
-                                        value: 'recurring_pattern',
-                                        label: trans('Recurring Pattern'),
-                                    },
-                                ]" :search="true" :native="false" :label="$t('Holiday Type')" input-type="search"
+                                <SelectElement name="holiday_type" :items="holidayTypeItems" :search="true" :native="false" :label="$t('Holiday Type')" input-type="search"
                                     @change="handleHolidayTypeChange" autocomplete="off"
                                     :placeholder="$t('Select Holiday Type')" :floating="false" />
 
@@ -409,6 +385,7 @@
 
 <script setup>
 import { ref, computed } from "vue";
+import { usePage } from '@inertiajs/vue3';
 import { trans } from "@i18n";
 import { Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot } from '@headlessui/vue'
 import { InformationCircleIcon } from '@heroicons/vue/20/solid'

@@ -301,13 +301,25 @@
             </template>
         </Vueform>
 
-        <UpdateHolidayHourModal :show="showUpdateHolidayModal" :options="holidayItemOptions"
-            :business_hour_uuid="options.item.uuid" @close="showUpdateHolidayModal = false"
-            @error="emitErrorToParentFromChild" @success="emitSuccessToParentFromChild" @refresh-data="getHolidays" />
+        <UpdateHolidayHourModal
+            v-if="holidayItemOptions"
+            :show="showUpdateHolidayModal"
+            :options="holidayItemOptions"
+            :business_hour_uuid="options.item.uuid"
+            @close="showUpdateHolidayModal = false"
+            @error="emitErrorToParentFromChild"
+            @success="emitSuccessToParentFromChild"
+            @refresh-data="getHolidays" />
 
-        <CreateHolidayHourModal :show="showAddHolidayModal" :options="holidayItemOptions"
-            :business_hour_uuid="options.item.uuid" @close="showAddHolidayModal = false" @error="emitErrorToParentFromChild"
-            @success="emitSuccessToParentFromChild" @refresh-data="getHolidays" />
+        <CreateHolidayHourModal
+            v-if="holidayItemOptions"
+            :show="showAddHolidayModal"
+            :options="holidayItemOptions"
+            :business_hour_uuid="options.item.uuid"
+            @close="showAddHolidayModal = false"
+            @error="emitErrorToParentFromChild"
+            @success="emitSuccessToParentFromChild"
+            @refresh-data="getHolidays" />
 
         <ConfirmationModal :show="showDeleteConfirmationModal" @close="showDeleteConfirmationModal = false"
             @confirm="confirmDeleteAction" :header="$t('Confirm Deletion')" :loading="isDeleteHolidayLoading"
