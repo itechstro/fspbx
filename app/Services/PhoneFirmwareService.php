@@ -482,7 +482,7 @@ class PhoneFirmwareService
      *     buildTime?: string|null,
      *     manifestName?: string|null
      * }  $parsed
-     * @return array{name: string, path: string, content: string}|null
+     * @return array{name: string, path: string, content: string, aliases: list<string>}|null
      */
     public function writeIntradeManifestForPackage(string $relativeDir, array $parsed): ?array
     {
@@ -509,19 +509,75 @@ class PhoneFirmwareService
             'buildTime' => $parsed['buildTime'] ?? null,
         ]);
 
-        $dest = $directoryPath . DIRECTORY_SEPARATOR . $parsed['manifestName'];
+        $manifestName = (string) $parsed['manifestName'];
+        $dest = $directoryPath . DIRECTORY_SEPARATOR . $manifestName;
         File::put($dest, $content);
         @chmod($dest, 0664);
 
+        // Phones often request lowercase names on case-sensitive volumes
+        // (e.g. intrade_entry_intrade_entry_hwv1_0.txt). Write both casings.
+        $lowercaseName = strtolower($manifestName);
+        if ($lowercaseName !== $manifestName) {
+            $lowercaseDest = $directoryPath . DIRECTORY_SEPARATOR . $lowercaseName;
+            File::put($lowercaseDest, $content);
+            @chmod($lowercaseDest, 0664);
+        }
+
         $storedPath = $relative === ''
-            ? (string) $parsed['manifestName']
-            : $relative . '/' . $parsed['manifestName'];
+            ? $manifestName
+            : $relative . '/' . $manifestName;
 
         return [
-            'name' => (string) $parsed['manifestName'],
+            'name' => $manifestName,
             'path' => $storedPath,
             'content' => $content,
+            'aliases' => $lowercaseName !== $manifestName ? [$lowercaseName] : [],
         ];
+    }
+
+    /**
+     * Ensure Intrade meta .txt files also exist in lowercase so phones can
+     * fetch them from case-sensitive static web roots (nginx/public/).
+     *
+     * @return int Number of lowercase alias files written
+     */
+    public function ensureIntradeManifestCaseAliases(?string $relativeDir = 'intrade'): int
+    {
+        $relative = $this->normalizeRelativePath($relativeDir ?? '');
+        $directoryPath = $this->absolutePath($relative);
+
+        if (! File::isDirectory($directoryPath)) {
+            return 0;
+        }
+
+        $written = 0;
+
+        foreach (File::files($directoryPath) as $file) {
+            $name = $file->getFilename();
+            if (! str_ends_with(strtolower($name), '.txt')) {
+                continue;
+            }
+
+            if (! preg_match('/^InTrade_.+_InTrade_.+_hwv\d+_\d+\.txt$/i', $name)) {
+                continue;
+            }
+
+            $lowercaseName = strtolower($name);
+            if ($lowercaseName === $name) {
+                continue;
+            }
+
+            $lowercaseDest = $directoryPath . DIRECTORY_SEPARATOR . $lowercaseName;
+            if (File::exists($lowercaseDest)) {
+                continue;
+            }
+
+            File::copy($file->getPathname(), $lowercaseDest);
+            @chmod($lowercaseDest, 0664);
+            $written++;
+        }
+
+        return $written;
     }
 
     public function publicUrl(string $relativePath, string $publicBaseUrl): string

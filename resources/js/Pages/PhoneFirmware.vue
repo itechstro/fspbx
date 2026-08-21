@@ -214,7 +214,8 @@
             <ul class="mt-2 list-disc space-y-1 pl-5">
                 <li>
                     Intrade uploads under <code class="rounded bg-white px-1">intrade/</code> auto-create the UTF-8 meta file
-                    (<code class="rounded bg-white px-1">InTrade_Entry_InTrade_Entry_hwv1_0.txt</code>) when the
+                    (<code class="rounded bg-white px-1">InTrade_Entry_InTrade_Entry_hwv1_0.txt</code>, plus a lowercase
+                    alias phones often request) when the
                     <code class="rounded bg-white px-1">.z</code> name includes the model and version
                     (e.g. <code class="rounded bg-white px-1">entry-2.12.21.19.1.z</code>).
                 </li>
