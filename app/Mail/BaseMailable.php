@@ -4,6 +4,7 @@ namespace App\Mail;
 
 use App\Models\DefaultSettings;
 use App\Services\EmailTemplateService;
+use App\Support\Localization\LocaleRegistry;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Address;
@@ -87,12 +88,21 @@ abstract class BaseMailable extends Mailable
 
     protected function useEmailTemplate(string $category, string $subcategory): void
     {
+        $language = app(LocaleRegistry::class)->resolve(
+            $this->attributes['language']
+                ?? get_domain_setting('language', $this->attributes['domain_uuid'] ?? null)
+        );
+        $this->attributes['language'] = $language;
+        $this->attributes['unsubscribe_label'] ??= $language === 'zh-tw'
+            ? '取消訂閱此清單'
+            : 'Unsubscribe from this list';
+
         $this->databaseTemplate = app(EmailTemplateService::class)->render(
             $category,
             $subcategory,
             $this->attributes['domain_uuid'] ?? null,
             $this->attributes,
-            $this->attributes['language'] ?? 'en-us'
+            $language
         );
 
         if ($this->databaseTemplate['available'] && filled($this->databaseTemplate['subject'])) {

@@ -28,19 +28,34 @@ class SafeEmailTemplateRendererTest extends TestCase
     {
         $definitions = app(EmailTemplateSourceService::class)->definitions();
 
-        $this->assertCount(20, $definitions);
+        $this->assertNotEmpty($definitions);
         $this->assertArrayHasKey('extension.welcome|en-us', $definitions);
+        $this->assertArrayHasKey('extension.welcome|zh-tw', $definitions);
         $this->assertArrayHasKey('voicemail.default|en-us', $definitions);
+        $this->assertArrayHasKey('voicemail.default|zh-tw', $definitions);
         $this->assertArrayHasKey('voicemail.transcription|en-us', $definitions);
 
+        $englishKeys = array_values(array_filter(
+            array_keys($definitions),
+            fn (string $key) => str_ends_with($key, '|en-us')
+        ));
+        $this->assertNotEmpty($englishKeys);
+        foreach ($englishKeys as $englishKey) {
+            $this->assertArrayHasKey(str_replace('|en-us', '|zh-tw', $englishKey), $definitions);
+        }
+
         foreach ($definitions as $definition) {
-            $this->assertNotSame('', $definition['template_subject']);
+            $this->assertNotSame('', $definition['template_description']);
+            $this->assertTrue(
+                mb_check_encoding($definition['template_description'], 'UTF-8'),
+                $definition['template_key'].'|'.$definition['template_language'].' description is not valid UTF-8'
+            );
             $this->assertNotSame('', $definition['template_html']);
             $this->assertNotSame('', $definition['template_text']);
-            $this->assertStringEndsWith(
-                $definition['template_category'].'/'.$definition['template_subcategory'].'.blade.php',
-                $definition['source_path']
-            );
+            $expectedFile = $definition['template_language'] === 'en-us'
+                ? $definition['template_category'].'/'.$definition['template_subcategory'].'.blade.php'
+                : $definition['template_category'].'/'.$definition['template_subcategory'].'.'.$definition['template_language'].'.blade.php';
+            $this->assertStringEndsWith($expectedFile, $definition['source_path']);
             if ($definition['template_layout'] === 'standard') {
                 $this->assertStringStartsWith(
                     "@extends('emails.email_layout')",

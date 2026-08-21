@@ -88,7 +88,10 @@ class EmailTemplateSourceService
             str_replace('\\', '/', $htmlPath),
             str_replace('\\', '/', resource_path('views/emails')).'/'
         );
-        $expectedPath = "{$category}/{$subcategory}.blade.php";
+        $defaultLanguage = Str::lower((string) config('locales.default', 'en-us'));
+        $expectedPath = $language === $defaultLanguage
+            ? "{$category}/{$subcategory}.blade.php"
+            : "{$category}/{$subcategory}.{$language}.blade.php";
         if ($relativePath !== $expectedPath) {
             throw new RuntimeException(
                 "Email template path must be {$expectedPath}; found {$relativePath}"
@@ -168,8 +171,8 @@ class EmailTemplateSourceService
         }
 
         $metadata = [];
-        foreach (preg_split('/\R/', trim($match[1])) as $line) {
-            if (preg_match('/^\s*([A-Za-z0-9_-]+)\s*:\s*(.*?)\s*$/', $line, $parts)) {
+        foreach (preg_split("/\r\n|\n|\r/", trim($match[1])) as $line) {
+            if (preg_match('/^\s*([A-Za-z0-9_-]+)\s*:\s*(.*?)\s*$/u', $line, $parts)) {
                 $metadata[Str::lower($parts[1])] = trim($parts[2]);
             }
         }

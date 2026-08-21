@@ -14,6 +14,7 @@
 <script setup>
 import { ref, watch, computed } from 'vue';
 import { usePage } from '@inertiajs/vue3';
+import { trans } from '@i18n';
 import VueDatePicker from '@vuepic/vue-datepicker';
 import {
     startOfDay, endOfDay,
@@ -131,12 +132,12 @@ const presetDates = computed(() => {
     const today = new Date();
 
     return [
-    { label: 'Today', value: [startOfDay(today), endOfDay(today)] },
-    { label: 'This Week', value: [startOfWeek(startOfDay(today), { weekStartsOn }), endOfWeek(endOfDay(today), { weekStartsOn })] },
-    { label: 'Past 7 Days', value: [subDays(startOfDay(today), 6), endOfDay(today)] },
-    { label: 'Past 30 Days', value: [subDays(startOfDay(today), 29), endOfDay(today)] },
-    { label: 'This Month', value: [startOfMonth(startOfDay(today)), endOfMonth(endOfDay(today))] },
-    { label: 'Last Month', value: [startOfMonth(subMonths(startOfDay(today), 1)), endOfMonth(subMonths(endOfDay(today), 1))] }
+    { label: trans('Today'), value: [startOfDay(today), endOfDay(today)] },
+    { label: trans('This Week'), value: [startOfWeek(startOfDay(today), { weekStartsOn }), endOfWeek(endOfDay(today), { weekStartsOn })] },
+    { label: trans('Past 7 Days'), value: [subDays(startOfDay(today), 6), endOfDay(today)] },
+    { label: trans('Past 30 Days'), value: [subDays(startOfDay(today), 29), endOfDay(today)] },
+    { label: trans('This Month'), value: [startOfMonth(startOfDay(today)), endOfMonth(endOfDay(today))] },
+    { label: trans('Last Month'), value: [startOfMonth(subMonths(startOfDay(today), 1)), endOfMonth(subMonths(endOfDay(today), 1))] }
     ];
 });
 

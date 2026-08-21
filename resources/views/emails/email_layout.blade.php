@@ -479,7 +479,7 @@
                         @endif
                         @if (!empty($attributes['unsubscribe_email']))
                           <p class="f-fallback sub align-center">
-                            <a href="mailto:{{ $attributes['unsubscribe_email'] }}">Unsubscribe from this list</a>
+                            <a href="mailto:{{ $attributes['unsubscribe_email'] }}">{{ $attributes['unsubscribe_label'] ?? 'Unsubscribe from this list' }}</a>
                           </p>
                         @endif
                       </td>
