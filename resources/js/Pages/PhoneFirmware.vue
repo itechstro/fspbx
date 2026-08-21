@@ -213,8 +213,13 @@
             <p class="font-medium text-gray-900">After uploading</p>
             <ul class="mt-2 list-disc space-y-1 pl-5">
                 <li>
-                    Fanvil and Intrade phones need a UTF-8 manifest
-                    (<code class="rounded bg-white px-1">vendor_model_hwv1_0.txt</code>) plus the firmware file in this folder.
+                    Intrade uploads under <code class="rounded bg-white px-1">intrade/</code> auto-create the UTF-8 meta file
+                    (<code class="rounded bg-white px-1">InTrade_Entry_InTrade_Entry_hwv1_0.txt</code>) when the
+                    <code class="rounded bg-white px-1">.z</code> name includes the model and version
+                    (e.g. <code class="rounded bg-white px-1">entry-2.12.21.19.1.z</code>).
+                </li>
+                <li>
+                    Fanvil and other vendors still need a matching UTF-8 manifest next to the firmware file when the phone expects one.
                 </li>
                 <li>
                     Open a vendor folder such as <code class="rounded bg-white px-1">intrade</code>,

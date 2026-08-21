@@ -137,10 +137,18 @@ class IntradeProvisionSettings
     {
         return [
             self::text('intrade_enable_multiline', '1', 'Enable multiline operation'),
+            self::text('intrade_enable_dnd', '1', 'Enable Do Not Disturb'),
+            self::text('intrade_dnd_mode', '0', 'DND mode'),
             self::text('intrade_call_waiting', '1', 'Enable call waiting'),
+            self::text('intrade_call_waiting_tone', '1', 'Play call waiting tone'),
             self::text('intrade_call_transfer', '1', 'Enable call transfer'),
             self::text('intrade_call_conference', '1', 'Enable conference calls'),
             self::text('intrade_enable_intercom', '1', 'Enable intercom'),
+            self::text('intrade_auto_answer', '0', 'Enable auto answer'),
+            self::text('intrade_auto_answer_delay', '5', 'Auto answer delay in seconds'),
+            self::text('intrade_ban_anonymous', '0', 'Reject anonymous callers'),
+            self::text('intrade_dial_by_pound', '1', 'Dial when # is pressed'),
+            self::text('intrade_pickup_num', '', 'Directed call pickup number', false),
             self::text('intrade_default_ext_line', '1', 'Default external line index'),
             self::text('intrade_enable_sel_line', '1', 'Enable line selection'),
             self::text('intrade_enable_def_line', '0', 'Enable default line selection', false),
@@ -289,6 +297,7 @@ class IntradeProvisionSettings
             self::text('intrade_auto_blf_list', '0', 'Auto BLF list on DSS keys', false),
             self::text('intrade_dss_timeout_to_home', '90', 'Seconds before DSS returns to home page', false),
             self::text('intrade_side_key_pages', '1', 'Number of programmable side key pages', false),
+            self::text('intrade_sidekey_label_length', '', 'Side key label length (0=Default, 1=Middle, 2=Long)', false),
         ];
     }
 

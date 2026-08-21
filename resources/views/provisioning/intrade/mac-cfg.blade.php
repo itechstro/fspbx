@@ -1,5 +1,6 @@
 @php
     use App\Services\Provisioning\IntradeModelProfiles;
+    use App\Services\Provisioning\IntradeFlashProtocol;
 
     $settings = is_array($settings ?? null) ? $settings : [];
     $profile = (string) ($modelProfile ?? '');
@@ -18,6 +19,7 @@
     $resolvedDssLongPress = $resolve('dss_long_press_action', '3');
     $talkingSoftkey = $resolve('softkey_talkingsoftkey', 'hold;xfer;conf;end;');
     $ringingSoftkey = $resolve('softkey_ringingsoftkey', 'accept;none;forward;reject;');
+    $flashProtocol = IntradeFlashProtocol::toPhone($resolve('flash_protocol', '2'));
 @endphp
 <?xml version="1.0" encoding="UTF-8"?>
 <sysConf>
@@ -304,7 +306,7 @@
         <DownloadCommonConf>{{ $resolve('download_common_conf', '1') }}</DownloadCommonConf>
         <SaveProvisionInfo>1</SaveProvisionInfo>
         <FlashServerIP>{{ $intrade_provision_url ?: ('https://' . ($domain_name ?? '') . '/prov') }}</FlashServerIP>
-        <FlashProtocol>{{ $resolve('flash_protocol', '2') }}</FlashProtocol>
+        <FlashProtocol>{{ $flashProtocol }}</FlashProtocol>
         <FlashMode>{{ $resolve('flash_mode', '0') }}</FlashMode>
         <FlashInterval>{{ $resolve('flash_interval', '1') }}</FlashInterval>
 @if ($resolve('firmware_config', '') !== '')
@@ -360,12 +362,12 @@
 @if ($profile === 'video')
     <uiMainTainConfig>
         <TimeoutToScreensaver>{{ $resolve('timeout_to_screensaver', '7200') }}</TimeoutToScreensaver>
-        <MissedCallPopup>0</MissedCallPopup>
-        <MWIPopup>0</MWIPopup>
-        <DeviceConnectPopup>0</DeviceConnectPopup>
-        <SMSPopup>0</SMSPopup>
-        <OtherPopup>1</OtherPopup>
-        <DisplayProvisionprompt>0</DisplayProvisionprompt>
+        <MissedCallPopup>{{ $resolve('missed_call_popup', '0') }}</MissedCallPopup>
+        <MWIPopup>{{ $resolve('mwi_popup', '0') }}</MWIPopup>
+        <DeviceConnectPopup>{{ $resolve('device_connect_popup', '0') }}</DeviceConnectPopup>
+        <SMSPopup>{{ $resolve('sms_popup', '0') }}</SMSPopup>
+        <OtherPopup>{{ $resolve('other_popup', '1') }}</OtherPopup>
+        <DisplayProvisionprompt>{{ $resolve('display_provision_prompt', '0') }}</DisplayProvisionprompt>
     </uiMainTainConfig>
 @elseif ($profile === 'entry')
     <UIconfig>
@@ -382,6 +384,7 @@
         <DisplayProvisionprompt>0</DisplayProvisionprompt>
         <PowerSaving>1</PowerSaving>
         <TimeoutToPowerSaving>{{ $resolve('timeout_to_power_saving', '360') }}</TimeoutToPowerSaving>
+        <SidekeyLabelLength>{{ $resolve('sidekey_label_length', '2') }}</SidekeyLabelLength>
     </background>
 @elseif ($profile === 'standard')
     <UIconfig>
@@ -399,6 +402,7 @@
         <PowerSaving>{{ $resolve('power_saving', '1') }}</PowerSaving>
         <TimeoutToPowerSaving>{{ $resolve('timeout_to_power_saving', '14400') }}</TimeoutToPowerSaving>
         <ScreensaverType>{{ $resolve('screensaver_type', '0') }}</ScreensaverType>
+        <SidekeyLabelLength>{{ $resolve('sidekey_label_length', '1') }}</SidekeyLabelLength>
     </background>
 @else
     <UIconfig>
@@ -411,6 +415,7 @@
         <PowerSaving>{{ $resolve('power_saving', '1') }}</PowerSaving>
         <TimeoutToPowerSaving>{{ $resolve('timeout_to_power_saving', '7200') }}</TimeoutToPowerSaving>
         <ScreensaverType>{{ $resolve('screensaver_type', '1') }}</ScreensaverType>
+        <SidekeyLabelLength>{{ $resolve('sidekey_label_length', '0') }}</SidekeyLabelLength>
 @if ($resolve('app_icon_display', '') !== '')
         <AppIconDisplay>{{ $resolve('app_icon_display') }}</AppIconDisplay>
 @endif

@@ -144,17 +144,32 @@ class PhoneFirmwareController extends Controller
         $validated = $request->validate([
             'path' => ['nullable', 'string', 'max:255'],
             'file' => ['required', 'file', 'max:' . (PhoneFirmwareService::MAX_UPLOAD_BYTES / 1024)],
+            'model' => ['nullable', 'string', 'in:entry,standard,advanced,video'],
+            'hw' => ['nullable', 'string', 'max:20'],
+            'version' => ['nullable', 'string', 'max:50'],
         ]);
 
         try {
             $result = $service->uploadFile(
                 (string) ($validated['path'] ?? ''),
                 $request->file('file'),
+                [
+                    'model' => $validated['model'] ?? null,
+                    'hw' => $validated['hw'] ?? null,
+                    'version' => $validated['version'] ?? null,
+                ],
             );
+
+            $messages = ['success' => ['Firmware file uploaded successfully.']];
+            if (! empty($result['manifest']['name'])) {
+                $messages['success'][] = 'Created Intrade meta file ' . $result['manifest']['name'] . '.';
+            } elseif (! empty($result['warning'])) {
+                $messages['warning'] = [$result['warning']];
+            }
 
             return response()->json([
                 'data' => $result,
-                'messages' => ['success' => ['Firmware file uploaded successfully.']],
+                'messages' => $messages,
             ]);
         } catch (InvalidArgumentException $exception) {
             return response()->json([

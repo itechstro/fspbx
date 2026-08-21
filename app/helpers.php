@@ -1955,6 +1955,7 @@ if (!function_exists('buildDestinationAction')) {
                     'blf_dtmf' => 'bd',
                     'voice_mail' => 'mwi',
                     'headset' => 'headset',
+                    'redial' => 'redial',
                     '' => '3',
                     default => $t,
                 };

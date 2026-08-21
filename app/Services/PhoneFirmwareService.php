@@ -84,17 +84,21 @@ class PhoneFirmwareService
             return '';
         }
 
+        // Collapse empty segments from phone URLs like .../intrade//file.txt
+        $segments = [];
         foreach (explode('/', $relativePath) as $segment) {
             if ($segment === '' || $segment === '.') {
-                throw new InvalidArgumentException('Invalid path.');
+                continue;
             }
 
             if ($segment === '..' || ! preg_match('/^[a-zA-Z0-9._-]+$/', $segment)) {
                 throw new InvalidArgumentException('Invalid path segment.');
             }
+
+            $segments[] = $segment;
         }
 
-        return $relativePath;
+        return implode('/', $segments);
     }
 
     public function absolutePath(string $relativePath = ''): string
@@ -227,7 +231,7 @@ class PhoneFirmwareService
         ];
     }
 
-    public function uploadFile(string $relativePath, UploadedFile $file): array
+    public function uploadFile(string $relativePath, UploadedFile $file, array $options = []): array
     {
         $this->ensureRoot();
         $relativePath = $this->normalizeRelativePath($relativePath);
@@ -260,10 +264,38 @@ class PhoneFirmwareService
 
         $storedPath = $relativePath === '' ? $sanitizedName : $relativePath . '/' . $sanitizedName;
 
-        return [
+        $result = [
             'name' => $sanitizedName,
             'path' => $storedPath,
         ];
+
+        $generateManifest = ($options['generate_manifest'] ?? true) !== false;
+        if ($extension === 'z' && $generateManifest && $this->isIntradeVendorPath($relativePath)) {
+            $parsed = $this->parseIntradeFirmwarePackage($sanitizedName, [
+                'model' => $options['model'] ?? null,
+                'hw' => $options['hw'] ?? null,
+            ]);
+
+            if (! empty($options['version'])) {
+                $parsed['version'] = trim((string) $options['version']);
+            }
+
+            $result['parse'] = $parsed;
+
+            if (empty($parsed['model'])) {
+                $result['warning'] = 'Uploaded .z but could not detect Intrade model. Rename like entry-2.12.21.19.1.z or choose a model when uploading.';
+                $result['manifest'] = null;
+            } else {
+                try {
+                    $result['manifest'] = $this->writeIntradeManifestForPackage($relativePath, $parsed);
+                } catch (InvalidArgumentException $exception) {
+                    $result['warning'] = $exception->getMessage();
+                    $result['manifest'] = null;
+                }
+            }
+        }
+
+        return $result;
     }
 
     public function deletePath(string $relativePath): void
@@ -295,11 +327,201 @@ class PhoneFirmwareService
         $relativePath = $this->normalizeRelativePath($relativePath);
         $absolutePath = $this->absolutePath($relativePath);
 
-        if (! File::isFile($absolutePath)) {
-            throw new InvalidArgumentException('File not found.');
+        if (File::isFile($absolutePath)) {
+            return $absolutePath;
         }
 
-        return $absolutePath;
+        // Phones often request lowercase manifest names on case-sensitive volumes.
+        $directory = dirname($absolutePath);
+        $wanted = strtolower(basename($absolutePath));
+
+        if (File::isDirectory($directory)) {
+            foreach (File::files($directory) as $file) {
+                if (strtolower($file->getFilename()) === $wanted) {
+                    return $file->getPathname();
+                }
+            }
+        }
+
+        throw new InvalidArgumentException('File not found.');
+    }
+
+    public function isIntradeVendorPath(string $relativePath): bool
+    {
+        $relativePath = $this->normalizeRelativePath($relativePath);
+        $vendor = strtolower((string) (explode('/', $relativePath)[0] ?? ''));
+
+        return $vendor === 'intrade';
+    }
+
+    /**
+     * Normalize hardware revision token to hwvX_Y (default hwv1_0).
+     */
+    public function normalizeHwRevision(?string $raw): string
+    {
+        $s = strtolower(trim((string) ($raw ?: '1_0')));
+
+        if (preg_match('/^hwv?(\d+)[._](\d+)$/', $s, $m) === 1) {
+            return 'hwv' . $m[1] . '_' . $m[2];
+        }
+
+        if (preg_match('/^v?(\d+)[._](\d+)$/', $s, $m) === 1) {
+            return 'hwv' . $m[1] . '_' . $m[2];
+        }
+
+        if (preg_match('/^(\d+)$/', $s, $m) === 1) {
+            return 'hwv' . $m[1] . '_0';
+        }
+
+        return 'hwv1_0';
+    }
+
+    /**
+     * Infer Intrade model + version + build time from a .z filename.
+     *
+     * @param  array{model?: string|null, hw?: string|null, now?: \DateTimeInterface|null}  $options
+     * @return array{
+     *     firmwareName: string,
+     *     model: ?string,
+     *     modelLabel: ?string,
+     *     version: ?string,
+     *     buildTime: string,
+     *     hw: string,
+     *     manifestName: ?string
+     * }
+     */
+    public function parseIntradeFirmwarePackage(string $fileName, array $options = []): array
+    {
+        $name = $this->sanitizeFileName($fileName);
+        $stem = (string) preg_replace('/\.z$/i', '', $name);
+        // Underscores are word chars in JS \b, so normalize for alias matching.
+        $hay = str_replace('_', ' ', $stem . ' ' . $name);
+
+        $labels = [
+            'entry' => 'Entry',
+            'standard' => 'Standard',
+            'advanced' => 'Advanced',
+            'video' => 'Video',
+        ];
+
+        $model = strtolower(trim((string) ($options['model'] ?? '')));
+        if (! isset($labels[$model])) {
+            $model = '';
+            $aliases = [
+                'advanced' => '/\badvanced\b|j660\b/i',
+                'standard' => '/\bstandard\b|j620g?\b/i',
+                'video' => '/\bvideo\b|j308\b/i',
+                'entry' => '/\bentry\b|j600g?\b/i',
+            ];
+
+            foreach ($aliases as $aliasModel => $pattern) {
+                if (preg_match($pattern, $hay) === 1) {
+                    $model = $aliasModel;
+                    break;
+                }
+            }
+        }
+
+        // Prefer the longest dotted version (e.g. 2.12.21.19.1).
+        preg_match_all('/\d+(?:\.\d+){2,}/', $stem, $versionMatches);
+        $versions = $versionMatches[0] ?? [];
+        usort($versions, fn (string $a, string $b): int => strlen($b) <=> strlen($a));
+        $version = $versions[0] ?? null;
+
+        $buildTime = '';
+        if (preg_match('/T(\d{4})[-_.]?(\d{2})[-_.]?(\d{2})[-_.]?(\d{2})[.:]?(\d{2})(?:[.:]?(\d{2}))?/i', $stem, $tMatch) === 1) {
+            $buildTime = $tMatch[1] . '.' . $tMatch[2] . '.' . $tMatch[3] . ' ' . $tMatch[4] . ':' . $tMatch[5];
+        } else {
+            $now = $options['now'] ?? now();
+            $buildTime = $now->format('Y.m.d H:i');
+        }
+
+        $hw = $this->normalizeHwRevision($options['hw'] ?? null);
+        $label = $labels[$model] ?? '';
+        // Phones request InTrade_<Model>_InTrade_<Model>_hwvX_Y.txt
+        $manifestName = $label !== '' ? 'InTrade_' . $label . '_InTrade_' . $label . '_' . $hw . '.txt' : null;
+
+        return [
+            'firmwareName' => $name,
+            'model' => $model !== '' ? $model : null,
+            'modelLabel' => $label !== '' ? $label : null,
+            'version' => $version,
+            'buildTime' => $buildTime,
+            'hw' => $hw,
+            'manifestName' => $manifestName,
+        ];
+    }
+
+    /**
+     * UTF-8 manifest body (no # comments).
+     *
+     * @param  array{version?: string|null, firmwareName?: string|null, buildTime?: string|null}  $data
+     */
+    public function buildIntradeManifestContent(array $data): string
+    {
+        $ver = trim((string) ($data['version'] ?? '')) ?: '0.0.0';
+        $fw = trim((string) ($data['firmwareName'] ?? ''));
+        $bt = trim((string) ($data['buildTime'] ?? ''));
+
+        return implode("\n", [
+            'Version=' . $ver,
+            'Firmware=' . $fw,
+            'BuildTime=' . $bt,
+            'Info=TXT',
+            '',
+        ]);
+    }
+
+    /**
+     * Write (or overwrite) InTrade_<Model>_InTrade_<Model>_hwvX_Y.txt next to a .z package.
+     *
+     * @param  array{
+     *     firmwareName?: string|null,
+     *     model?: string|null,
+     *     version?: string|null,
+     *     buildTime?: string|null,
+     *     manifestName?: string|null
+     * }  $parsed
+     * @return array{name: string, path: string, content: string}|null
+     */
+    public function writeIntradeManifestForPackage(string $relativeDir, array $parsed): ?array
+    {
+        if (empty($parsed['model']) || empty($parsed['manifestName']) || empty($parsed['firmwareName'])) {
+            return null;
+        }
+
+        if (empty($parsed['version'])) {
+            throw new InvalidArgumentException(
+                'Could not detect firmware Version from the filename. Rename like entry-2.12.21.19.1.z or pass version.'
+            );
+        }
+
+        $relative = $this->normalizeRelativePath($relativeDir);
+        $directoryPath = $this->absolutePath($relative);
+
+        if (! File::isDirectory($directoryPath)) {
+            throw new InvalidArgumentException('Upload directory not found.');
+        }
+
+        $content = $this->buildIntradeManifestContent([
+            'version' => $parsed['version'],
+            'firmwareName' => $parsed['firmwareName'],
+            'buildTime' => $parsed['buildTime'] ?? null,
+        ]);
+
+        $dest = $directoryPath . DIRECTORY_SEPARATOR . $parsed['manifestName'];
+        File::put($dest, $content);
+        @chmod($dest, 0664);
+
+        $storedPath = $relative === ''
+            ? (string) $parsed['manifestName']
+            : $relative . '/' . $parsed['manifestName'];
+
+        return [
+            'name' => (string) $parsed['manifestName'],
+            'path' => $storedPath,
+            'content' => $content,
+        ];
     }
 
     public function publicUrl(string $relativePath, string $publicBaseUrl): string

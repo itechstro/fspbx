@@ -11,6 +11,7 @@ export const BASE_KEY_TYPES = [
 export const INTRADE_FANVIL_KEY_TYPES = [
     { value: 'voice_mail', name: 'Voice Mail' },
     { value: 'headset', name: 'Headset' },
+    { value: 'redial', name: 'Redial' },
 ]
 
 /** Fanvil / Intrade / Ibratro BLF memory-key subtypes (FusionPBX Fanvil codes). */
@@ -52,6 +53,7 @@ export const KEY_TYPES_WITH_VALUE_SELECT = [
 export const KEY_TYPES_WITHOUT_VALUE_FIELD = [
     'voice_mail',
     'headset',
+    'redial',
 ]
 
 export const KEY_TYPES_WITH_VALUE_TEXT = KEY_TYPES_WITH_VALUE_SELECT.concat(
@@ -118,6 +120,10 @@ export function fixedKeyValue(keyType) {
         return 'F_HEADSET'
     }
 
+    if (keyType === 'redial') {
+        return 'F_REDIAL'
+    }
+
     return null
 }
 
@@ -128,6 +134,10 @@ export function defaultKeyLabel(keyType) {
 
     if (keyType === 'headset') {
         return 'Headset'
+    }
+
+    if (keyType === 'redial') {
+        return 'Redial'
     }
 
     return null

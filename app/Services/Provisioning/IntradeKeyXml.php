@@ -22,7 +22,7 @@ class IntradeKeyXml
             return '2';
         }
 
-        if (in_array($type, ['mwi', 'headset'], true)) {
+        if (in_array($type, ['mwi', 'headset', 'redial'], true)) {
             return '3';
         }
 
@@ -52,6 +52,10 @@ class IntradeKeyXml
 
         if ($deviceKeyType === 'headset') {
             return 'F_HEADSET';
+        }
+
+        if ($deviceKeyType === 'redial') {
+            return 'F_REDIAL';
         }
 
         $value = trim((string) ($row['device_key_value'] ?? ''));
@@ -146,9 +150,19 @@ class IntradeKeyXml
             $globalId = $start + $position - 1;
             $row = $rows[$globalId] ?? null;
 
+            if (! is_array($row)) {
+                $slots[] = [
+                    'index' => $position,
+                    'row' => null,
+                ];
+                continue;
+            }
+
+            // Blank value/label with a leftover type (e.g. park) must clear on the phone.
+            $computedValue = self::value($row);
             $slots[] = [
                 'index' => $position,
-                'row' => is_array($row) ? $row : null,
+                'row' => $computedValue === '' ? null : $row,
             ];
         }
 
@@ -156,8 +170,9 @@ class IntradeKeyXml
     }
 
     /**
-     * Emit only configured side-key slots (Fanvil x7 dssSide behavior).
-     * Missing indexes are omitted so reprovision does not clear unused side slots.
+     * Build side-key slots for one page. Empty / unset indexes emit a clear
+     * (Type 0) so removing a key in admin actually clears it on the phone.
+     * Fanvil/Intrade keep the previous value when a key is omitted from the cfg.
      *
      * @return array<int, array{index: int, row: array<string, mixed>}>
      */
@@ -168,13 +183,57 @@ class IntradeKeyXml
         for ($index = 1; $index <= $perPage; $index++) {
             $row = $rows[$index] ?? null;
             if (! is_array($row)) {
+                $slots[] = [
+                    'index' => $index,
+                    'row' => self::clearedRow(),
+                ];
                 continue;
             }
 
             $type = (string) ($row['device_key_type'] ?? '3');
+            $computedValue = self::value($row);
+            $shouldClear = $type === '3' || $type === '' || $computedValue === '';
+
             $slots[] = [
                 'index' => $index,
-                'row' => $type === '3' ? self::clearedRow() : $row,
+                'row' => $shouldClear ? self::clearedRow() : $row,
+            ];
+        }
+
+        return $slots;
+    }
+
+    /**
+     * Entry pages 2–3: admin memory indexes pack 2 configurable keys per page
+     * (1→2-1, 2→2-2, 3→3-1, 4→3-2). Phone Fkey 3 is the page switch — never emitted.
+     *
+     * @param  array<int, array<string, mixed>>  $memoryKeys
+     * @return array<int, array{index: int, row: array<string, mixed>}>
+     */
+    public static function entryExtraSideSlots(array $memoryKeys, int $page, int $configurablePerPage = 2): array
+    {
+        $base = ($page - 2) * $configurablePerPage;
+        $slots = [];
+
+        for ($position = 1; $position <= $configurablePerPage; $position++) {
+            $globalId = $base + $position;
+            $row = $memoryKeys[$globalId] ?? null;
+
+            if (! is_array($row)) {
+                $slots[] = [
+                    'index' => $position,
+                    'row' => self::clearedRow(),
+                ];
+                continue;
+            }
+
+            $type = (string) ($row['device_key_type'] ?? '3');
+            $computedValue = self::value($row);
+            $shouldClear = $type === '3' || $type === '' || $computedValue === '';
+
+            $slots[] = [
+                'index' => $position,
+                'row' => $shouldClear ? self::clearedRow() : $row,
             ];
         }
 
@@ -200,14 +259,14 @@ class IntradeKeyXml
     /**
      * Factory side-key defaults per InTrade model profile.
      *
-     * @return ?array{sip_slots: array<int, int>, mwi_index: ?int, headset_index: ?int}
+     * @return ?array{sip_slots: array<int, int>, mwi_index: ?int, headset_index: ?int, redial_index?: ?int}
      */
     public static function sideKeyDefaultPlan(string $profile): ?array
     {
         return match ($profile) {
-            // 3 physical side keys: SIP1-3 only.
+            // Keys 1–2 are SIP defaults; key 3 on each page is the page switch.
             'entry' => [
-                'sip_slots' => [1, 2, 3],
+                'sip_slots' => [1, 2],
                 'mwi_index' => null,
                 'headset_index' => null,
             ],
@@ -223,11 +282,12 @@ class IntradeKeyXml
                 'mwi_index' => 7,
                 'headset_index' => 8,
             ],
-            // Screen DSS page 1: SIP1-4, voice mail on 5, headset on 6.
+            // Factory Intrade Video (2.6): SIP1–SIP5, key 6 Headset, key 7 Redial.
             'video' => [
-                'sip_slots' => [1, 2, 3, 4],
-                'mwi_index' => 5,
+                'sip_slots' => [1, 2, 3, 4, 5],
+                'mwi_index' => null,
                 'headset_index' => 6,
+                'redial_index' => 7,
             ],
             default => null,
         };
@@ -252,6 +312,12 @@ class IntradeKeyXml
 
         foreach ($plan['sip_slots'] as $lineNumber => $index) {
             $sipLine = $lineNumber + 1;
+
+            // Only create SIP keys for configured lines (avoids inactive SIP2+ on Video).
+            if (! self::lineIsConfigured($lines[$sipLine] ?? null)) {
+                continue;
+            }
+
             $defaultRow = self::defaultSipSideKey($index, $sipLine, $lines);
 
             if (! isset($lineKeys[$index])) {
@@ -265,6 +331,10 @@ class IntradeKeyXml
 
             $row = $lineKeys[$index];
             $type = (string) ($row['device_key_type'] ?? '');
+            // Explicit clear stays cleared — do not re-apply SIP.
+            if ($type === '3' || $type === '') {
+                continue;
+            }
             if ($type !== '1') {
                 continue;
             }
@@ -288,9 +358,28 @@ class IntradeKeyXml
             $lineKeys[$headsetIndex] = self::legacyRow($headsetIndex, 'headset', 'F_HEADSET', 0, 'Headset');
         }
 
+        $redialIndex = $plan['redial_index'] ?? null;
+        if ($redialIndex !== null && ! isset($lineKeys[$redialIndex])) {
+            $lineKeys[$redialIndex] = self::legacyRow($redialIndex, 'redial', 'F_REDIAL', 0, 'Redial');
+        }
+
         ksort($lineKeys, SORT_NUMERIC);
 
         return $lineKeys;
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $line
+     */
+    private static function lineIsConfigured(?array $line): bool
+    {
+        if ($line === null) {
+            return false;
+        }
+
+        return trim((string) ($line['user_id'] ?? '')) !== ''
+            || trim((string) ($line['auth_id'] ?? '')) !== ''
+            || trim((string) ($line['password'] ?? '')) !== '';
     }
 
     /**
@@ -298,7 +387,7 @@ class IntradeKeyXml
      *
      * @param  array<string, mixed>  $line
      */
-    public static function lineSideKeyLabel(array $line): string
+    public static function lineSideKeyLabel(array $line, ?int $lineNumber = null): string
     {
         $displayName = trim((string) ($line['display_name'] ?? ''));
         if ($displayName !== '') {
@@ -306,8 +395,11 @@ class IntradeKeyXml
         }
 
         $authId = trim((string) ($line['auth_id'] ?? $line['user_id'] ?? ''));
+        if ($authId !== '') {
+            return $authId;
+        }
 
-        return $authId;
+        return $lineNumber ? 'SIP' . $lineNumber : '';
     }
 
     /**
@@ -327,7 +419,7 @@ class IntradeKeyXml
     private static function defaultSipSideKey(int $index, int $lineNumber, array $lines): array
     {
         $line = $lines[$lineNumber] ?? [];
-        $label = self::lineSideKeyLabel($line);
+        $label = self::lineSideKeyLabel($line, $lineNumber);
 
         return self::legacyRow($index, '1', '', $lineNumber, $label);
     }

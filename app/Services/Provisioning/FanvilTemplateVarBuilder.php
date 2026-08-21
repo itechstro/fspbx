@@ -498,6 +498,11 @@ class FanvilTemplateVarBuilder
       if ($label === null || trim((string) $label) === '') {
         $label = 'Headset';
       }
+    } elseif ($logicalType === 'redial') {
+      $value = 'F_REDIAL';
+      if ($label === null || trim((string) $label) === '') {
+        $label = 'Redial';
+      }
     } elseif ($logicalType === 'park') {
       $value = (string) ($value ?? '');
       if ($value !== '' && ctype_digit($value)) {
@@ -543,6 +548,7 @@ class FanvilTemplateVarBuilder
       'voice_mail' => 'voice_mail',
       'voicemail' => 'voice_mail',
       'headset' => 'headset',
+      'redial' => 'redial',
       default => $type,
     };
   }
