@@ -61,7 +61,9 @@ use App\Console\Commands\Updates\Update279;
 use App\Console\Commands\Updates\Update280;
 use App\Console\Commands\Updates\Update281;
 use App\Console\Commands\Updates\Update282;
+use App\Console\Commands\Updates\Update283;
 use App\Console\Commands\Updates\Update198;
+use App\Console\Commands\Updates\Update199;
 use App\Console\Commands\Updates\Update200;
 use App\Console\Commands\Updates\Update201;
 use App\Console\Commands\Updates\Update202;
@@ -351,6 +353,8 @@ class UpdateApp extends Command
             '1.9.7.1' => Update280::class,
             '1.9.8' => Update281::class,
             '1.9.8.1' => Update282::class,
+            '1.9.8.2' => Update283::class,
+            '1.9.9' => Update199::class,
             // Add more versions as needed
         ];
 
@@ -425,6 +429,20 @@ class UpdateApp extends Command
 
         if (!empty($supervisorProgramsToRestart)) {
             $this->restartSupervisorPrograms($supervisorProgramsToRestart);
+        }
+
+        try {
+            $toolSyncExitCode = $this->call('ai-agents:sync-provider-tools', [
+                '--delay' => 300,
+                '--reason' => 'app-update',
+            ]);
+        } catch (\Throwable $exception) {
+            $toolSyncExitCode = 1;
+            report($exception);
+        }
+
+        if ($toolSyncExitCode !== 0) {
+            $this->warn('AI provider tool synchronization could not be queued. Use the Sync Tools action on the AI Agents page after the update.');
         }
 
         $this->info('Update completed successfully!');

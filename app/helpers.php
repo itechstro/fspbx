@@ -1085,31 +1085,23 @@ if (!function_exists('generate_sip_password')) {
 if (!function_exists('formatPhoneNumber')) {
     function formatPhoneNumber($phoneNumber, $countryCode = 'US', $format = PhoneNumberFormat::NATIONAL)
     {
-        // If it starts with +1 (US E.164), normalize to national format
-        if (preg_match('/^\+1\d{10}$/', $phoneNumber)) {
-            $phoneNumberUtil = PhoneNumberUtil::getInstance();
-            try {
-                $phoneNumberObject = $phoneNumberUtil->parse($phoneNumber, 'US');
-                return $phoneNumberUtil->format($phoneNumberObject, $format);
-            } catch (NumberParseException $e) {
-                return $phoneNumber; // fallback
-            }
-        }
-
-        // If truly international (+ but not +1) or 011-prefixed, keep as-is
-        if (preg_match('/^\s*(\+|011)/', $phoneNumber) && !preg_match('/^\+1\d{10}$/', $phoneNumber)) {
+        if ($phoneNumber === null || $phoneNumber === '') {
             return $phoneNumber;
         }
 
-        // Default: parse and format
         $phoneNumberUtil = PhoneNumberUtil::getInstance();
+
         try {
-            $phoneNumberObject = $phoneNumberUtil->parse($phoneNumber, $countryCode);
+            $phoneNumberObject = $phoneNumberUtil->parse(
+                (string) $phoneNumber,
+                strtoupper(trim((string) $countryCode)) ?: 'US'
+            );
+
             if ($phoneNumberUtil->isValidNumber($phoneNumberObject)) {
                 return $phoneNumberUtil->format($phoneNumberObject, $format);
             }
         } catch (NumberParseException $e) {
-            // ignore and fallback
+            // Preserve values libphonenumber does not understand.
         }
 
         return $phoneNumber;
@@ -1769,8 +1761,11 @@ if (!function_exists('buildDestinationAction')) {
             case 'time_conditions':
             case 'contact_centers':
             case 'conferences':
+            case 'conference_centers':
+            case 'ai_agents':
             case 'faxes':
             case 'call_flows':
+            case 'dynamic_routes':
                 return [
                     'destination_app' => 'transfer',
                     'destination_data' => $option['extension'] . ' XML ' . $domain_name,

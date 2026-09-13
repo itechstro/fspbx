@@ -5,6 +5,7 @@ use App\Http\Controllers\AccessControlController;
 use App\Http\Controllers\ActiveConferenceController;
 use App\Http\Controllers\ActiveCallsController;
 use App\Http\Controllers\ActivityLogController;
+use App\Http\Controllers\AiAgentController;
 use App\Http\Controllers\AppsController;
 use App\Http\Controllers\AppsCredentialsController;
 use App\Http\Controllers\Auth\ForgotPasswordController;
@@ -38,6 +39,7 @@ use App\Http\Controllers\DeviceProfileController;
 use App\Http\Controllers\DialplanController;
 use App\Http\Controllers\DomainController;
 use App\Http\Controllers\DomainGroupsController;
+use App\Http\Controllers\DynamicRouteController;
 use App\Http\Controllers\EmailQueueController;
 use App\Http\Controllers\EmailTemplateController;
 use App\Http\Controllers\ExtensionsController;
@@ -116,6 +118,7 @@ Route::webhooks('webhook/postmark', 'postmark');
 Route::webhooks('webhook/mailgun', 'mailgun');
 Route::webhooks('webhook/commio/sms', 'commio_messaging');
 Route::webhooks('webhook/sinch/sms', 'sinch_messaging');
+Route::webhooks('webhook/voxutel/sms', 'voxutel_messaging');
 Route::webhooks('webhook/bandwidth/sms', 'bandwidth_messaging');
 Route::webhooks('webhook/telnyx/sms', 'telnyx_messaging');
 Route::webhooks('webhook/clicksend/sms', 'clicksend_messaging');
@@ -319,6 +322,7 @@ Route::group(['middleware' => 'auth'], function () {
 
     // Call Flows
     Route::get('call-flows', [CallFlowController::class, 'index'])->name('call-flows.index');
+    Route::get('dynamic-routes', [DynamicRouteController::class, 'index'])->name('dynamic-routes.index');
 
     // Basic Queues
     Route::get('basic-queues', [BasicQueueController::class, 'index'])->name('basic-queues.index');
@@ -330,6 +334,7 @@ Route::group(['middleware' => 'auth'], function () {
 
     // Conference Centers
     Route::get('conference-centers', [ConferenceCenterController::class, 'index'])->name('conference-centers.index');
+    Route::get('ai-agents', [AiAgentController::class, 'index'])->name('ai-agents.index');
     Route::get('conferences', [ConferenceController::class, 'index'])->name('conferences.index');
     Route::get('conference-controls', [ConferenceControlController::class, 'index'])->name('conference-controls.index');
     Route::get('conference-profiles', [ConferenceProfileController::class, 'index'])->name('conference-profiles.index');

@@ -332,7 +332,7 @@
                                                                 },
                                                             }" :default="nextLineNumber" />
 
-                                                            <SelectElement name="line_type_id" :label="$t('Type')"
+                                                            <SelectElement name="line_type_id" :label="$t('Type')" default="line"
                                                                 :items="options.line_key_types" :search="true"
                                                                 label-prop="name" :native="false" input-type="search"
                                                                 autocomplete="off" :columns="{
@@ -707,7 +707,7 @@
 
                                                             <SelectElement name="key_value_select" :label="$t('Value')"
                                                                 label-prop="name" value-prop="extension" :search="true"
-                                                                :native="false" :submit="false"
+                                                                :native="false" :submit="false" allow-absent
                                                                 :create="KEY_TYPES_WITH_EXTENSION_CREATE
                                                                     .includes(form$?.data?.side_keys?.[index]?.key_type)" :append-new-option="false"
                                                                 input-type="search" autocomplete="off" :columns="{
@@ -833,7 +833,7 @@
 
                                                             <SelectElement name="key_value_select" :label="$t('Value')"
                                                                 label-prop="name" value-prop="extension" :search="true"
-                                                                :native="false" :submit="false"
+                                                                :native="false" :submit="false" allow-absent
                                                                 :create="KEY_TYPES_WITH_EXTENSION_CREATE
                                                                     .includes(form$?.data?.multi_purpose_keys?.[index]?.key_type)"
                                                                 :append-new-option="false" input-type="search"
@@ -960,7 +960,7 @@
 
                                                             <SelectElement name="key_value_select" :label="$t('Value')"
                                                                 label-prop="name" value-prop="extension" :search="true"
-                                                                :native="false" :submit="false"
+                                                                :native="false" :submit="false" allow-absent
                                                                 :create="KEY_TYPES_WITH_EXTENSION_CREATE
                                                                     .includes(form$?.data?.expansion_keys?.[index]?.key_type)"
                                                                 :append-new-option="false" input-type="search"

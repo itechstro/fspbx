@@ -85,6 +85,8 @@ class EmailTemplatePreviewService
             'portal_email' => 'jordan@example.test',
             'portal_login_url' => 'https://example.test/login',
             'password_request_url' => 'https://example.test/forgot-password',
+            'url' => 'https://example.test/reset-password/sample-token?email=jordan%40example.test',
+            'expire_minutes' => config('auth.passwords.'.config('auth.defaults.passwords').'.expire', 60),
 
             'hostname' => 'pbx.example.test',
             'success' => ['recording-001.wav', 'recording-002.wav'],
@@ -146,7 +148,12 @@ class EmailTemplatePreviewService
             'call_uuid' => '00000000-0000-4000-8000-000000000002',
             'destination_number' => '2000',
             'sent_at' => now()->toDateTimeString(),
-
+            'fields' => [
+                ['label' => 'Name', 'value' => 'Jordan Lee'],
+                ['label' => 'Callback', 'value' => '+1 202-555-0142'],
+                ['label' => 'Purpose', 'value' => 'Requested an account follow-up'],
+            ],
+            'notes' => 'Please return the call this afternoon.',
             'date' => now()->format('F j, Y'),
             'duration' => '00:42',
             'sentiment' => 'Positive',

@@ -136,10 +136,6 @@ class VirtualReceptionistController extends Controller
 
             $this->generateDialPlanXML($instance);
 
-            if (isset($_SESSION['destinations']['array'])) {
-                unset($_SESSION['destinations']['array']);
-            }
-
             return response()->json([
                 'item_uuid' => $instance->ivr_menu_uuid,
                 'messages' => ['success' => [__('Virtual receptionist created successfully.')]]
@@ -189,11 +185,6 @@ class VirtualReceptionistController extends Controller
             $instance->save();
 
             $this->generateDialPlanXML($instance);
-
-            //clear the destinations session array
-            if (isset($_SESSION['destinations']['array'])) {
-                unset($_SESSION['destinations']['array']);
-            }
 
             // Return a JSON response indicating success
             return response()->json([
@@ -594,7 +585,7 @@ class VirtualReceptionistController extends Controller
                 'ivr_menu_option_digits' => $inputs['key'],
                 'ivr_menu_option_action' => 'menu-exec-app',
                 'ivr_menu_option_param' => $this->buildKeyDestinationAction($inputs),
-                'ivr_menu_option_description' => $inputs['description'],
+                'ivr_menu_option_description' => $inputs['description'] ?? null,
                 'ivr_menu_option_enabled' => $inputs['status'],
             ]);
 
@@ -605,7 +596,7 @@ class VirtualReceptionistController extends Controller
                 'data' => $ivrMenuOption,
             ], 201);
         } catch (\Exception $e) {
-            logger('VirtualReceptioninstController@createKey error: ' . $e->getMessage() . " at " . $e->getFile() . ":" . $e->getLine());
+            logger('VirtualReceptionistController@createKey error: ' . $e->getMessage() . " at " . $e->getFile() . ":" . $e->getLine());
             return response()->json([
                 'success' => false,
                 'errors' => ['server' => [__('Unable to create Virtual Receptionist Key.')]]
@@ -633,7 +624,7 @@ class VirtualReceptionistController extends Controller
                 'ivr_menu_option_digits' => $inputs['key'],
                 'ivr_menu_option_action' => 'menu-exec-app',
                 'ivr_menu_option_param' => $this->buildKeyDestinationAction($inputs),
-                'ivr_menu_option_description' => $inputs['description'],
+                'ivr_menu_option_description' => $inputs['description'] ?? null,
                 'ivr_menu_option_enabled' => $inputs['status'],
             ]);
 
@@ -692,8 +683,11 @@ class VirtualReceptionistController extends Controller
             case 'time_conditions':
             case 'contact_centers':
             case 'conferences':
+            case 'conference_centers':
             case 'faxes':
             case 'call_flows':
+            case 'dynamic_routes':
+            case 'ai_agents':
                 return 'transfer ' . $key['extension'] . ' XML ' . session('domain_name');
             case 'bridges':
                 return 'lua bridge.lua ' . ($key['target'] ?? '');
@@ -724,8 +718,11 @@ class VirtualReceptionistController extends Controller
             case 'time_conditions':
             case 'contact_centers':
             case 'conferences':
+            case 'conference_centers':
             case 'faxes':
             case 'call_flows':
+            case 'dynamic_routes':
+            case 'ai_agents':
                 return ['action' => 'transfer', 'data' => $target . ' XML ' . session('domain_name')];
             case 'bridges':
                 return ['action' => 'lua', 'data' => 'bridge.lua ' . $target];

@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Support\BridgeRuntimeDestination;
-use App\Models\{Bridge, BusinessHour, CallCenterQueues, CallFlows, Conferences, Dialplans, Domain, Extensions, Faxes, IvrMenus, Recordings, RingGroups, Voicemails};
+use App\Models\{AiAgent, Bridge, BusinessHour, CallCenterQueues, CallFlows, Conferences, Dialplans, Domain, DynamicRoute, Extensions, Faxes, IvrMenus, Recordings, RingGroups, Voicemails};
 use App\Models\ConferenceCenter;
 
 class CallRoutingOptionsService
@@ -22,9 +22,11 @@ class CallRoutingOptionsService
         ['value' => 'bridges', 'name' => 'Bridge'],
         ['value' => 'faxes', 'name' => 'Fax'],
         ['value' => 'call_flows', 'name' => 'Call Flow'],
+        ['value' => 'dynamic_routes', 'name' => 'Dynamic Route'],
         ['value' => 'recordings', 'name' => 'Play Greeting'],
         ['value' => 'conferences', 'name' => 'Conferences'],
         ['value' => 'conference_centers', 'name' => 'Conference Centers'],
+        ['value' => 'ai_agents', 'name' => 'AI Agent'],
         ['value' => 'check_voicemail', 'name' => 'Check Voicemail'],
         ['value' => 'company_directory', 'name' => 'Company Directory'],
         ['value' => 'hangup', 'name' => 'Hang up'],
@@ -49,7 +51,9 @@ class CallRoutingOptionsService
         'conference_centers' => \App\Models\ConferenceCenter::class,
         'faxes'            => \App\Models\Faxes::class,
         'call_flows'       => \App\Models\CallFlows::class,
+        'dynamic_routes'   => \App\Models\DynamicRoute::class,
         'recordings'       => \App\Models\Recordings::class,
+        'ai_agents'        => \App\Models\AiAgent::class,
     ];
 
     private const TRANSFER_FORMAT = '%s:%s XML %s';
@@ -67,8 +71,10 @@ class CallRoutingOptionsService
             ['value' => 'business_hours', 'label' => __('Business Hours')],
             ['value' => 'time_conditions', 'label' => __('Schedule')],
             ['value' => 'contact_centers', 'label' => __('Contact Center')],
+            ['value' => 'ai_agents', 'label' => __('AI Agent')],
             ['value' => 'faxes', 'label' => __('Fax')],
             ['value' => 'call_flows', 'label' => __('Call Flow')],
+            ['value' => 'dynamic_routes', 'label' => __('Dynamic Route')],
             ['value' => 'external', 'label' => __('External Number')],
         ];
     }
@@ -83,6 +89,8 @@ class CallRoutingOptionsService
                 return $this->buildBridgeOptions();
             case 'call_flows':
                 return $this->buildOptions(CallFlows::class, 'call_flow_extension', 'call_flow_name');
+            case 'dynamic_routes':
+                return $this->buildDynamicRouteOptions();
                 // case 'dial_plans':
                 //     return $this->buildOptions(Dialplans::class, 'dialplan_name', '', true);
             case 'extensions':
@@ -103,6 +111,18 @@ class CallRoutingOptionsService
                 return $this->buildOptions(Conferences::class, 'conference_extension', 'conference_name');
             case 'conference_centers':
                 return $this->buildOptions(ConferenceCenter::class, 'conference_center_extension', 'conference_center_name');
+            case 'ai_agents':
+                return AiAgent::query()
+                    ->where('domain_uuid', $this->domainUuid)
+                    ->where('enabled', true)
+                    ->where('provisioning_status', 'synced')
+                    ->orderBy('extension')
+                    ->get(['ai_agent_uuid', 'extension', 'name'])
+                    ->map(fn (AiAgent $agent) => [
+                        'value' => $agent->ai_agent_uuid,
+                        'extension' => $agent->extension,
+                        'name' => $agent->extension . ' - ' . $agent->name,
+                    ])->all();
             case 'voicemails':
                 return $this->buildOptions(Voicemails::class, 'voicemail_id', 'voicemail_description');
             case 'other':
@@ -148,13 +168,7 @@ class CallRoutingOptionsService
 
             $name = $row->$extensionField . ($nameField ? " - " . $row->$nameField : '');
             if ($model === Voicemails::class) {
-                if ($row->extension) {
-                    // Use extension's name_formatted if extension exists
-                    $name = $row->extension->name_formatted;
-                } else {
-                    // Fallback to voicemail_id - "Team voicemail" if extension does not exist
-                    $name =  $row->voicemail_id . " - Team voicemail" . ($row->voicemail_description ? ' (' . $row->voicemail_description . ')' : '');
-                }
+                $name = $this->voicemailOptionName($row);
             }
 
             if ($model === Recordings::class) {
@@ -185,6 +199,22 @@ class CallRoutingOptionsService
                 'bridge_uuid' => $bridge->bridge_uuid,
                 'extension' => $bridge->bridge_uuid,
                 'name' => $bridge->bridge_name ?: $bridge->bridge_destination,
+            ])
+            ->values()
+            ->all();
+    }
+
+    protected function buildDynamicRouteOptions(): array
+    {
+        return DynamicRoute::query()
+            ->where('domain_uuid', $this->domainUuid)
+            ->where('enabled', true)
+            ->orderBy('extension')
+            ->get(['dynamic_route_uuid', 'extension', 'name'])
+            ->map(fn (DynamicRoute $route) => [
+                'value' => $route->dynamic_route_uuid,
+                'extension' => $route->extension,
+                'name' => $route->extension . ' - ' . $route->name,
             ])
             ->values()
             ->all();
@@ -383,10 +413,7 @@ class CallRoutingOptionsService
 
             $domainUuid = $this->domainUuid;
 
-            $dialplan = Dialplans::where(function ($query) use ($destination) {
-                $query->where('dialplan_number', $destination)
-                    ->orWhere('dialplan_number', '=', '1' . $destination);
-            })
+            $dialplan = Dialplans::where('dialplan_number', $destination)
                 ->where('dialplan_enabled', 'true')
                 ->where(function ($query) use ($domainUuid) {
                     $query->where('domain_uuid', $domainUuid)
@@ -417,7 +444,7 @@ class CallRoutingOptionsService
                         'type' => 'voicemails',
                         'extension' => $voicemail->voicemail_id,
                         'option' => $voicemail->voicemail_uuid,
-                        'name' => $voicemail->extension ? $voicemail->extension->name_formatted : $voicemail->voicemail_id . ' - Team Voicemail',
+                        'name' => $this->voicemailOptionName($voicemail),
                     ];
                 }
             }
@@ -459,10 +486,7 @@ class CallRoutingOptionsService
         $domainUuid = $this->domainUuid;
 
         // Use regex and check in the Dialplan database to determine what this extension belongs to
-        $dialplan = Dialplans::where(function ($query) use ($extension) {
-            $query->where('dialplan_number', $extension)
-                ->orWhere('dialplan_number', '=', '1' . $extension);
-        })
+        $dialplan = Dialplans::where('dialplan_number', $extension)
             ->where('dialplan_enabled', 'true')
             ->where(function ($query) use ($domainUuid) {
                 $query->where('domain_uuid', $domainUuid)
@@ -491,7 +515,7 @@ class CallRoutingOptionsService
                 'type' => 'voicemails',
                 'extension' => $voicemail->voicemail_id,
                 'option' => $voicemail->voicemail_uuid,
-                'name' => $voicemail->extension->name_formatted ?? $voicemail->voicemail_id,
+                'name' => $this->voicemailOptionName($voicemail),
             ];
         }
 
@@ -516,6 +540,17 @@ class CallRoutingOptionsService
         }
     }
 
+    private function voicemailOptionName(Voicemails $voicemail): string
+    {
+        if ($voicemail->extension) {
+            return $voicemail->extension->name_formatted;
+        }
+
+        return $voicemail->voicemail_id
+            . ' - Team voicemail'
+            . ($voicemail->voicemail_description ? ' (' . $voicemail->voicemail_description . ')' : '');
+    }
+
     /**
      * Map Dialplan data back to a routing option.
      */
@@ -528,10 +563,12 @@ class CallRoutingOptionsService
             'contact_centers' => '/call_center_queue_uuid=([0-9a-fA-F-]+)/',
             'business_hours' => '/business_hours=([0-9a-fA-F-]+)/',
             'call_flows' => '/call_flow_uuid=([0-9a-fA-F-]+)/',
+            'dynamic_routes' => '/dynamic_route_uuid=([0-9a-fA-F-]+)/',
             'time_conditions' => '/\b(year|yday|mon|mday|week|mweek|wday|hour|minute|minute-of-day|time-of-day|date-time)=("[^"]+"|\'[^\']+\'|\S+)/',
             'faxes' => '/fax_uuid=([0-9a-fA-F-]+)/',
             'conferences' => '/conference_uuid=([0-9a-fA-F-]+)/',
             'conference_centers' => '/app.lua conference_center/',
+            'ai_agents' => '/ai_agent.lua\s+([0-9a-fA-F-]+)/',
             'check_voicemail' => '/app.lua voicemail/',
             'company_directory' => '/directory.lua/',
             'external' => '/disa.lua/',
@@ -589,6 +626,36 @@ class CallRoutingOptionsService
                         'option' => $conferenceCenter?->conference_center_uuid,
                         'name' => $conferenceCenter
                             ? $conferenceCenter->conference_center_extension . ' - ' . $conferenceCenter->conference_center_name
+                            : $dialplan->dialplan_name,
+                    ];
+                }
+
+                if ($type === 'ai_agents') {
+                    $agent = AiAgent::query()
+                        ->where('domain_uuid', $this->domainUuid)
+                        ->where('ai_agent_uuid', $matches[1])
+                        ->first();
+
+                    return [
+                        'type' => $type,
+                        'extension' => $extension,
+                        'option' => $agent?->ai_agent_uuid,
+                        'name' => $agent ? $agent->extension . ' - ' . $agent->name : $dialplan->dialplan_name,
+                    ];
+                }
+
+                if ($type === 'dynamic_routes') {
+                    $dynamicRoute = DynamicRoute::query()
+                        ->where('domain_uuid', $this->domainUuid)
+                        ->whereKey($matches[1])
+                        ->first(['dynamic_route_uuid', 'extension', 'name']);
+
+                    return [
+                        'type' => $type,
+                        'extension' => $dynamicRoute?->extension ?? $extension,
+                        'option' => $dynamicRoute?->dynamic_route_uuid ?? $matches[1],
+                        'name' => $dynamicRoute
+                            ? $dynamicRoute->extension . ' - ' . $dynamicRoute->name
                             : $dialplan->dialplan_name,
                     ];
                 }
@@ -706,8 +773,10 @@ class CallRoutingOptionsService
             'time_conditions' => 'Schedules',
             'bridges' => 'Bridge',
             'call_flows' => 'Call Flow',
+            'dynamic_routes' => 'Dynamic Route',
             'conferences' => 'Conference',
             'conference_centers' => 'Conference Center',
+            'ai_agents' => 'AI Agent',
             'recordings' => 'Play recording',
             'company_directory' => 'Company Directory',
             'check_voicemail' => 'Check Voicemail',

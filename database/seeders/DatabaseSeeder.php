@@ -12,6 +12,7 @@ use App\Models\GroupPermissions;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use App\Models\PaymentGateway;
 use App\Models\GatewaySetting;
@@ -154,6 +155,13 @@ class DatabaseSeeder extends Seeder
             ['application_name' => 'User Manager', 'permission_name' => 'api_key_create'],
             ['application_name' => 'User Manager', 'permission_name' => 'api_key_update'],
             ['application_name' => 'User Manager', 'permission_name' => 'api_key_delete'],
+            ['application_name' => 'Directory Services', 'permission_name' => 'ldap_directory_view'],
+            ['application_name' => 'Directory Services', 'permission_name' => 'ldap_directory_create'],
+            ['application_name' => 'Directory Services', 'permission_name' => 'ldap_directory_update'],
+            ['application_name' => 'Directory Services', 'permission_name' => 'ldap_directory_delete'],
+            ['application_name' => 'Directory Services', 'permission_name' => 'ldap_directory_test'],
+            ['application_name' => 'Directory Services', 'permission_name' => 'ldap_directory_sync'],
+            ['application_name' => 'Directory Services', 'permission_name' => 'ldap_directory_map_groups'],
             ['application_name' => 'Extensions', 'permission_name' => 'extension_device_create'],
             ['application_name' => 'Extensions', 'permission_name' => 'extension_device_assign'],
             ['application_name' => 'Extensions', 'permission_name' => 'extension_device_unassign'],
@@ -270,6 +278,17 @@ class DatabaseSeeder extends Seeder
             ['application_name' => 'Contacts', 'permission_name' => 'contact_sync_run'],
             ['application_name' => 'PhoneControl', 'permission_name' => 'phone_control_view'],
             ['application_name' => 'PhoneControl', 'permission_name' => 'phone_control_call'],
+            ['application_name' => 'AI Agents', 'permission_name' => 'ai_agent_view'],
+            ['application_name' => 'AI Agents', 'permission_name' => 'ai_agent_create'],
+            ['application_name' => 'AI Agents', 'permission_name' => 'ai_agent_update'],
+            ['application_name' => 'AI Agents', 'permission_name' => 'ai_agent_delete'],
+            ['application_name' => 'AI Agents', 'permission_name' => 'ai_agent_manage_domain'],
+            ['application_name' => 'AI Agents', 'permission_name' => 'ai_agent_manage_provider'],
+            ['application_name' => 'AI Agents', 'permission_name' => 'ai_agent_manage_integration'],
+            ['application_name' => 'Dynamic Routes', 'permission_name' => 'dynamic_route_view'],
+            ['application_name' => 'Dynamic Routes', 'permission_name' => 'dynamic_route_create'],
+            ['application_name' => 'Dynamic Routes', 'permission_name' => 'dynamic_route_update'],
+            ['application_name' => 'Dynamic Routes', 'permission_name' => 'dynamic_route_delete'],
         ];
         $timestamp = date("Y-m-d H:i:s");
 
@@ -296,6 +315,7 @@ class DatabaseSeeder extends Seeder
         if (!empty($toInsert)) {
             Permissions::insert($toInsert);
         }
+
     }
 
     private function createGroupPermissions()
@@ -343,6 +363,13 @@ class DatabaseSeeder extends Seeder
                 'api_key_create',
                 'api_key_update',
                 'api_key_delete',
+                'ldap_directory_view',
+                'ldap_directory_create',
+                'ldap_directory_update',
+                'ldap_directory_delete',
+                'ldap_directory_test',
+                'ldap_directory_sync',
+                'ldap_directory_map_groups',
                 'extension_device_create',
                 'extension_device_assign',
                 'extension_device_unassign',
@@ -460,6 +487,17 @@ class DatabaseSeeder extends Seeder
                 'contact_sync_run',
                 'phone_control_view',
                 'phone_control_call',
+                'ai_agent_view',
+                'ai_agent_create',
+                'ai_agent_update',
+                'ai_agent_delete',
+                'ai_agent_manage_domain',
+                'ai_agent_manage_provider',
+                'ai_agent_manage_integration',
+                'dynamic_route_view',
+                'dynamic_route_create',
+                'dynamic_route_update',
+                'dynamic_route_delete',
             ],
             'admin' => [
                 'call_webhook_view',
@@ -566,6 +604,10 @@ class DatabaseSeeder extends Seeder
                 'contact_sync_run',
                 'phone_control_view',
                 'phone_control_call',
+                'dynamic_route_view',
+                'dynamic_route_create',
+                'dynamic_route_update',
+                'dynamic_route_delete',
             ],
             'Message Admin' => [
                 'message_settings_list_view',
@@ -1303,6 +1345,30 @@ class DatabaseSeeder extends Seeder
             ],
             [
                 'default_setting_category'      => 'scheduled_jobs',
+                'default_setting_subcategory'   => 'active_node',
+                'default_setting_name'          => 'text',
+                'default_setting_value'         => "",
+                'default_setting_enabled'       => true,
+                'default_setting_description'   => "PostgreSQL system identifier of the approved server that owns coordinated scheduled jobs.",
+            ],
+            [
+                'default_setting_category'      => 'scheduled_jobs',
+                'default_setting_subcategory'   => 'active_node_generation',
+                'default_setting_name'          => 'numeric',
+                'default_setting_value'         => "0",
+                'default_setting_enabled'       => true,
+                'default_setting_description'   => "Ownership generation for coordinated scheduled jobs. Incremented when ownership changes.",
+            ],
+            [
+                'default_setting_category'      => 'scheduled_jobs',
+                'default_setting_subcategory'   => 'coordination_secret',
+                'default_setting_name'          => 'text',
+                'default_setting_value'         => "",
+                'default_setting_enabled'       => true,
+                'default_setting_description'   => "Shared secret used to authenticate scheduled-job coordination between approved FS PBX nodes.",
+            ],
+            [
+                'default_setting_category'      => 'scheduled_jobs',
                 'default_setting_subcategory'   => 'scheduled_announcements_active_fqdn',
                 'default_setting_name'          => 'text',
                 'default_setting_value'         => "",
@@ -1363,7 +1429,7 @@ class DatabaseSeeder extends Seeder
                 'default_setting_name'          => 'boolean',
                 'default_setting_value'         => "true",
                 'default_setting_enabled'       => true,
-                'default_setting_description'   => "Enables automatic deletion of call recordings (.wav and .mp3) and their corresponding database records older than the configured retention period.",
+                'default_setting_description'   => "Enables automatic deletion of local call recording files (.wav and .mp3) older than the configured retention period. CDRs are retained and only local recording references are cleared.",
             ],
             [
                 'default_setting_category'      => 'scheduled_jobs',
@@ -1371,7 +1437,7 @@ class DatabaseSeeder extends Seeder
                 'default_setting_name'          => 'text',
                 'default_setting_value'         => "90",
                 'default_setting_enabled'       => true,
-                'default_setting_description'   => "Specifies the number of days to retain call recordings before they are automatically deleted.",
+                'default_setting_description'   => "Specifies the number of days to retain local call recording files before they are automatically deleted.",
             ],
             [
                 'default_setting_category'      => 'scheduled_jobs',
@@ -1817,7 +1883,22 @@ class DatabaseSeeder extends Seeder
 
         // Build ONLY the missing rows
         $toInsert = [];
+        // These rows have one writer in HA. Keep their catalog definitions, but
+        // let initial coordination create missing rows on its elected writer.
+        // Running this seeder independently on two subscribers must not create
+        // different UUIDs for the same global ownership setting.
+        $coordinationIsReplicated = false;
+        try {
+            $coordinationIsReplicated = DB::connection()->getDriverName() === 'pgsql'
+                && (bool) DB::selectOne('select exists(select 1 from pg_subscription) as present')->present;
+        } catch (\Throwable) {
+            $coordinationIsReplicated = true;
+        }
         foreach ($settings as $s) {
+            if ($coordinationIsReplicated && $s['default_setting_category'] === 'scheduled_jobs'
+                && in_array($s['default_setting_subcategory'], ['active_node', 'active_node_generation', 'coordination_secret'], true)) {
+                continue;
+            }
             $key = "{$s['default_setting_category']}|{$s['default_setting_subcategory']}|{$s['default_setting_name']}";
             if (!isset($existingLookup[$key])) {
                 $toInsert[] = [

@@ -3,6 +3,9 @@
 use App\Http\Controllers\AccountSettingsController;
 use App\Http\Controllers\AppsController;
 use App\Http\Controllers\AccessControlController;
+use App\Http\Controllers\AiAgentController;
+use App\Http\Controllers\AiProviderIntegrationController;
+use App\Http\Controllers\AiToolController;
 use App\Http\Controllers\ActiveConferenceController;
 use App\Http\Controllers\Api\EmergencyCallController;
 use App\Http\Controllers\Api\HolidayHoursController;
@@ -43,8 +46,13 @@ use App\Http\Controllers\DomainGroupsController;
 use App\Http\Controllers\DomainSettingsController;
 use App\Http\Controllers\DomainLicenseController;
 use App\Http\Controllers\DomainUsageController;
+use App\Http\Controllers\DynamicRouteController;
 use App\Http\Controllers\EmailLogsController;
+use App\Http\Controllers\AiAgentLogsController;
 use App\Http\Controllers\EmailQueueController;
+use App\Http\Controllers\LdapDirectoryController;
+use App\Http\Controllers\ScheduledJobCoordinationController;
+use App\Http\Controllers\ScheduledJobPeerController;
 use App\Http\Controllers\EmailTemplateController;
 use App\Http\Controllers\ExtensionsController;
 use App\Http\Controllers\ExtensionWelcomeEmailController;
@@ -113,7 +121,26 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
+Route::post('/ai-tools/retell/send-email', [AiToolController::class, 'sendEmail'])
+    ->middleware('throttle:60,1')
+    ->name('ai-tools.retell.send-email');
+
 Route::group(['middleware' => ['auth:sanctum', 'api.cookie.auth']], function () {
+    Route::get('/ai-agents/data', [AiAgentController::class, 'data'])->name('ai-agents.data');
+    Route::post('/ai-agents/item-options', [AiAgentController::class, 'itemOptions'])->name('ai-agents.item-options');
+    Route::get('/ai-agents/integration', [AiProviderIntegrationController::class, 'show'])->name('ai-agents.integration.show');
+    Route::put('/ai-agents/integration', [AiProviderIntegrationController::class, 'update'])->name('ai-agents.integration.update');
+    Route::post('/ai-agents/integration/test', [AiProviderIntegrationController::class, 'test'])->name('ai-agents.integration.test');
+    Route::get('/ai-agents/provider-agents', [AiProviderIntegrationController::class, 'providerAgents'])->name('ai-agents.provider-agents');
+    Route::get('/ai-agents/tool-status', [AiAgentController::class, 'toolStatus'])->name('ai-agents.tool-status');
+    Route::post('/ai-agents/sync-tools', [AiAgentController::class, 'syncTools'])->name('ai-agents.sync-tools');
+    Route::post('/ai-agents', [AiAgentController::class, 'store'])->name('ai-agents.store');
+    Route::put('/ai-agents/{ai_agent}', [AiAgentController::class, 'update'])->name('ai-agents.update');
+    Route::post('/ai-agents/{ai_agent}/toggle', [AiAgentController::class, 'toggle'])->name('ai-agents.toggle');
+    Route::post('/ai-agents/{ai_agent}/retry', [AiAgentController::class, 'retry'])->name('ai-agents.retry');
+    Route::post('/ai-agents/{ai_agent}/refresh', [AiAgentController::class, 'refresh'])->name('ai-agents.refresh');
+    Route::delete('/ai-agents/{ai_agent}', [AiAgentController::class, 'destroy'])->name('ai-agents.destroy');
+
     // Dashboard
     Route::get('/dashboard/data', [DashboardController::class, 'getData'])->name('dashboard.data');
     Route::get('/dashboard/counts', [DashboardController::class, 'getCounts'])->name('dashboard.counts');
@@ -146,6 +173,9 @@ Route::group(['middleware' => ['auth:sanctum', 'api.cookie.auth']], function () 
     Route::post('/email-logs/retry', [EmailLogsController::class, 'retry'])->name('email-logs.retry');
     Route::get('/email-logs/{uuid}/delivery-details', [EmailLogsController::class, 'deliveryDetails'])->name('email-logs.delivery-details');
     Route::post('/test-email-send', [TestEmailController::class, 'store'])->name('test-email-send.store');
+
+    // AI Agent logs
+    Route::get('/ai-agent-logs', [AiAgentLogsController::class, 'index'])->name('ai-agent-logs.index');
 
     // Email templates
     Route::get('/email-templates/data', [EmailTemplateController::class, 'getData'])->name('email-templates.data');
@@ -355,6 +385,24 @@ Route::group(['middleware' => ['auth:sanctum', 'api.cookie.auth']], function () 
     Route::post('users/item-options', [UsersController::class, 'getItemOptions'])->name('users.item.options');
     Route::post('users/bulk-delete', [UsersController::class, 'bulkDelete'])->name('users.bulk.delete');
     Route::post('users/select-all', [UsersController::class, 'selectAll'])->name('users.select.all');
+    Route::get('ldap-directories', [LdapDirectoryController::class, 'index'])->name('ldap-directories.index');
+    Route::get('scheduled-jobs/active-node', [ScheduledJobCoordinationController::class, 'show'])->name('scheduled-jobs.active-node.show');
+    Route::post('scheduled-jobs/nodes/discover', [ScheduledJobCoordinationController::class, 'discover'])->name('scheduled-jobs.nodes.discover');
+    Route::post('scheduled-jobs/nodes/{node}/approve', [ScheduledJobCoordinationController::class, 'approve'])->name('scheduled-jobs.nodes.approve');
+    Route::post('scheduled-jobs/nodes/{node}/retire', [ScheduledJobCoordinationController::class, 'retire'])->name('scheduled-jobs.nodes.retire');
+    Route::put('scheduled-jobs/active-node', [ScheduledJobCoordinationController::class, 'updateOwner'])->name('scheduled-jobs.active-node.update');
+    Route::post('scheduled-jobs/active-node/force', [ScheduledJobCoordinationController::class, 'force'])->name('scheduled-jobs.active-node.force');
+    Route::post('scheduled-jobs/handoffs/{handoff}/force', [ScheduledJobCoordinationController::class, 'forceHandoff'])->name('scheduled-jobs.handoffs.force');
+    Route::post('scheduled-jobs/coordination-secret/rotate', [ScheduledJobCoordinationController::class, 'rotateSecret'])->name('scheduled-jobs.secret.rotate');
+    Route::post('ldap-directories', [LdapDirectoryController::class, 'store'])->name('ldap-directories.store');
+    Route::put('ldap-directories/{directory}', [LdapDirectoryController::class, 'update'])->name('ldap-directories.update');
+    Route::delete('ldap-directories/{directory}', [LdapDirectoryController::class, 'destroy'])->name('ldap-directories.destroy');
+    Route::post('ldap-directories/{directory}/test', [LdapDirectoryController::class, 'test'])->name('ldap-directories.test');
+    Route::post('ldap-directories/{directory}/sync', [LdapDirectoryController::class, 'sync'])->name('ldap-directories.sync');
+    Route::get('ldap-directories/{directory}/mappings', [LdapDirectoryController::class, 'mappings'])->name('ldap-directories.mappings');
+    Route::put('ldap-directories/{directory}/mappings', [LdapDirectoryController::class, 'updateMappings'])->name('ldap-directories.mappings.update');
+    Route::get('ldap-directories/{directory}/groups/{group}/members', [LdapDirectoryController::class, 'groupMembers'])
+        ->name('ldap-directories.groups.members');
 
     // Extensions
     Route::post('extensions', [ExtensionsController::class, 'store'])->name('extensions.store');
@@ -542,6 +590,15 @@ Route::group(['middleware' => ['auth:sanctum', 'api.cookie.auth']], function () 
     Route::post('/call-flows/bulk-delete', [CallFlowController::class, 'bulkDelete'])->name('call-flows.bulk.delete');
     Route::post('/call-flows/bulk-copy', [CallFlowController::class, 'bulkCopy'])->name('call-flows.bulk.copy');
     Route::post('/call-flows/bulk-toggle', [CallFlowController::class, 'bulkToggle'])->name('call-flows.bulk.toggle');
+
+    // Dynamic Routes
+    Route::post('dynamic-routes', [DynamicRouteController::class, 'store'])->name('dynamic-routes.store');
+    Route::put('dynamic-routes/{dynamic_route}', [DynamicRouteController::class, 'update'])->name('dynamic-routes.update');
+    Route::get('dynamic-routes/data', [DynamicRouteController::class, 'getData'])->name('dynamic-routes.data');
+    Route::post('dynamic-routes/item-options', [DynamicRouteController::class, 'getItemOptions'])->name('dynamic-routes.item.options');
+    Route::post('dynamic-routes/select-all', [DynamicRouteController::class, 'selectAll'])->name('dynamic-routes.select.all');
+    Route::post('dynamic-routes/bulk-delete', [DynamicRouteController::class, 'bulkDelete'])->name('dynamic-routes.bulk.delete');
+    Route::post('dynamic-routes/bulk-toggle', [DynamicRouteController::class, 'bulkToggle'])->name('dynamic-routes.bulk.toggle');
 
     // Bridges
     Route::post('bridges', [BridgeController::class, 'store'])->name('bridges.store');
@@ -868,6 +925,7 @@ Route::group(['middleware' => ['auth:sanctum', 'api.cookie.auth']], function () 
 
     // System Settings
     Route::put('system-settings/update', [SystemSettingsController::class, 'update'])->name('system-settings.update');
+    Route::put('system-settings/sip-capture', [SystemSettingsController::class, 'updateSipCapture'])->name('system-settings.sip_capture.update');
     Route::get('system-settings/payment_gateways', [SystemSettingsController::class, 'getPaymentGatewayData'])->name('system-settings.payment_gateways');
     Route::get('ai-usage-rates', [AiUsageRatesController::class, 'show'])->name('ai-usage-rates.show');
     Route::put('ai-usage-rates', [AiUsageRatesController::class, 'update'])->name('ai-usage-rates.update');
@@ -925,6 +983,7 @@ Route::group(['middleware' => ['auth:sanctum', 'api.cookie.auth']], function () 
     Route::post('domains', [DomainController::class, 'store'])->name('domains.store');
     Route::put('domains/{domain}', [DomainController::class, 'update'])->name('domains.update');
     Route::get('domains/data', [DomainController::class, 'getData'])->name('domains.data');
+    Route::get('domains/registration-summary', [DomainController::class, 'registrationSummary'])->name('domains.registration-summary');
     Route::post('domains/item-options', [DomainController::class, 'getItemOptions'])->name('domains.item.options');
     Route::post('domains/bulk-delete', [DomainController::class, 'bulkDelete'])->name('domains.bulk.delete');
 });
@@ -942,3 +1001,12 @@ Route::post('letsencrypt/challenge', [LetsEncryptController::class, 'receiveChal
     ->name('letsencrypt.challenge');
 Route::post('letsencrypt/receive-certificate', [LetsEncryptController::class, 'receiveCertificate'])
     ->name('letsencrypt.receive-certificate');
+
+// Signed peer-to-peer scheduled-job coordination. These routes do not use a
+// user session; each request and response is authenticated by HMAC.
+Route::post('ha/node/identify', [ScheduledJobPeerController::class, 'identify'])
+    ->middleware('throttle:30,1')->name('ha.node.identify');
+Route::post('ha/scheduled-jobs/handoffs', [ScheduledJobPeerController::class, 'prepareHandoff'])
+    ->middleware('throttle:30,1')->name('ha.scheduled-jobs.handoffs.store');
+Route::get('ha/scheduled-jobs/handoffs/{handoff}', [ScheduledJobPeerController::class, 'handoffStatus'])
+    ->middleware('throttle:30,1')->name('ha.scheduled-jobs.handoffs.show');

@@ -16,6 +16,7 @@ use App\Models\Extensions;
 use App\Models\RingGroups;
 use App\Models\Voicemails;
 use App\Models\Destinations;
+use App\Models\DynamicRoute;
 use Illuminate\Support\Carbon;
 use App\Models\CallCenterQueues;
 use App\Models\CallCenterAgents;
@@ -28,6 +29,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Laravel\Horizon\Contracts\MasterSupervisorRepository;
 use App\Services\FreeswitchEslService;
+use App\Services\SipRegistrationSummaryService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
@@ -76,7 +78,7 @@ class DashboardController extends Controller
         return array_merge($permissions, CustomerNotesController::permissionFlags());
     }
 
-    public function getCounts()
+    public function getCounts(SipRegistrationSummaryService $registrationSummaryService)
     {
         $domain_uuid = session('domain_uuid');
 
@@ -203,6 +205,12 @@ class DashboardController extends Controller
                 ->count();
         }
 
+        if (userCheckPermission('dynamic_route_view')) {
+            $counts['dynamic_routes'] = DynamicRoute::where('domain_uuid', $domain_uuid)
+                ->where('enabled', true)
+                ->count();
+        }
+
         if (userCheckPermission("business_hours_list_view")) {
             //Business Hours Count
             $counts['business_hours'] = BusinessHour::where('domain_uuid', $domain_uuid)
@@ -247,19 +255,11 @@ class DashboardController extends Controller
                 ->count();
         }
 
-        $eslService = new FreeswitchEslService();
+        $onlineCounts = $registrationSummaryService->onlineExtensionCountsByRealm();
+        $currentRealm = strtolower(trim((string) session('domain_name')));
 
-        //Get all registrations
-        $regs = $eslService->getAllSipRegistrations();
-
-        // Get unique extensions online
-        $uniqueRegs = $regs->unique('user')->values();
-        $counts['global_reg_count'] = $uniqueRegs->count();
-
-        //Filter by domain
-        $filteredRegs = $uniqueRegs->where('sip_auth_realm', session('domain_name'))->values();
-
-        $counts['local_reg_count'] = $filteredRegs->count();
+        $counts['global_reg_count'] = array_sum($onlineCounts);
+        $counts['local_reg_count'] = (int) ($onlineCounts[$currentRealm] ?? 0);
 
 
         return $counts;
@@ -585,6 +585,9 @@ class DashboardController extends Controller
 
         if (userCheckPermission("call_flow_view")) {
             $apps[] = ['name' => __('Call Flows'), 'href' => route('call-flows.index'), 'icon' => 'AlternativeRouteIcon', 'slug' => 'call_flows'];
+        }
+        if (userCheckPermission('dynamic_route_view')) {
+            $apps[] = ['name' => __('Dynamic Routes'), 'href' => route('dynamic-routes.index'), 'icon' => 'AlternativeRouteIcon', 'slug' => 'dynamic_routes'];
         }
         if (userCheckPermission("fax_view")) {
             $apps[] = ['name' => __('Faxes'), 'href' => '/faxes', 'icon' => 'FaxIcon', 'slug' => 'faxes'];

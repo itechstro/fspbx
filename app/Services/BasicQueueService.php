@@ -303,6 +303,7 @@ class BasicQueueService
             'faxes',
             'conferences',
             'call_flows',
+            'dynamic_routes',
             'conference_centers' => [
                 'action' => 'transfer',
                 'data' => ($validated['timeout_target'] ?? '') . ' XML ' . $domainName,
@@ -442,10 +443,6 @@ class BasicQueueService
         app(DialplanService::class)->clearDialplanCache(session('domain_name'));
         FusionCache::clear('dialplan:' . session('domain_name'));
         FusionCache::clear('configuration:callcenter.conf*');
-
-        if (isset($_SESSION['destinations']['array'])) {
-            unset($_SESSION['destinations']['array']);
-        }
     }
 
     private function reloadRuntimeQueues(Collection $queues, bool $reloadXml = true): void
