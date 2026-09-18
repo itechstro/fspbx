@@ -159,14 +159,14 @@ log "Building core FusionPBX schema..."
 php public/core/upgrade/upgrade_schema.php >/dev/null 2>&1 || true
 
 log "Ensuring admin domain exists..."
-php artisan tinker .cursor/dev/create_domain.php >/dev/null
+php .cursor/dev/create_domain.php
 
 log "Seeding groups, permissions and default settings..."
 php public/core/upgrade/upgrade_domains.php >/dev/null 2>&1 || true
 php public/core/upgrade/upgrade.php >/dev/null 2>&1 || true
 
 log "Ensuring app schema/metadata and superadmin user..."
-php artisan tinker .cursor/dev/seed_admin.php
+php .cursor/dev/seed_admin.php
 
 log "Running Laravel migrations..."
 php artisan migrate --force

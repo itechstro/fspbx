@@ -1,11 +1,15 @@
 <?php
 // Idempotently ensure the FS PBX app schema/metadata and a superadmin user.
-// Run via: php artisan tinker .cursor/dev/seed_admin.php
+// Run via: php .cursor/dev/seed_admin.php
 // Must run AFTER the legacy upgrade_domains.php so the superadmin group exists.
 //
 // This mirrors the relevant parts of the `fspbx:initial-seed` command without
 // its production host-service side effects (FreeSWITCH / supervisor restarts,
 // www-data ownership changes, etc.) which do not apply to a dev VM.
+
+require __DIR__ . '/../../vendor/autoload.php';
+$app = require __DIR__ . '/../../bootstrap/app.php';
+$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
 use App\Services\Install\InstallSchema;
 use App\Models\Domain;
