@@ -1,0 +1,17 @@
+{
+  "name": "FS PBX",
+  "user": "ubuntu",
+  "install": "bash .cursor/install.sh",
+  "start": "bash .cursor/start.sh",
+  "terminals": [
+    {
+      "name": "app-server",
+      "command": "php artisan serve --host=0.0.0.0 --port=8000"
+    },
+    {
+      "name": "queue-worker",
+      "command": "php artisan queue:work --tries=1 --timeout=90"
+    }
+  ],
+  "ports": [8000]
+}
