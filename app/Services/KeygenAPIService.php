@@ -201,10 +201,38 @@ class KeygenAPIService
      */
     public function getMachineFingerprint()
     {
-        // Get the MAC address of the machine (assumes Linux-based system)
-        $macAddress = exec('cat /sys/class/net/eth0/address');
+        // Prefer eth0 so existing licensed machines keep the same fingerprint.
+        // Cloud images often name the first NIC ens3 or similar.
+        $macAddress = $this->readInterfaceMacAddress('eth0');
+        if ($macAddress === '') {
+            foreach (glob('/sys/class/net/*', GLOB_ONLYDIR) ?: [] as $path) {
+                $name = basename($path);
+                if ($name === 'lo') {
+                    continue;
+                }
+                $macAddress = $this->readInterfaceMacAddress($name);
+                if ($macAddress !== '') {
+                    break;
+                }
+            }
+        }
 
         // Hash the MAC address using SHA256
         return hash('sha256', $macAddress);
+    }
+
+    private function readInterfaceMacAddress(string $interface): string
+    {
+        $path = '/sys/class/net/'.$interface.'/address';
+        if (! is_readable($path)) {
+            return '';
+        }
+
+        $address = strtolower(trim((string) file_get_contents($path)));
+        if ($address === '' || $address === '00:00:00:00:00:00') {
+            return '';
+        }
+
+        return $address;
     }
 }

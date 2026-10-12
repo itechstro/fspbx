@@ -93,9 +93,12 @@ abstract class BaseMailable extends Mailable
                 ?? get_domain_setting('language', $this->attributes['domain_uuid'] ?? null)
         );
         $this->attributes['language'] = $language;
-        $this->attributes['unsubscribe_label'] ??= $language === 'zh-tw'
-            ? '取消訂閱此清單'
-            : 'Unsubscribe from this list';
+        $unsubscribeLabels = [
+            'zh-tw' => '取消訂閱此清單',
+            'th' => 'ยกเลิกการรับข้อความจากรายการนี้',
+        ];
+        $this->attributes['unsubscribe_label'] ??= $unsubscribeLabels[$language]
+            ?? 'Unsubscribe from this list';
 
         $this->databaseTemplate = app(EmailTemplateService::class)->render(
             $category,

@@ -3,7 +3,8 @@
 
                             <Vueform v-if="!loading" ref="form$" :endpoint="submitForm" @success="handleSuccess"
                                 @error="handleError" @response="handleResponse" :display-errors="false"
-                                :float-placeholders="false" :default="defaultValues">
+                                :float-placeholders="false" :default="defaultValues"
+                                @mounted="(form) => form.disableValidation()">
                                 <template #empty>
                                     <div class="lg:grid lg:grid-cols-12 lg:gap-x-5">
                                         <div class="px-2 py-6 sm:px-6 lg:col-span-3 lg:px-0 lg:py-0">

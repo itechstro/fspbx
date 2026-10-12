@@ -80,6 +80,8 @@ return [
         'zh-tw' => [
             'name' => 'Chinese (Traditional)',
             'native' => '繁體中文',
+            // Kept in the picker while newer catalog strings still fall back to English.
+            'offer' => true,
         ],
         'cs' => [
             'name' => 'Czech',
@@ -160,6 +162,12 @@ return [
         'sv-se' => [
             'name' => 'Swedish',
             'native' => 'Svenska',
+        ],
+        'th' => [
+            'name' => 'Thai',
+            'native' => 'ไทย',
+            // Kept in the picker while newer catalog strings still fall back to English.
+            'offer' => true,
         ],
         'tr' => [
             'name' => 'Turkish',

@@ -72,7 +72,10 @@ createInertiaApp({
       const vueApp = createApp({ render: () => h(App, props) });
 
       vueApp.use(plugin);
-      vueformConfig.locale = props.initialPage.props.locale === 'zh-tw' ? 'zh_TW' : 'en';
+      const vueformLocaleByAppLocale = {
+        'zh-tw': 'zh_TW',
+      };
+      vueformConfig.locale = vueformLocaleByAppLocale[props.initialPage.props.locale] ?? 'en';
       vueApp.use(Vueform, vueformConfig); // ✅ register Vueform IMMEDIATELY here
       vueApp.use(i18nVue, {
         lang: props.initialPage.props.locale,

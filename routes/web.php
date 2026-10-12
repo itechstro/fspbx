@@ -423,8 +423,6 @@ Route::group(['middleware' => 'auth'], function () {
     Route::post('/apps/mobile-app-options', [AppsController::class, 'getMobileAppOptions'])->name('apps.user.options');
     //Route::get('/apps/organization/update', [AppsController::class, 'updateOrganization']) ->name('appsUpdateOrganization');
     Route::get('/apps/connection/update', [AppsController::class, 'updateConnection'])->name('appsUpdateConnection');
-    Route::post('/apps/token/get', [AppsController::class, 'getToken'])->name('apps.token.get');
-    Route::post('/apps/token/update', [AppsController::class, 'updateToken'])->name('apps.token.update');
     Route::post('/apps/cloudplay/settings/get', [AppsController::class, 'getCloudPlaySettings'])->name('apps.cloudplay.settings.get');
     Route::post('/apps/cloudplay/settings/update', [AppsController::class, 'updateCloudPlaySettings'])->name('apps.cloudplay.settings.update');
     Route::post('/apps/cloudplay/customer/all', [AppsController::class, 'getCloudPlayCustomers'])->name('apps.cloudplay.customer.all');

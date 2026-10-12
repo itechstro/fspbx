@@ -37,86 +37,86 @@
                             <ToggleElement name="enabled" :text="$t('Enable call transcriptions')" :true-value="true"
                                 :false-value="false" :disabled="disableOptions" />
 
-                            <StaticElement name="calls_header" tag="h5" content="Calls"
+                            <StaticElement name="calls_header" tag="h5" :content="$t('Calls')"
                                 :conditions="[['enabled', '==', true]]" />
 
                             <!-- Auto-transcribe -->
-                            <ToggleElement name="auto_transcribe" text="Automatically transcribe new calls"
+                            <ToggleElement name="auto_transcribe" :text="$t('Automatically transcribe new calls')"
                                 :true-value="true" :false-value="false" :disabled="disableOptions"
                                 :conditions="[['enabled', '==', true]]" />
 
-                            <ToggleElement name="auto_summarize" text="Automatically summarize completed transcriptions"
-                                description="Required for automatic call summaries and sentiment on Call History."
+                            <ToggleElement name="auto_summarize" :text="$t('Automatically summarize completed transcriptions')"
+                                :description="$t('Required for automatic call summaries and sentiment on Call History.')"
                                 :true-value="true" :false-value="false" :disabled="disableOptions"
                                 :conditions="[['enabled', '==', true]]" />
 
-                            <ToggleElement name="auto_translate" text="Automatically translate call transcriptions"
+                            <ToggleElement name="auto_translate" :text="$t('Automatically translate call transcriptions')"
                                 :true-value="true" :false-value="false" :disabled="disableOptions"
                                 :conditions="[['enabled', '==', true]]" />
 
-                            <ToggleElement name="email_transcription" text="Automatically email call transcripts"
-                                description="Sends after transcription completes with whatever is available. Waits for translation when auto-translate is enabled."
+                            <ToggleElement name="email_transcription" :text="$t('Automatically email call transcripts')"
+                                :description="$t('Sends after transcription completes with whatever is available. Waits for translation when auto-translate is enabled.')"
                                 :true-value="true" :false-value="false" :disabled="disableOptions"
                                 :conditions="[['enabled', '==', true]]" />
 
-                            <TextElement name="email" label="Call transcript email"
+                            <TextElement name="email" :label="$t('Call transcript email')"
                                 :columns="{ lg: { wrapper: 5 } }" :disabled="disableOptions"
                                 :conditions="[
                                     ['enabled', '==', true],
                                     ['email_transcription', '==', true],
                                 ]" />
 
-                            <StaticElement name="recorder_header" tag="h5" content="Recorder"
-                                description="Separate options for SIPREC / recorder calls."
+                            <StaticElement name="recorder_header" tag="h5" :content="$t('Recorder')"
+                                :description="$t('Separate options for SIPREC / recorder calls.')"
                                 :conditions="[['enabled', '==', true]]" />
 
                             <ToggleElement name="auto_transcribe_recorder"
-                                text="Automatically transcribe recorder calls"
+                                :text="$t('Automatically transcribe recorder calls')"
                                 :true-value="true" :false-value="false" :disabled="disableOptions"
                                 :conditions="[['enabled', '==', true]]" />
 
                             <ToggleElement name="auto_summarize_recorder"
-                                text="Automatically summarize recorder transcriptions"
-                                description="Required for automatic summaries and sentiment on the Recorder page."
+                                :text="$t('Automatically summarize recorder transcriptions')"
+                                :description="$t('Required for automatic summaries and sentiment on the Recorder page.')"
                                 :true-value="true" :false-value="false" :disabled="disableOptions"
                                 :conditions="[['enabled', '==', true]]" />
 
-                            <SelectElement name="recorder_summary_language" label="Summary Language"
+                            <SelectElement name="recorder_summary_language" :label="$t('Summary Language')"
                                 :items="translationLanguages" :search="true" :native="false" input-type="search"
                                 autocomplete="off" :allow-absent="true" :strict="false"
-                                placeholder="e.g. th, en-us, zh-tw"
+                                :placeholder="$t('e.g. th, en-us, zh-tw')"
                                 :columns="{ lg: { wrapper: 5 } }" :disabled="disableOptions"
-                                description="Language for call and recorder summaries. Leave blank to use Translation Language, then domain language, then English."
+                                :description="$t('Language for call and recorder summaries. Leave blank to use Translation Language, then domain language, then English.')"
                                 :conditions="[['enabled', '==', true]]" />
 
                             <ToggleElement name="auto_translate_recorder"
-                                text="Automatically translate recorder transcriptions"
+                                :text="$t('Automatically translate recorder transcriptions')"
                                 :true-value="true" :false-value="false" :disabled="disableOptions"
                                 :conditions="[['enabled', '==', true]]" />
 
                             <ToggleElement name="email_transcription_recorder"
-                                text="Automatically email recorder transcripts"
-                                description="Sends after transcription completes with whatever is available. Waits for translation when auto-translate is enabled."
+                                :text="$t('Automatically email recorder transcripts')"
+                                :description="$t('Sends after transcription completes with whatever is available. Waits for translation when auto-translate is enabled.')"
                                 :true-value="true" :false-value="false" :disabled="disableOptions"
                                 :conditions="[['enabled', '==', true]]" />
 
-                            <TextElement name="email_recorder" label="Recorder transcript email"
+                            <TextElement name="email_recorder" :label="$t('Recorder transcript email')"
                                 :columns="{ lg: { wrapper: 5 } }" :disabled="disableOptions"
                                 :conditions="[
                                     ['enabled', '==', true],
                                     ['email_transcription_recorder', '==', true],
                                 ]" />
 
-                            <StaticElement name="translation_header" tag="h5" content="Translation"
-                                description="Shared target language for call and recorder translations."
+                            <StaticElement name="translation_header" tag="h5" :content="$t('Translation')"
+                                :description="$t('Shared target language for call and recorder translations.')"
                                 :conditions="[['enabled', '==', true]]" />
 
-                            <SelectElement name="translation_language" label="Translation Language"
+                            <SelectElement name="translation_language" :label="$t('Translation Language')"
                                 :items="translationLanguages" :search="true" :native="false" input-type="search"
                                 autocomplete="off" :allow-absent="true" :strict="false"
-                                placeholder="e.g. en-us, zh-cn, ms, ta"
+                                :placeholder="$t('e.g. en-us, zh-cn, ms, ta')"
                                 :columns="{ lg: { wrapper: 5 } }" :disabled="disableOptions"
-                                description="Target language used when translating call and recorder transcripts."
+                                :description="$t('Target language used when translating call and recorder transcripts.')"
                                 :conditions="[['enabled', '==', true]]" />
 
                             <!-- Provider -->

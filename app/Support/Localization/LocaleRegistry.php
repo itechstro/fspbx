@@ -97,7 +97,9 @@ class LocaleRegistry
                 'name' => $meta['name'] ?? $code,
                 'native' => $meta['native'] ?? $meta['name'] ?? $code,
                 'completion' => $completion,
-                'ready' => $code === $this->default() || $completion >= $minimum,
+                'ready' => $code === $this->default()
+                    || ! empty($meta['offer'])
+                    || $completion >= $minimum,
             ];
         }
 

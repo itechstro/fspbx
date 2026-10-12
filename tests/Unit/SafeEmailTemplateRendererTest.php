@@ -39,8 +39,10 @@ class SafeEmailTemplateRendererTest extends TestCase
         $this->assertArrayHasKey('ai-agent.send-email|en-us', $definitions);
         $this->assertArrayHasKey('extension.welcome|en-us', $definitions);
         $this->assertArrayHasKey('extension.welcome|zh-tw', $definitions);
+        $this->assertArrayHasKey('extension.welcome|th', $definitions);
         $this->assertArrayHasKey('voicemail.default|en-us', $definitions);
         $this->assertArrayHasKey('voicemail.default|zh-tw', $definitions);
+        $this->assertArrayHasKey('voicemail.default|th', $definitions);
         $this->assertArrayHasKey('voicemail.transcription|en-us', $definitions);
         $this->assertArrayHasKey('authentication.reset-password|en-us', $definitions);
 
@@ -51,6 +53,7 @@ class SafeEmailTemplateRendererTest extends TestCase
         $this->assertNotEmpty($englishKeys);
         foreach ($englishKeys as $englishKey) {
             $this->assertArrayHasKey(str_replace('|en-us', '|zh-tw', $englishKey), $definitions);
+            $this->assertArrayHasKey(str_replace('|en-us', '|th', $englishKey), $definitions);
         }
 
         foreach ($definitions as $definition) {

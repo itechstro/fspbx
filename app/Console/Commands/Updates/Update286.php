@@ -39,6 +39,15 @@ class Update286
                 return true;
             }
 
+            // CloudPlay stores its customer id in the same org_id setting.
+            // Those accounts are not Ringotel organizations, and this install
+            // has no Ringotel API token to repair them with.
+            if (get_mobile_app_provider() !== 'ringotel') {
+                echo "Mobile app provider is not Ringotel; DND code repair skipped.\n";
+
+                return true;
+            }
+
             $service = app(RingotelApiService::class);
 
             // Keep this one-time repair inside the update. Decode JSON as objects

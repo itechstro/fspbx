@@ -238,7 +238,7 @@ onMounted(() => {
     if (props.permissions?.ai_usage_rates_view) {
         navigation.value.push({
             key: 'ai_usage_rates',
-            name: 'AI Usage Rates',
+            name: trans('AI Usage Rates'),
             icon: markRaw(AdjustmentsVerticalIcon),
         });
     }
@@ -262,7 +262,7 @@ onMounted(() => {
             icon: markRaw(GraphicEqIcon),
             children: [
                 { key: 'transcription_options', name: trans('Options'), icon: markRaw(AdjustmentsVerticalIcon) },
-                { key: 'assemblyai', name: 'AssemblyAI', icon: markRaw(GraphicEqIcon) }
+                { key: 'assemblyai', name: trans('AssemblyAI'), icon: markRaw(GraphicEqIcon) },
             ],
         });
     }

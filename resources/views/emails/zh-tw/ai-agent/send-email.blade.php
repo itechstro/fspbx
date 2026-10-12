@@ -1,5 +1,5 @@
 {{-- email-template
-version: 1.0.1
+version: 1.0.2
 language: zh-tw
 category: ai-agent
 subcategory: send-email

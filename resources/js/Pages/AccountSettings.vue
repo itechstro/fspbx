@@ -339,14 +339,14 @@ const navigation = [
     ...(props.permissions?.call_webhook_view
         ? [{ key: 'call_webhooks', name: trans('Call Webhooks'), icon: ArrowPathRoundedSquareIcon }]
         : []),
-    // { key: 'billing', name: 'Billing', icon: CreditCardIcon },
+    // { key: 'billing', name: trans('Billing'), icon: CreditCardIcon },
     {
         key: 'call_transcription',
         name: trans('Call Transcription'),
         icon: markRaw(GraphicEqIcon),
         children: [
             { key: 'transcription_options', name: trans('Options'), icon: markRaw(AdjustmentsVerticalIcon) },
-            { key: 'assemblyai', name: 'AssemblyAI', icon: markRaw(GraphicEqIcon) }
+            { key: 'assemblyai', name: trans('AssemblyAI'), icon: markRaw(GraphicEqIcon) }
         ],
     },
     {

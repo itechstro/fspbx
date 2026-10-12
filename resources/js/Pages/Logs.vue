@@ -68,7 +68,7 @@
             <!-- FREESWITCH -->
             <section v-show="selectedMenuOption === 'freeswitch_logs'">
                 <Vueform>
-                    <StaticElement name="locations_title" tag="h4" content="FreeSWITCH" />
+                    <StaticElement name="locations_title" tag="h4" :content="$t('FreeSWITCH')" />
                 </Vueform>
 
                 <FreeSwitchLogs
@@ -97,7 +97,7 @@
             <!-- LARAVEL -->
             <section v-show="selectedMenuOption === 'laravel_logs'">
                 <Vueform>
-                    <StaticElement name="locations_title" tag="h4" content="Laravel" />
+                    <StaticElement name="locations_title" tag="h4" :content="$t('Laravel')" />
                 </Vueform>
 
                 <LaravelLogs
@@ -110,7 +110,7 @@
             <!-- Keep TigerTMS last so new log tabs stay above the PMS integration logs. -->
             <section v-if="features?.tigertms_logs" v-show="selectedMenuOption === 'tigertms_logs'">
                 <Vueform>
-                    <StaticElement name="locations_title" tag="h4" content="TigerTMS" />
+                    <StaticElement name="locations_title" tag="h4" :content="$t('TigerTMS')" />
                 </Vueform>
 
                 <TigerTmsLogs :trigger="tigerTmsLogsTrigger" :startPeriod="startPeriod" :endPeriod="endPeriod"
@@ -137,7 +137,7 @@
                         <div>
                             <label for="test_email_address" class="block text-sm font-medium text-gray-700">{{ $t('Email address') }}</label>
                             <input id="test_email_address" v-model.trim="testEmailForm.email" type="email" required
-                                autocomplete="email" placeholder="name@example.com"
+                                autocomplete="email" :placeholder="$t('name@example.com')"
                                 class="mt-1 block w-full rounded-md border-0 py-1.5 text-sm text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600" />
                             <p v-if="testEmailErrors.email" class="mt-2 text-xs text-red-600">{{ testEmailErrors.email[0] }}</p>
                         </div>
@@ -149,7 +149,7 @@
                                 {{ $t('Cancel') }}
                             </button>
                             <button type="submit" :disabled="testEmailLoading"
-                                class="inline-flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60">
+                                class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60">
                                 <EnvelopeIcon class="h-4 w-4" />
                                 {{ testEmailLoading ? $t('Sending...') : $t('Send') }}
                             </button>
@@ -267,14 +267,14 @@ const navigation = computed(() => {
     }
 
     if (props.permissions?.log_view) {
-        items.push({ key: 'freeswitch_logs', name: 'FreeSWITCH', icon: ServerStackIcon })
+        items.push({ key: 'freeswitch_logs', name: trans('FreeSWITCH'), icon: ServerStackIcon })
         items.push({ key: 'nginx_logs', name: trans('Web service'), icon: GlobeAltIcon })
-        items.push({ key: 'laravel_logs', name: 'Laravel', icon: DocumentTextIcon })
+        items.push({ key: 'laravel_logs', name: trans('Laravel'), icon: DocumentTextIcon })
     }
 
     // Keep TigerTMS as the last tab. Add future log tabs above this block.
     if (props.features?.tigertms_logs) {
-        items.push({ key: 'tigertms_logs', name: 'TigerTMS', icon: BuildingOffice2Icon })
+        items.push({ key: 'tigertms_logs', name: trans('TigerTMS'), icon: BuildingOffice2Icon })
     }
 
     return items

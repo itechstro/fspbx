@@ -111,7 +111,7 @@
                             <div class="min-w-0 flex-1">
                                 <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
                                     <h3 class="text-sm font-semibold text-gray-900">{{ formatLabel(row.subcategory) }}</h3>
-                                    <button type="button" class="inline-flex items-center rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-indigo-700 ring-1 ring-inset ring-indigo-600/20 hover:bg-indigo-100" :title="$t('Filter by :category', { category: row.category_label })" @click="selectedCategory = row.category">{{ row.category_label }}</button>
+                                    <button type="button" class="inline-flex items-center rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-indigo-700 ring-1 ring-inset ring-indigo-600/20 hover:bg-indigo-100" :title="$t('Filter by :label', { label: row.category_label })" @click="selectedCategory = row.category">{{ row.category_label }}</button>
                                     <span class="font-mono text-xs text-gray-400">{{ row.subcategory }}</span>
                                     <span class="text-xs text-gray-300">·</span>
                                     <span class="text-xs text-gray-500">{{ row.type_label }}</span>

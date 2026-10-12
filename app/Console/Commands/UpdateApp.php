@@ -62,6 +62,7 @@ use App\Console\Commands\Updates\Update280;
 use App\Console\Commands\Updates\Update281;
 use App\Console\Commands\Updates\Update282;
 use App\Console\Commands\Updates\Update283;
+use App\Console\Commands\Updates\Update284;
 use App\Console\Commands\Updates\Update198;
 use App\Console\Commands\Updates\Update199;
 use App\Console\Commands\Updates\Update200;
@@ -358,6 +359,7 @@ class UpdateApp extends Command
             '1.9.8.1' => Update282::class,
             '1.9.8.2' => Update283::class,
             '1.9.9' => Update199::class,
+            '1.9.10' => Update284::class,
             '2.0.0' => Update285::class,
             '2.0.3' => Update286::class,
             '2.0.4' => Update287::class,
@@ -404,8 +406,11 @@ class UpdateApp extends Command
         // Cache config and routes
         $this->executeCommand('php artisan config:cache');
 
-        // Refresh enabled modules using the DB license
-        $this->runArtisanCommand('modules:refresh');
+        // A missing or unmatched Pro license must not stop the core update.
+        $moduleRefreshExitCode = $this->call('modules:refresh');
+        if ($moduleRefreshExitCode !== 0) {
+            $this->warn('Module refresh did not complete. Pro features were left unchanged.');
+        }
 
         $this->executeCommand('php artisan route:cache');
         $this->executeCommand('php artisan queue:restart');

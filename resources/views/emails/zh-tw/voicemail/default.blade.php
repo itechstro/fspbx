@@ -1,5 +1,5 @@
 {{-- email-template
-version: 1.1.0
+version: 1.1.1
 language: zh-tw
 category: voicemail
 subcategory: default

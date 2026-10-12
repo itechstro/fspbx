@@ -24,7 +24,7 @@
                         <TextElement name="endpoint_url" :label="$t('Public HTTPS Endpoint URL')"
                             placeholder="https://crm.example.com/webhooks/fs-pbx" :floating="false"
                             :description="$t('The endpoint must use HTTPS and resolve only to a public network address.')"
-                            />
+                            :rules="['required', 'url']" />
 
                         <CheckboxgroupElement name="events" :label="$t('Events')" :items="eventOptions"
                             :description="$t('Choose which call lifecycle changes FS PBX sends.')" />

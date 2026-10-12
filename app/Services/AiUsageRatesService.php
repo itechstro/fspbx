@@ -15,41 +15,41 @@ class AiUsageRatesService
     {
         return [
             [
-                'group' => 'AssemblyAI models',
-                'description' => 'USD per hour of audio.',
+                'group' => __('AssemblyAI models'),
+                'description' => __('USD per hour of audio.'),
                 'fields' => [
-                    ['key' => 'assemblyai_universal_2_hourly_usd', 'label' => 'Universal-2 hourly rate'],
-                    ['key' => 'assemblyai_universal_3_pro_hourly_usd', 'label' => 'Universal-3 Pro hourly rate'],
+                    ['key' => 'assemblyai_universal_2_hourly_usd', 'label' => __('Universal-2 hourly rate')],
+                    ['key' => 'assemblyai_universal_3_pro_hourly_usd', 'label' => __('Universal-3 Pro hourly rate')],
                 ],
             ],
             [
-                'group' => 'AssemblyAI add-ons',
-                'description' => 'USD per hour when the add-on is enabled on a transcription request.',
+                'group' => __('AssemblyAI add-ons'),
+                'description' => __('USD per hour when the add-on is enabled on a transcription request.'),
                 'fields' => [
-                    ['key' => 'assemblyai_sentiment_hourly_usd', 'label' => 'Sentiment analysis'],
-                    ['key' => 'assemblyai_entity_hourly_usd', 'label' => 'Entity detection'],
-                    ['key' => 'assemblyai_highlights_hourly_usd', 'label' => 'Auto highlights'],
-                    ['key' => 'assemblyai_content_safety_hourly_usd', 'label' => 'Content safety'],
-                    ['key' => 'assemblyai_summarization_hourly_usd', 'label' => 'Summarization'],
+                    ['key' => 'assemblyai_sentiment_hourly_usd', 'label' => __('Sentiment analysis')],
+                    ['key' => 'assemblyai_entity_hourly_usd', 'label' => __('Entity detection')],
+                    ['key' => 'assemblyai_highlights_hourly_usd', 'label' => __('Auto highlights')],
+                    ['key' => 'assemblyai_content_safety_hourly_usd', 'label' => __('Content safety')],
+                    ['key' => 'assemblyai_summarization_hourly_usd', 'label' => __('Summarization')],
                 ],
             ],
             [
-                'group' => 'OpenAI models',
-                'description' => 'USD per 1M tokens.',
+                'group' => __('OpenAI models'),
+                'description' => __('USD per 1M tokens.'),
                 'fields' => [
-                    ['key' => 'openai_gpt5_nano_input_per_million_usd', 'label' => 'GPT-5 nano input'],
-                    ['key' => 'openai_gpt5_nano_output_per_million_usd', 'label' => 'GPT-5 nano output'],
-                    ['key' => 'openai_gpt41_mini_input_per_million_usd', 'label' => 'GPT-4.1 mini input'],
-                    ['key' => 'openai_gpt41_mini_output_per_million_usd', 'label' => 'GPT-4.1 mini output'],
+                    ['key' => 'openai_gpt5_nano_input_per_million_usd', 'label' => __('GPT-5 nano input')],
+                    ['key' => 'openai_gpt5_nano_output_per_million_usd', 'label' => __('GPT-5 nano output')],
+                    ['key' => 'openai_gpt41_mini_input_per_million_usd', 'label' => __('GPT-4.1 mini input')],
+                    ['key' => 'openai_gpt41_mini_output_per_million_usd', 'label' => __('GPT-4.1 mini output')],
                 ],
             ],
             [
-                'group' => 'OpenAI spend reserves',
-                'description' => 'Estimated USD reserved before starting a job for tenant limit checks.',
+                'group' => __('OpenAI spend reserves'),
+                'description' => __('Estimated USD reserved before starting a job for tenant limit checks.'),
                 'fields' => [
-                    ['key' => 'openai_reserve_summary_usd', 'label' => 'Call summary reserve'],
-                    ['key' => 'openai_reserve_translation_usd', 'label' => 'Translation reserve'],
-                    ['key' => 'openai_reserve_executive_summary_usd', 'label' => 'Executive summary reserve'],
+                    ['key' => 'openai_reserve_summary_usd', 'label' => __('Call summary reserve')],
+                    ['key' => 'openai_reserve_translation_usd', 'label' => __('Translation reserve')],
+                    ['key' => 'openai_reserve_executive_summary_usd', 'label' => __('Executive summary reserve')],
                 ],
             ],
         ];

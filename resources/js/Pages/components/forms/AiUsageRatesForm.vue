@@ -1,13 +1,13 @@
 <template>
     <div class="space-y-6 bg-gray-50 px-4 py-6 sm:p-6 text-gray-600">
         <div>
-            <h4 class="text-base font-semibold text-gray-900">AI Usage Rates</h4>
+            <h4 class="text-base font-semibold text-gray-900">{{ $t('AI Usage Rates') }}</h4>
             <p class="mt-1 text-sm text-gray-500">
-                Estimated provider rates for per-call cost reporting and tenant spend limits. These are not live invoice amounts.
+                {{ $t('Estimated provider rates for per-call cost reporting and tenant spend limits. These are not live invoice amounts.') }}
             </p>
         </div>
 
-        <div v-if="loading" class="text-sm text-gray-500">Loading rates...</div>
+        <div v-if="loading" class="text-sm text-gray-500">{{ $t('Loading rates...') }}</div>
 
         <template v-else>
             <div v-for="group in schema" :key="group.group" class="rounded-lg bg-white p-4 ring-1 ring-gray-200">
@@ -40,7 +40,7 @@
                     :disabled="saving"
                     @click="saveRates"
                 >
-                    Save rates
+                    {{ $t('Save rates') }}
                 </button>
             </div>
         </template>
