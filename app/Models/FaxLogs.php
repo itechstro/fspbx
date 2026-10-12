@@ -112,8 +112,8 @@ class FaxLogs extends Model
     public function getDirectionLabelAttribute(): ?string
     {
         return match ($this->direction) {
-            'outbound' => 'Outbound',
-            'inbound' => 'Inbound',
+            'outbound' => __('Outbound'),
+            'inbound' => __('Inbound'),
             default => null,
         };
     }

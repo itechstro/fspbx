@@ -5,9 +5,9 @@ namespace App\Http\Middleware;
 use App\Services\CdrDataService;
 use Inertia\Middleware;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 use App\Support\Localization\LocaleRegistry;
+use App\Support\ModuleMenuItems;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -51,7 +51,7 @@ class HandleInertiaRequests extends Middleware
             // other way to know a dialect's fallback parents.
             'localeChain' => fn() => app(LocaleRegistry::class)->chain(app()->getLocale()),
 
-            'menus' => fn () => $this->visibleMenus(),
+            'menus' => fn () => app(ModuleMenuItems::class)->apply($this->visibleMenus()),
 
             'menuUsesCatalogTranslations' => fn() => $this->menuUsesCatalogTranslations(),
 
@@ -80,24 +80,6 @@ class HandleInertiaRequests extends Middleware
 
             'presentation' => fn() => get_domain_presentation(session('domain_uuid')),
         ]);
-    }
-
-    private function menuUsesCatalogTranslations(): bool
-    {
-        if (Session::has('user.menu_uses_catalog_translations')) {
-            return (bool) Session::get('user.menu_uses_catalog_translations');
-        }
-
-        $menuUuid = Session::get('user.menu_uuid');
-        $usesCatalog = $menuUuid
-            && DB::table('v_menus')
-                ->where('menu_uuid', $menuUuid)
-                ->where('menu_name', 'fspbx')
-                ->exists();
-
-        Session::put('user.menu_uses_catalog_translations', (bool) $usesCatalog);
-
-        return (bool) $usesCatalog;
     }
 
     public function getPermissions()

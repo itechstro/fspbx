@@ -200,7 +200,7 @@ class DomainController extends Controller
             // Handle any other exception that may occur
             return response()->json([
                 'success' => false,
-                'errors' => ['server' => ['Failed to get item details']]
+                'errors' => ['server' => [__('Failed to get item details')]]
             ], 500); // 500 Internal Server Error for any other errors
         }
     }
@@ -245,7 +245,7 @@ class DomainController extends Controller
             'status' => 200,
             'redirectUrl' => $url ?? '',
             'success' => [
-                'message' => 'Domain has been switched'
+                'message' => __('Domain has been switched')
             ]
         ]);
     }
@@ -294,7 +294,7 @@ class DomainController extends Controller
 
         // Check if domains exist in session
         if (!$domains) {
-            return response()->json(['error' => 'Domains not found in session'], 404);
+            return response()->json(['error' => __('Domains not found in session')], 404);
         }
 
         // Check if search parameter is provided
@@ -353,14 +353,14 @@ class DomainController extends Controller
             $this->sessionDomainService->refreshForUser(Auth::user());
 
             return response()->json([
-                'messages' => ['success' => ['Domain created successfully.']],
+                'messages' => ['success' => [__('Domain created successfully.')]],
             ], 201);
         } catch (\Exception $e) {
             DB::rollBack();
             logger('DomainController@store error: ' . $e->getMessage() . " at " . $e->getFile() . ":" . $e->getLine());
             return response()->json([
                 'success' => false,
-                'errors' => ['server' => ['Failed to create domain']],
+                'errors' => ['server' => [__('Failed to create domain')]],
             ], 500);
         }
     }
@@ -411,7 +411,7 @@ class DomainController extends Controller
             $this->sessionDomainService->refreshForUser(Auth::user());
 
             return response()->json([
-                'messages' => ['success' => ['Domain updated successfully.']],
+                'messages' => ['success' => [__('Domain updated successfully.')]],
             ], 200);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -421,7 +421,7 @@ class DomainController extends Controller
             );
             return response()->json([
                 'success' => false,
-                'errors' => ['server' => ['Failed to update this domain']]
+                'errors' => ['server' => [__('Failed to update this domain')]]
             ], 500);
         }
     }
@@ -439,7 +439,7 @@ class DomainController extends Controller
             if (empty($items) || !is_array($items)) {
                 return response()->json([
                     'success' => false,
-                    'errors'  => ['request' => ['No domains were selected for deletion.']],
+                    'errors'  => ['request' => [__('No domains were selected for deletion.')]],
                 ], 422);
             }
 
@@ -463,7 +463,7 @@ class DomainController extends Controller
             $this->sessionDomainService->refreshForUser(Auth::user());
 
             return response()->json([
-                'messages' => ['server' => ['All selected domains have been deleted successfully.']],
+                'messages' => ['server' => [__('All selected domains have been deleted successfully.')]],
             ], 200);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -475,7 +475,7 @@ class DomainController extends Controller
 
             return response()->json([
                 'success' => false,
-                'errors'  => ['server' => ['Server returned an error while deleting the selected domains.']],
+                'errors'  => ['server' => [__('Server returned an error while deleting the selected domains.')]],
             ], 500);
         }
     }

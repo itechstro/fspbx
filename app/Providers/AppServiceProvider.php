@@ -66,6 +66,9 @@ class AppServiceProvider extends ServiceProvider
 
         $this->app->singleton(LocaleRegistry::class);
 
+        // Menu entries optional modules register while they're enabled.
+        $this->app->singleton(\App\Support\ModuleMenuItems::class);
+
         $this->app->scoped(PhoneNumberService::class);
 
         // Merge a locale's JSON strings over its LocaleRegistry::chain() so
@@ -132,6 +135,7 @@ class AppServiceProvider extends ServiceProvider
         User::observe(UserObserver::class);
         UserDomainGroupPermissions::observe(UserDomainGroupPermissionsObserver::class);
         Extensions::observe(ExtensionObserver::class);
+        \App\Models\CallCenterAgents::observe(\App\Observers\CallCenterAgentObserver::class);
         EmergencyCall::observe(EmergencyCallObserver::class);
         EmergencyCallMember::observe(EmergencyCallMemberObserver::class);
         EmergencyCallEmail::observe(EmergencyCallEmailObserver::class);

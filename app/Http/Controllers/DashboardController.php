@@ -61,6 +61,8 @@ class DashboardController extends Controller
                     'data_route' => route('dashboard.data'),
                     'counts_route' => route('dashboard.counts'),
                     'my_extension_status_route' => route('dashboard.my-extension-status'),
+                    'call_stats_route' => route('dashboard.call-stats'),
+                    'cdrs_page' => route('cdrs.index'),
                     'customer_notes_route' => route('dashboard.customer-notes'),
                     'extension_item_options' => route('extensions.item.options'),
                     'agent_status_update' => $this->agentStatusUpdateRoute(),
@@ -74,6 +76,7 @@ class DashboardController extends Controller
         $permissions = [];
         $permissions['extension_view'] = userCheckPermission('extension_view');
         $permissions['account_settings_index'] = userCheckPermission('account_settings_list_view');
+        $permissions['cdr_view'] = userCheckPermission('xml_cdr_view');
 
         return array_merge($permissions, CustomerNotesController::permissionFlags());
     }
@@ -244,17 +247,6 @@ class DashboardController extends Controller
             $counts['queues'] = CallCenterQueues::where('domain_uuid', $domain_uuid)->count();
         }
 
-        if (
-            Module::has('Billing')
-            && Module::collections()->has('Billing')
-            && userCheckPermission('billing_view')
-        ) {
-            $counts['billing'] = DB::table('billing_quotes')
-                ->where('domain_uuid', $domain_uuid)
-                ->whereIn('status', ['draft', 'sent', 'viewed', 'accepted'])
-                ->count();
-        }
-
         $onlineCounts = $registrationSummaryService->onlineExtensionCountsByRealm();
         $currentRealm = strtolower(trim((string) session('domain_name')));
 
@@ -263,6 +255,51 @@ class DashboardController extends Controller
 
 
         return $counts;
+    }
+
+    /**
+     * Today's inbound, outbound, and local calls by hour for the dashboard Calls card,
+     * counted like the Call History tile and bucketed in the account time zone.
+     */
+    public function getCallStats(CdrDataService $cdrDataService)
+    {
+        if (!userCheckPermission('xml_cdr_view')) {
+            abort(403);
+        }
+
+        $domainUuid = session('domain_uuid');
+        $timezone = get_local_time_zone($domainUuid);
+        $startOfDay = Carbon::now($timezone)->startOfDay();
+
+        $cdrs = $cdrDataService->getData([
+            'paginate' => false,
+            'domain_uuid' => $domainUuid,
+            'filter' => [
+                'startPeriod' => $startOfDay->copy()->utc()->getTimestamp(),
+                'endPeriod' => $startOfDay->copy()->endOfDay()->utc()->getTimestamp(),
+            ],
+        ]);
+
+        $hours = array_fill(0, 24, ['inbound' => 0, 'outbound' => 0, 'local' => 0]);
+        foreach ($cdrs as $cdr) {
+            if (in_array($cdr->direction, ['inbound', 'outbound', 'local'], true)) {
+                $hour = (int) Carbon::createFromTimestamp($cdr->start_epoch, $timezone)->format('G');
+                $hours[$hour][$cdr->direction]++;
+            }
+        }
+
+        return response()->json([
+            'inbound' => array_sum(array_column($hours, 'inbound')),
+            'outbound' => array_sum(array_column($hours, 'outbound')),
+            'local' => array_sum(array_column($hours, 'local')),
+            'hours' => collect($hours)->map(fn (array $counts, int $hour) => [
+                'hour' => $hour,
+                'label' => Carbon::createFromTime($hour)->format('g A'),
+                'inbound' => $counts['inbound'],
+                'outbound' => $counts['outbound'],
+                'local' => $counts['local'],
+            ])->values(),
+        ]);
     }
 
     public function getData()
@@ -386,6 +423,12 @@ class DashboardController extends Controller
 
         $data['time_zone'] = get_domain_setting('time_zone');
         $data['billing_suspension'] = filter_var(get_domain_setting('billing_suspension'), FILTER_VALIDATE_BOOLEAN);
+        // Suspended accounts with a billing page get a "Pay now" link in the banner.
+        $data['billing'] = $this->billingAccountSummary();
+        $data['billing_pay_url'] = $data['billing_suspension']
+            && $this->billingAccountService()?->customerForDomain(session('domain_uuid'))
+            ? '/billing/account'
+            : null;
 
         return $data;
     }
@@ -622,22 +665,38 @@ class DashboardController extends Controller
             $apps[] = $contact_center_app;
         }
 
+        return $apps;
+    }
+
+    /**
+     * The open account's billing for the Account widget (Billing module), or
+     * null when the account isn't billed to a customer. Staff see any billed
+     * account and link to its customer view; tenant admins see their own.
+     */
+    private function billingAccountSummary(): ?array
+    {
+        $staff = userCheckPermission('billing_customers_view');
+        $billing = $this->billingAccountService($staff ? 'billing_customers_view' : 'billing_portal_view');
+        $customer = $billing?->customerForDomain(session('domain_uuid'));
+
+        return $customer ? $billing->accountSummary($customer, $staff) : null;
+    }
+
+    /**
+     * The Billing module's BillingAccountService, or null when the module is
+     * unavailable or the user lacks $permission.
+     */
+    private function billingAccountService(string $permission = 'billing_portal_view'): ?object
+    {
         if (
-            Module::has('Billing')
-            && Module::collections()->has('Billing')
-            && userCheckPermission('billing_view')
+            !Module::has('Billing')
+            || !Module::collections()->has('Billing')
+            || !userCheckPermission($permission)
+            || !class_exists(\Modules\Billing\Services\BillingAccountService::class)
         ) {
-            $apps[] = [
-                'name' => __('Billing'),
-                'href' => '/billing',
-                'icon' => 'CreditCardIcon',
-                'slug' => 'billing',
-                'alt_href' => userCheckPermission('billing_settings_edit') ? '/billing/settings' : null,
-                'alt_link_label' => userCheckPermission('billing_settings_edit') ? __('Settings') : null,
-            ];
+            return null;
         }
 
-
-        return $apps;
+        return app(\Modules\Billing\Services\BillingAccountService::class);
     }
 }

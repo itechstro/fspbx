@@ -29,6 +29,13 @@ class SafeEmailTemplateRendererTest extends TestCase
         $definitions = app(EmailTemplateSourceService::class)->definitions();
 
         $this->assertNotEmpty($definitions);
+        $byLanguage = [];
+        foreach ($definitions as $definition) {
+            $byLanguage[$definition['template_language']] = ($byLanguage[$definition['template_language']] ?? 0) + 1;
+        }
+        foreach (['en-us', 'ru', 'fr', 'es-419', 'pt-br', 'zh-tw'] as $language) {
+            $this->assertArrayHasKey($language, $byLanguage);
+        }
         $this->assertArrayHasKey('ai-agent.send-email|en-us', $definitions);
         $this->assertArrayHasKey('extension.welcome|en-us', $definitions);
         $this->assertArrayHasKey('extension.welcome|zh-tw', $definitions);
@@ -47,20 +54,22 @@ class SafeEmailTemplateRendererTest extends TestCase
         }
 
         foreach ($definitions as $definition) {
+            foreach (['template_subject', 'template_description', 'template_html', 'template_text'] as $field) {
+                $this->assertTrue(mb_check_encoding($definition[$field], 'UTF-8'), $definition['source_path'].' '.$field);
+            }
+            $this->assertNotSame('', $definition['template_subject']);
             $this->assertNotSame('', $definition['template_description']);
-            $this->assertTrue(
-                mb_check_encoding($definition['template_description'], 'UTF-8'),
-                $definition['template_key'].'|'.$definition['template_language'].' description is not valid UTF-8'
-            );
             $this->assertNotSame('', $definition['template_html']);
             $this->assertNotSame('', $definition['template_text']);
-            $expectedFile = $definition['template_language'] === 'en-us'
-                ? $definition['template_category'].'/'.$definition['template_subcategory'].'.blade.php'
-                : $definition['template_category'].'/'.$definition['template_subcategory'].'.'.$definition['template_language'].'.blade.php';
-            $this->assertStringEndsWith($expectedFile, $definition['source_path']);
+            $this->assertStringEndsWith(
+                $definition['template_language'].'/'.$definition['template_category'].'/'.$definition['template_subcategory'].'.blade.php',
+                $definition['source_path']
+            );
             if ($definition['template_layout'] === 'standard') {
                 $this->assertStringStartsWith(
-                    "@extends('emails.email_layout')",
+                    $definition['template_language'] === 'en-us'
+                        ? "@extends('emails.email_layout')"
+                        : "@extends('emails.{$definition['template_language']}.email_layout')",
                     ltrim($definition['template_html'])
                 );
             }
@@ -87,6 +96,26 @@ class SafeEmailTemplateRendererTest extends TestCase
         $this->assertStringContainsString('Hello Ada &amp; Lin', $html);
         $this->assertStringContainsString('{{ dangerous() }} &lt;script&gt;alert(1)&lt;/script&gt;', $html);
         $this->assertStringNotContainsString("@yield('content')", $html);
+    }
+
+    public function test_language_layouts_keep_their_own_footer_without_a_second_english_wrapper(): void
+    {
+        $footers = [
+            'ru' => 'Отписаться от рассылки',
+            'fr' => 'Se désabonner de cette liste',
+            'es-419' => 'Cancelar la suscripción a esta lista',
+            'pt-br' => 'Cancelar inscrição nesta lista',
+        ];
+        foreach ($footers as $language => $footer) {
+            $html = app(SafeEmailTemplateRenderer::class)->renderHtml(
+                "@extends('emails.{$language}.email_layout')\n@section('content')<p>Example</p>@endsection",
+                ['unsubscribe_email' => 'support@example.test'],
+                'standard'
+            );
+            $this->assertStringContainsString($footer, $html);
+            $this->assertStringNotContainsString('Unsubscribe from this list', $html);
+            $this->assertSame(1, substr_count($html, '<html'));
+        }
     }
 
     public function test_php_blocks_and_scripts_are_rejected_in_editable_content(): void

@@ -28,7 +28,7 @@
                             <button type="button"
                                 class="absolute right-4 top-4 rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
                                 @click="emit('close')">
-                                <span class="sr-only">Close</span>
+                                <span class="sr-only">{{ $t("Close") }}</span>
                                 <XMarkIcon class="h-6 w-6" aria-hidden="true" />
                             </button>
 
@@ -48,6 +48,8 @@
 import { Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot } from "@headlessui/vue";
 import { XMarkIcon } from "@heroicons/vue/24/solid";
 import BasicQueueFormFields from "./BasicQueueFormFields.vue";
+
+const formLocale = useVueformLocale();
 
 const props = defineProps({
     show: Boolean,
@@ -90,18 +92,18 @@ const buttonIconClassOverrides = {
     },
 };
 
-const strategyOptions = [
-    { value: "ring-all", label: "Ring All" },
-    { value: "longest-idle-agent", label: "Longest Idle Agent" },
-    { value: "round-robin", label: "Round Robin" },
-    { value: "top-down", label: "Top Down" },
-    { value: "agent-with-least-talk-time", label: "Least Talk Time" },
-    { value: "agent-with-fewest-calls", label: "Fewest Calls" },
-    { value: "sequentially-by-agent-order", label: "Sequential Agent Order" },
-    { value: "random", label: "Random" },
-];
+const strategyOptions = computed(() => [
+    { value: "ring-all", label: trans("Ring All") },
+    { value: "longest-idle-agent", label: trans("Longest Idle Agent") },
+    { value: "round-robin", label: trans("Round Robin") },
+    { value: "top-down", label: trans("Top Down") },
+    { value: "agent-with-least-talk-time", label: trans("Least Talk Time") },
+    { value: "agent-with-fewest-calls", label: trans("Fewest Calls") },
+    { value: "sequentially-by-agent-order", label: trans("Sequential Agent Order") },
+    { value: "random", label: trans("Random") },
+]);
 
-const tierOptions = Array.from({ length: 20 }, (_, i) => {
+const tierOptions = Array.from({ length: 10 }, (_, i) => {
     const value = String(i + 1);
     return { value, label: value };
 });
@@ -126,8 +128,8 @@ const defaultValues = computed(() => ({
     tiers: (props.options?.tiers ?? []).map((tier) => ({
         call_center_agent_uuid: tier.call_center_agent_uuid,
         agent_label: tier.agent_label || tier.agent_name || null,
-        tier_level: String(tier.tier_level ?? 0),
-        tier_position: String(tier.tier_position ?? 0),
+        tier_level: String(tier.tier_level ?? 1),
+        tier_position: String(tier.tier_position ?? 1),
     })),
 }));
 
@@ -155,7 +157,7 @@ const availableAgentOptions = computed(() => {
 
     return [
         {
-            label: "Agents",
+            label: trans("Agents"),
             items: agentOptions.value.filter((agent) => !selectedAgentUuids.includes(agent.value)),
         },
     ];
@@ -170,8 +172,8 @@ const handleAgentSelect = (option) => {
             {
                 call_center_agent_uuid: option.value,
                 agent_label: option.label,
-                tier_level: "0",
-                tier_position: "0",
+                tier_level: "1",
+                tier_position: "1",
             },
         ],
     });
@@ -182,27 +184,27 @@ const handleAgentSelect = (option) => {
 const getAgentLabel = (agentUuid, fallback = null) => {
     const agent = agentOptions.value.find((option) => option.value === agentUuid);
 
-    return agent?.label || fallback || agentUuid || "Agent";
+    return agent?.label || fallback || agentUuid || trans("Agent");
 };
 
 const fetchGreetings = async () => {
     const route = props.options?.routes?.greeting_route;
 
     if (!route) {
-        availableGreetings.value = [{ value: "disabled", label: "No greeting" }];
+        availableGreetings.value = [{ value: "disabled", label: trans("No greeting") }];
         return availableGreetings.value;
     }
 
     try {
         const response = await axios.get(route);
         availableGreetings.value = [
-            { value: "disabled", label: "No greeting" },
+            { value: "disabled", label: trans("No greeting") },
             ...(response.data || []),
         ];
         return availableGreetings.value;
     } catch (error) {
         emit("error", error);
-        availableGreetings.value = [{ value: "disabled", label: "No greeting" }];
+        availableGreetings.value = [{ value: "disabled", label: trans("No greeting") }];
         return availableGreetings.value;
     }
 };
@@ -260,7 +262,7 @@ const playGreeting = () => {
 
     currentAudio.value.play().catch(() => {
         isAudioPlaying.value = false;
-        showNotification("error", { request: ["Audio playback failed"] });
+        showNotification("error", { request: [trans("Audio playback failed")] });
     });
 
     currentAudio.value.addEventListener("ended", () => {
@@ -269,7 +271,7 @@ const playGreeting = () => {
 
     currentAudio.value.addEventListener("error", () => {
         isAudioPlaying.value = false;
-        showNotification("error", { request: ["File not found or failed to load audio"] });
+        showNotification("error", { request: [trans("File not found or failed to load audio")] });
     });
 };
 
@@ -334,7 +336,7 @@ const handleGreetingUpdate = async (updatedGreeting) => {
     const newName = updatedGreeting?.label?.trim();
 
     if (!newName) {
-        showNotification("error", { request: ["Greeting name cannot be empty."] });
+        showNotification("error", { request: [trans("Greeting name cannot be empty.")] });
         return;
     }
 
@@ -413,6 +415,8 @@ const formatTarget = (name, value) => {
 };
 
 const submitForm = async (FormData, form$) => {
+    form$.messageBag.clear();
+    Object.values(form$.elements$).forEach(clearErrorsRecursive);
     const requestData = form$.requestData;
     const route = props.mode === "create"
         ? props.options.routes.store_route
@@ -456,6 +460,6 @@ const handleError = (error, details, form$) => {
         return;
     }
 
-    form$.messageBag.append("Could not submit form");
+    form$.messageBag.append(trans("Could not submit form"));
 };
 </script>

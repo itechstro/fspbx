@@ -46,7 +46,7 @@ class TokenController extends Controller
                 'name' => $token->name,
                 'created_at' => format_domain_datetime($token->created_at, session('domain_uuid')),
                 'last_used_at' => $token->last_used_at
-                    ? Carbon::parse($token->last_used_at)->diffForHumans()
+                    ? Carbon::parse($token->last_used_at)->locale(app()->getLocale())->diffForHumans()
                     : null,
                 'expires_at' => format_domain_datetime($token->expires_at, session('domain_uuid')),
             ];
@@ -71,7 +71,7 @@ class TokenController extends Controller
         $user = User::where('user_email', $request->user_email)->first();
 
         if (!$user || !password_verify($request->password, $user->password)) {
-            return $this->sendError('Athentication failed.', [], 401);
+            return $this->sendError(__('Authentication failed.'), [], 401);
         }
         $token = $user->createToken('auth_token')->plainTextToken;
 
@@ -81,7 +81,7 @@ class TokenController extends Controller
                 'access_token' => $token,
                 'token_type' => 'Bearer',
             ],
-            'Token generated successfully.'
+            __('Token generated successfully.')
         );
     }
 
@@ -100,7 +100,7 @@ class TokenController extends Controller
             DB::commit();
 
             return response()->json([
-                'messages' => ['success' => ['API token created successfully.']],
+                'messages' => ['success' => [__('API token created successfully.')]],
                 'token' => $token->plainTextToken, // Show once!
             ], 201);
         } catch (\Throwable $e) {
@@ -109,7 +109,7 @@ class TokenController extends Controller
                 . " at " . $e->getFile() . ":" . $e->getLine());
 
             return response()->json([
-                'messages' => ['error' => ['Something went wrong while creating the API token.']]
+                'messages' => ['error' => [__('Something went wrong while creating the API token.')]]
             ], 500);
         }
     }
@@ -126,7 +126,7 @@ class TokenController extends Controller
         // 1) Permission check
         if (! userCheckPermission('api_key_delete')) {
             return response()->json([
-                'messages' => ['error' => ['Access denied.']]
+                'messages' => ['error' => [__('Access denied.')]]
             ], 403);
         }
 
@@ -146,7 +146,7 @@ class TokenController extends Controller
             DB::commit();
 
             return response()->json([
-                'messages' => ['success' => ['Selected API Key revoked successfully.']]
+                'messages' => ['success' => [__('Selected API Key revoked successfully.')]]
             ]);
         } catch (\Throwable $e) {
             DB::rollBack();
@@ -157,7 +157,7 @@ class TokenController extends Controller
             );
 
             return response()->json([
-                'messages' => ['error' => ['An error occurred while revoking API Key.']]
+                'messages' => ['error' => [__('An error occurred while revoking API Key.')]]
             ], 500);
         }
     }

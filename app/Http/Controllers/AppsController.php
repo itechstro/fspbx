@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Inertia\Inertia;
+use App\Support\Localization\ValidationMessages;
 use App\Models\Domain;
 use App\Models\Extensions;
 use Illuminate\Support\Str;
@@ -37,9 +38,6 @@ class AppsController extends Controller
     protected $ringotelApiService;
 
     public $model;
-    public $filters = [];
-    public $sortField;
-    public $sortOrder;
     protected $viewName = 'RingotelAppSettings';
     protected $searchable = ['domain_name', 'domain_description'];
     protected $allowedSortFields = [
@@ -58,20 +56,26 @@ class AppsController extends Controller
      *
      * @return \Illuminate\Contracts\Foundation\Application|\Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View
      */
-    public function index()
+    public function index(Request $request)
     {
         return Inertia::render(
             'CloudPlayAppSettings',
             [
-                'data' => function () {
-                    return $this->getData();
-                },
                 'pagination' => [
                     'per_page' => fspbx_pagination_per_page(),
                     'per_page_options' => fspbx_pagination_options(),
                 ],
                 'routes' => [
                     'current_page' => route('apps.index'),
+                    'data_route' => route('apps.data'),
+                    'select_all' => route('apps.select.all'),
+                    'create_organization' => route('apps.organization.create'),
+                    'update_organization' => route('apps.organization.update'),
+                    'destroy_organization' => route('apps.organization.destroy'),
+                    'pair_organization' => route('apps.organization.pair'),
+                    'get_all_orgs' => route('apps.organization.all'),
+                    'get_api_token' => route('apps.token.get'),
+                    'update_api_token' => route('apps.token.update'),
                     'item_options' => route('apps.item.options'),
                     'create_customer' => route('apps.cloudplay.customer.create'),
                     'pair_customer' => route('apps.cloudplay.customer.pair'),
@@ -91,34 +95,12 @@ class AppsController extends Controller
     /**
      *  Get data
      */
-    public function getData($paginate = null)
+    public function getData(Request $request)
     {
-        $paginate ??= fspbx_pagination_per_page();
-
-        // Check if search parameter is present and not empty
-        if (!empty(request('filterData.search'))) {
-            $this->filters['search'] = request('filterData.search');
-        }
-
-        // Add sorting criteria
-        $requestedSortField = request()->get('sortField', 'domain_name');
-        $requestedSortOrder = request()->get('sortOrder', 'asc');
-
-        $this->sortField = in_array($requestedSortField, $this->allowedSortFields, true)
-            ? $requestedSortField
-            : 'domain_name';
-        $this->sortOrder = in_array($requestedSortOrder, ['asc', 'desc'], true)
-            ? $requestedSortOrder
-            : 'asc';
-
-        $data = $this->builder($this->filters);
-
-        // Apply pagination if requested
-        if ($paginate) {
-            $data = $data->paginate($paginate);
-        } else {
-            $data = $data->get(); // This will return a collection
-        }
+        $data = $this->builder(
+            ['search' => $request->input('filter.search')],
+            (string) $request->input('sort', 'domain_name')
+        )->paginate(fspbx_pagination_per_page($request));
 
         // Normalize the query-level sort flag into the existing UI payload shape.
         $data->each(function ($domain) {
@@ -141,7 +123,7 @@ class AppsController extends Controller
      * @param  array  $filters
      * @return Builder
      */
-    public function builder(array $filters = [])
+    public function builder(array $filters = [], string $sort = 'domain_name')
     {
         $data =  $this->model::query();
         // Get all domains with 'domain_enabled' set to 'true' and eager load settings
@@ -172,18 +154,21 @@ class AppsController extends Controller
 
         if (is_array($filters)) {
             foreach ($filters as $field => $value) {
+                if ($value === null || $value === '') continue;
                 if (method_exists($this, $method = "filter" . ucfirst($field))) {
                     $this->$method($data, $value);
                 }
             }
         }
 
-        // Apply sorting
-        $sortColumn = $this->sortField === 'ringotel_status'
-            ? 'ringotel_status_sort'
-            : $this->sortField;
-
-        $data->orderBy($sortColumn, $this->sortOrder);
+        $sortField = ltrim($sort, '-');
+        $sortOrder = str_starts_with($sort, '-') ? 'desc' : 'asc';
+        if (! in_array($sortField, $this->allowedSortFields, true)) {
+            $sortField = 'domain_name';
+            $sortOrder = 'asc';
+        }
+        $sortColumn = $sortField === 'ringotel_status' ? 'ringotel_status_sort' : $sortField;
+        $data->orderBy($sortColumn, $sortOrder);
 
         return $data;
     }
@@ -213,6 +198,14 @@ class AppsController extends Controller
                 }
             }
         });
+    }
+
+    public function selectAll(Request $request)
+    {
+        return response()->json([
+            'messages' => ['success' => [__('All items selected')]],
+            'items' => $this->builder(['search' => $request->input('filter.search')])->pluck('domain_uuid'),
+        ]);
     }
 
     public function getItemOptions(CloudPlayApiService $cloudPlayApiService)
@@ -314,14 +307,14 @@ class AppsController extends Controller
             // Return a JSON response indicating success
             return response()->json([
                 'org_id' => $organization['id'],
-                'messages' => ['success' => ['Organization successfully activated']]
+                'messages' => ['success' => [__('Organization successfully activated')]]
             ], 201);
         } catch (\Exception $e) {
             logger($e->getMessage() . " at " . $e->getFile() . ":" . $e->getLine());
             // Handle any other exception that may occur
             return response()->json([
                 'success' => false,
-                'errors' => ['server' => ['Unable to activate organization. Check logs for more details'], 'server2' => [$e->getMessage()]]
+                'errors' => ['server' => [__('Unable to activate organization. Check logs for more details')], 'server2' => [$e->getMessage()]]
             ], 500);  // 500 Internal Server Error for any other errors
         }
     }
@@ -357,14 +350,14 @@ class AppsController extends Controller
 
             // Return a JSON response indicating success
             return response()->json([
-                'messages' => ['success' => ['Organization successfully updated']]
+                'messages' => ['success' => [__('Organization successfully updated')]]
             ], 201);
         } catch (\Exception $e) {
             logger($e->getMessage() . " at " . $e->getFile() . ":" . $e->getLine());
             // Handle any other exception that may occur
             return response()->json([
                 'success' => false,
-                'errors' => ['server' => ['Unable to update organization. Check logs for more details']]
+                'errors' => ['server' => [__('Unable to update organization. Check logs for more details')]]
             ], 500);  // 500 Internal Server Error for any other errors
         }
     }
@@ -392,7 +385,7 @@ class AppsController extends Controller
             if (!$org_id) {
                 return response()->json([
                     'success' => false,
-                    'errors' => ['server' => ['Organization ID not found for the given domain.']]
+                    'errors' => ['server' => [__('Organization ID not found for the given domain.')]]
                 ], 404); // 404 Not Found
             }
 
@@ -416,13 +409,13 @@ class AppsController extends Controller
                     ->delete();
 
                 return response()->json([
-                    'messages' => ['success' => ['Organization and its connections were successfully deleted.']]
+                    'messages' => ['success' => [__('Organization and its connections were successfully deleted.')]]
                 ], 200); // 200 OK
             }
 
             return response()->json([
                 'success' => false,
-                'errors' => ['server' => ['Failed to delete the organization.']]
+                'errors' => ['server' => [__('Failed to delete the organization.')]]
             ], 500); // 500 Internal Server Error
 
         } catch (\Exception $e) {
@@ -456,14 +449,14 @@ class AppsController extends Controller
                 'conn_id' => $connection['id'],
                 'connection_name' => $inputs['connection_name'],
                 'domain' => $inputs['domain'] . ":" . $inputs['port'],
-                'messages' => ['success' => ['Connection created successfully']]
+                'messages' => ['success' => [__('Connection created successfully')]]
             ], 201);
         } catch (\Exception $e) {
             logger($e->getMessage() . " at " . $e->getFile() . ":" . $e->getLine());
             // Handle any other exception that may occur
             return response()->json([
                 'success' => false,
-                'errors' => ['server' => ['Unable to add connection. Check logs for more details']]
+                'errors' => ['server' => [__('Unable to add connection. Check logs for more details')]]
             ], 500);  // 500 Internal Server Error for any other errors
         }
     }
@@ -485,14 +478,14 @@ class AppsController extends Controller
 
             // Return a JSON response indicating success
             return response()->json([
-                'messages' => ['success' => ['Connection deleted successfully']]
+                'messages' => ['success' => [__('Connection deleted successfully')]]
             ], 201);
         } catch (\Exception $e) {
             logger($e->getMessage() . " at " . $e->getFile() . ":" . $e->getLine());
             // Handle any other exception that may occur
             return response()->json([
                 'success' => false,
-                'errors' => ['server' => ['Unable to delete connection. Check logs for more details']]
+                'errors' => ['server' => [__('Unable to delete connection. Check logs for more details')]]
             ], 500);  // 500 Internal Server Error for any other errors
         }
     }
@@ -514,14 +507,14 @@ class AppsController extends Controller
 
             // Return a JSON response indicating success
             return response()->json([
-                'messages' => ['success' => ['Connection updated successfully']]
+                'messages' => ['success' => [__('Connection updated successfully')]]
             ], 201);
         } catch (\Exception $e) {
             logger($e->getMessage() . " at " . $e->getFile() . ":" . $e->getLine());
             // Handle any other exception that may occur
             return response()->json([
                 'success' => false,
-                'errors' => ['server' => ['Unable to update connection. Check logs for more details']]
+                'errors' => ['server' => [__('Unable to update connection. Check logs for more details')]]
             ], 500);  // 500 Internal Server Error for any other errors
         }
     }
@@ -579,7 +572,7 @@ class AppsController extends Controller
             'users' => $users,
             'status' => 200,
             'success' => [
-                'message' => 'The request processed successfully'
+                'message' => __('The request processed successfully')
             ]
         ]);
     }
@@ -613,18 +606,18 @@ class AppsController extends Controller
 
             // Check if the record was saved successfully
             if (!$domainSettings) {
-                throw new \Exception('Unable to connect this organization');
+                throw new \Exception(__('Unable to connect this organization'));
             }
 
             return response()->json([
-                'messages' => ['success' => ['Connection updated successfully']]
+                'messages' => ['success' => [__('Connection updated successfully')]]
             ], 200);
         } catch (\Exception $e) {
             logger($e->getMessage() . " at " . $e->getFile() . ":" . $e->getLine());
             return response()->json([
                 'status' => 500,
                 'error' => [
-                    'message' => 'An unexpected error occurred. Please try again later.',
+                    'message' => __('An unexpected error occurred. Please try again later.'),
                 ],
             ]);
         }
@@ -683,14 +676,14 @@ class AppsController extends Controller
             }
 
             return response()->json([
-                'messages' => ['success' => ['User are successfully synced']]
+                'messages' => ['success' => [__('Users synced successfully')]]
             ], 200);
         } catch (\Exception $e) {
             logger($e->getMessage() . " at " . $e->getFile() . ":" . $e->getLine());
             return response()->json([
                 'status' => 500,
                 'error' => [
-                    'message' => 'An unexpected error occurred. Please try again later.',
+                    'message' => __('An unexpected error occurred. Please try again later.'),
                 ],
             ]);
         }
@@ -718,7 +711,7 @@ class AppsController extends Controller
                 ->value('domain_setting_value');
 
             if (empty($org_id)) {
-                throw new \Exception("Contact your administrator to enable mobile apps.");
+                throw new \Exception(__("Contact your administrator to enable mobile apps."));
             }
 
             if ($provider->getProviderKey() === 'cloudplay') {
@@ -950,7 +943,7 @@ class AppsController extends Controller
                 'user' => $user,
                 'qrcode' => $qrcode,
                 'qr_error' => $qrError,
-                'messages' => ['success' => ['Mobile app has been enabled']]
+                'messages' => ['success' => [__('Mobile app has been enabled')]]
             ]);
         } catch (\Throwable $e) {
             logger('ExtensionsController@createUser error: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
@@ -992,14 +985,14 @@ class AppsController extends Controller
             $this->clearRingotelExtensionStatusCache(request('org_id'));
 
             return response()->json([
-                'messages' => ['success' => ['Mobile app has been removed']]
+                'messages' => ['success' => [__('Mobile app has been removed')]]
             ], 200);
         } catch (\Exception $e) {
             logger('ExtensionsController@deleteUser error: ' . $e->getMessage() . " at " . $e->getFile() . ":" . $e->getLine());
             return response()->json([
                 'status' => 500,
                 'error' => [
-                    'message' => 'An unexpected error occurred. Please try again later.',
+                    'message' => __('An unexpected error occurred. Please try again later.'),
                 ],
             ]);
         }
@@ -1106,7 +1099,7 @@ class AppsController extends Controller
                 'user' => $user,
                 'qrcode' => $qrcode,
                 'qr_error' => $qrError,
-                'messages' => ['success' => ['Mobile app credentials have been reset']]
+                'messages' => ['success' => [__('Mobile app credentials have been reset')]]
             ]);
         } catch (\Throwable $e) {
             logger('ExtensionsController@resetPassword error: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
@@ -1129,7 +1122,7 @@ class AppsController extends Controller
         if (!userCheckPermission('extension_edit') || !userCheckPermission('extension_mobile_app_settings')) {
             return response()->json([
                 'success' => false,
-                'errors' => ['permission' => ['Access denied.']],
+                'errors' => ['permission' => [__('Access denied.')]],
             ], 403);
         }
 
@@ -1138,6 +1131,11 @@ class AppsController extends Controller
             'items.*' => ['uuid'],
             'action' => ['required', 'in:enable,add_contact,deactivate,remove,reset_credentials'],
             'connection' => ['nullable', 'string'],
+        ], ValidationMessages::common(), [
+            'items' => __('Extensions'),
+            'items.*' => __('Extension'),
+            'action' => __('Action'),
+            'connection' => __('Connection'),
         ]);
 
         if (
@@ -1147,7 +1145,7 @@ class AppsController extends Controller
         ) {
             return response()->json([
                 'success' => false,
-                'errors' => ['connection' => ['A mobile app connection is required.']],
+                'errors' => ['connection' => [__('A mobile app connection is required.')]],
             ], 422);
         }
 
@@ -1167,7 +1165,7 @@ class AppsController extends Controller
         if (empty($orgId)) {
             return response()->json([
                 'success' => false,
-                'errors' => ['mobile_app' => ['Contact your administrator to enable mobile apps.']],
+                'errors' => ['mobile_app' => [__('Contact your administrator to enable mobile apps.')]],
             ], 422);
         }
 
@@ -1441,8 +1439,11 @@ class AppsController extends Controller
         return response()->json([
             'messages' => [
                 'success' => [
-                    'Mobile app bulk action completed successfully.',
-                    "Processed {$processed}, skipped " . ($skipped + $failed) . '.',
+                    __('Mobile app bulk action completed successfully.'),
+                    __('Processed :processed, skipped :skipped.', [
+                        'processed' => $processed,
+                        'skipped' => $skipped + $failed,
+                    ]),
                 ],
             ],
         ], 200);
@@ -1576,7 +1577,7 @@ class AppsController extends Controller
                 'user' => $user,
                 'qrcode' => $qrcode,
                 'qr_error' => $qrError,
-                'messages' => ['success' => ['Mobile app has been activated']]
+                'messages' => ['success' => [__('Mobile app has been activated')]]
             ], 200);
         } catch (\Exception $e) {
             logger('ExtensionsController@activateUser error: ' . $e->getMessage() . " at " . $e->getFile() . ":" . $e->getLine());
@@ -1645,7 +1646,7 @@ class AppsController extends Controller
             $this->clearRingotelExtensionStatusCache(request('org_id'));
 
             return response()->json([
-                'messages' => ['success' => ['Mobile app has been deactivated']]
+                'messages' => ['success' => [__('Mobile app has been deactivated')]]
             ], 200);
         } catch (\Throwable $e) {
             logger('AppsController@deactivateUser error: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
@@ -1661,6 +1662,9 @@ class AppsController extends Controller
         $request->validate([
             'mobile_app_user_uuid' => ['required', 'uuid'],
             'dnd' => ['required', 'boolean'],
+        ], ValidationMessages::common(), [
+            'mobile_app_user_uuid' => __('Mobile App'),
+            'dnd' => __('Do Not Disturb'),
         ]);
 
         try {
@@ -1677,7 +1681,7 @@ class AppsController extends Controller
             return response()->json([
                 'ringotel_user' => $ringotelUser,
                 'messages' => [
-                    'success' => [$request->boolean('dnd') ? 'Mobile App DND has been enabled.' : 'Mobile App status changed to Available.'],
+                    'success' => [$request->boolean('dnd') ? __('Mobile App DND has been enabled.') : __('Mobile App status changed to Available.')],
                 ],
             ], 200);
         } catch (\Throwable $e) {
@@ -1685,7 +1689,7 @@ class AppsController extends Controller
 
             return response()->json([
                 'errors' => [
-                    'error' => ['Unable to update Mobile App state.'],
+                    'error' => [__('Unable to update Mobile App state.')],
                 ],
             ], 500);
         }
@@ -1696,6 +1700,9 @@ class AppsController extends Controller
         $request->validate([
             'mobile_app_user_uuid' => ['required', 'uuid'],
             'termid' => ['required', 'string'],
+        ], ValidationMessages::common(), [
+            'mobile_app_user_uuid' => __('Mobile App'),
+            'termid' => __('Device'),
         ]);
 
         try {
@@ -1714,7 +1721,7 @@ class AppsController extends Controller
             return response()->json([
                 'ringotel_user' => $ringotelUser,
                 'messages' => [
-                    'success' => ['Mobile App device has been removed.'],
+                    'success' => [__('Mobile App device has been removed.')],
                 ],
             ], 200);
         } catch (\Throwable $e) {
@@ -1722,7 +1729,7 @@ class AppsController extends Controller
 
             return response()->json([
                 'errors' => [
-                    'error' => ['Unable to remove Mobile App device.'],
+                    'error' => [__('Unable to remove Mobile App device.')],
                 ],
             ], 500);
         }
@@ -1830,7 +1837,7 @@ class AppsController extends Controller
 
             return response()->json([
                 'success' => false,
-                'errors' => ['server' => ['Unable to retrieve API Token. Check logs for more details']],
+                'errors' => ['server' => [__('Unable to retrieve API Token. Check logs for more details')]],
             ], 500); // 500 Internal Server Error for any other errors
         }
     }
@@ -1862,14 +1869,14 @@ class AppsController extends Controller
 
             // Return a JSON response indicating success
             return response()->json([
-                'messages' => ['success' => ['API Token was successfully updated']]
+                'messages' => ['success' => [__('API Token was successfully updated')]]
             ], 201);
         } catch (\Exception $e) {
             logger($e->getMessage() . " at " . $e->getFile() . ":" . $e->getLine());
             // Handle any other exception that may occur
             return response()->json([
                 'success' => false,
-                'errors' => ['server' => ['Unable to update API Token. Check logs for more details']]
+                'errors' => ['server' => [__('Unable to update API Token. Check logs for more details')]]
             ], 500);  // 500 Internal Server Error for any other errors
         }
     }

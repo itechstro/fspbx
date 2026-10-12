@@ -58,6 +58,104 @@ class ScheduledJobCoordinatorTest extends TestCase
         parent::tearDown();
     }
 
+    public function test_scheduled_jobs_permission_can_read_shared_server_selection(): void
+    {
+        session()->put('permissions', [(object) ['permission_name' => 'scheduled_jobs_manage']]);
+        $resolver = Mockery::mock(ActiveNodeResolver::class);
+        $resolver->shouldReceive('statusContext')->once()->andReturn(['selected_node' => '1001']);
+        $controller = new \App\Http\Controllers\ScheduledJobCoordinationController($resolver);
+        $this->assertSame(['active_node' => ['selected_node' => '1001']], $controller->show()->getData(true));
+    }
+
+    public function test_contact_center_settings_permission_does_not_authorize_global_owner_changes(): void
+    {
+        session()->put('permissions', [(object) ['permission_name' => 'contact_center_settings_edit']]);
+        $controller = new \App\Http\Controllers\ScheduledJobCoordinationController(Mockery::mock(ActiveNodeResolver::class));
+        try {
+            $controller->updateOwner(new \Illuminate\Http\Request());
+            $this->fail('Only superadmins may change global ownership.');
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $error) {
+            $this->assertSame(403, $error->getStatusCode());
+        }
+    }
+
+    public function test_shared_control_props_use_existing_routes_and_do_not_create_a_second_owner(): void
+    {
+        session()->put('permissions', [(object) ['permission_name' => 'scheduled_jobs_manage']]);
+        $resolver = Mockery::mock(ActiveNodeResolver::class);
+        $resolver->shouldReceive('statusContext')->once()->andReturn(['selected_node' => '1001']);
+        $controller = new \App\Http\Controllers\ScheduledJobCoordinationController($resolver);
+        $props = $controller->controlProps();
+        $this->assertSame(['selected_node' => '1001'], $props['active_node']);
+        $this->assertSame(route('scheduled-jobs.active-node.update'), $props['routes']['active_node']);
+        $this->assertSame(route('scheduled-jobs.nodes.approve', ['node' => '__NODE__']), $props['routes']['node_approve']);
+        $this->assertTrue($props['manage']);
+        $this->assertDatabaseCount('v_default_settings', 0);
+    }
+
+    public function test_directory_or_contact_center_permissions_do_not_expose_global_controls(): void
+    {
+        session()->put('permissions', [
+            (object) ['permission_name' => 'ldap_directory_view'],
+            (object) ['permission_name' => 'contact_center_settings_edit'],
+        ]);
+        $controller = new \App\Http\Controllers\ScheduledJobCoordinationController(Mockery::mock(ActiveNodeResolver::class));
+        foreach (['show', 'controlProps', 'rotateSecret'] as $action) {
+            try {
+                $controller->$action();
+                $this->fail('Expected the dedicated scheduled jobs permission to be required.');
+            } catch (\Symfony\Component\HttpKernel\Exception\HttpException $error) {
+                $this->assertSame(403, $error->getStatusCode());
+            }
+        }
+        $ldap = new \App\Http\Controllers\LdapDirectoryController();
+        $this->assertSame([], (new ReflectionMethod($ldap, 'activeNodeContext'))->invoke($ldap));
+        $this->assertFalse((new ReflectionMethod($ldap, 'permissions'))->invoke($ldap)['manage_active_node']);
+    }
+
+    public function test_scheduled_jobs_permission_authorizes_management_through_existing_resolver(): void
+    {
+        session()->put('permissions', [(object) ['permission_name' => 'scheduled_jobs_manage']]);
+        $resolver = Mockery::mock(ActiveNodeResolver::class);
+        $resolver->shouldReceive('discover')->once()->with(null)->andReturn([]);
+        $controller = new \App\Http\Controllers\ScheduledJobCoordinationController($resolver);
+        $this->assertSame(['candidates' => []], $controller->discover(new \Illuminate\Http\Request())->getData(true));
+    }
+
+    public function test_main_seeder_assigns_scheduled_jobs_permission_only_to_superadmin_idempotently(): void
+    {
+        Schema::create('v_permissions', function (Blueprint $table) {
+            $table->uuid('permission_uuid')->primary();
+            $table->string('application_name');
+            $table->string('permission_name')->unique();
+            $table->timestamp('insert_date');
+        });
+        Schema::create('v_groups', function (Blueprint $table) {
+            $table->uuid('group_uuid')->primary();
+            $table->string('group_name');
+        });
+        Schema::create('v_group_permissions', function (Blueprint $table) {
+            $table->uuid('group_permission_uuid')->primary();
+            $table->uuid('group_uuid');
+            $table->string('group_name');
+            $table->string('permission_name');
+            $table->string('permission_protected');
+            $table->string('permission_assigned');
+            $table->timestamp('insert_date');
+        });
+        foreach (['superadmin', 'admin', 'user'] as $group) {
+            DB::table('v_groups')->insert(['group_uuid' => (string) Str::uuid(), 'group_name' => $group]);
+        }
+        $seeder = new \Database\Seeders\DatabaseSeeder();
+        for ($i = 0; $i < 2; $i++) {
+            (new ReflectionMethod($seeder, 'createPermissions'))->invoke($seeder);
+            (new ReflectionMethod($seeder, 'createGroupPermissions'))->invoke($seeder);
+        }
+        $this->assertSame(1, DB::table('v_permissions')->where('permission_name', 'scheduled_jobs_manage')->count());
+        $this->assertSame(['superadmin'], DB::table('v_group_permissions')
+            ->where('permission_name', 'scheduled_jobs_manage')->where('permission_assigned', 'true')->pluck('group_name')->all());
+    }
+
     public function test_standalone_node_runs_without_a_persisted_registry_heartbeat(): void
     {
         $resolver = $this->resolver('1001', []);
@@ -274,6 +372,34 @@ class ScheduledJobCoordinatorTest extends TestCase
             $this->assertSame(409, $exception->getCode());
         }
         $this->assertDatabaseCount('scheduled_job_handoffs', 0);
+    }
+
+    public function test_external_resources_block_handoff_without_a_long_lived_execution_claim(): void
+    {
+        $this->node('1001', 'pbx-a', 'https://pbx-a.example.test');
+        $this->node('2002', 'pbx-b', 'https://pbx-b.example.test');
+        $this->setting('active_node', '1001');
+        $this->setting('active_node_generation', '4', 'numeric');
+        $peer = Mockery::mock(ScheduledJobPeerClient::class);
+        $peer->shouldReceive('identify')->once()->andReturn([
+            'system_identifier' => '2002', 'hostname' => 'pbx-b', 'host_fingerprint' => hash('sha256', '2002'),
+        ]);
+        $resolver = $this->resolver('1001', ['https://pbx-b.example.test'], [], $peer);
+        $released = false;
+        \Illuminate\Support\Facades\Event::listen(\App\Events\ScheduledJobsDraining::class, function ($event) use (&$released, $resolver) {
+            $this->assertSame(0, DB::transactionLevel(), 'External cleanup must not hold the ownership lock');
+            $this->assertSame('1001', $event->nodeId);
+            $this->assertSame(4, $event->generation);
+            $this->assertNull($resolver->claimExecution('test', 'new-work', 60), 'Draining must reject new work');
+            if (! $released) { $event->ready = false; }
+        });
+        $result = $resolver->prepareHandoff(['target_node_id' => '2002', 'target_endpoint' => 'https://pbx-b.example.test',
+            'expected_generation' => 4, 'idempotency_key' => (string) Str::uuid()]);
+        $this->assertSame('draining', $result['status']);
+        $this->assertSame('1001', $resolver->configuredNode());
+        $released = true;
+        $this->assertSame('completed', $resolver->finalizePendingHandoff()->status);
+        $this->assertSame('2002', $resolver->configuredNode());
     }
 
     public function test_forced_takeover_records_fenced_endpoint_and_advances_generation(): void
@@ -600,6 +726,176 @@ class ScheduledJobCoordinatorTest extends TestCase
         }
         $this->assertSame('1001', $ui->configuredNode());
         $this->assertDatabaseCount('scheduled_job_handoffs', 0);
+    }
+
+    public function test_s3_claim_drains_with_the_shared_owner_and_blocks_the_next_recording(): void
+    {
+        $resolver = $this->configuredPair();
+        $this->setting('s3_upload_calls', 'true', 'boolean');
+        $command = $this->s3Command($resolver);
+        $run = new ReflectionMethod($command, 'runSelected');
+        $coordinated = true;
+        $work = function ($authorize, $write) use ($resolver) {
+            $this->assertDatabaseHas('scheduled_job_executions', [
+                'job_type' => 's3_recording_upload', 'node_id' => '1001',
+                'ownership_generation' => 4, 'status' => 'running',
+            ]);
+            $this->assertSame('draining', $resolver->prepareHandoff($this->payload())['status']);
+            $authorize();
+            $write(fn () => $this->setting('s3_committed', 'true'));
+            $this->assertSame('1001', $resolver->configuredNode());
+        };
+        $this->assertTrue($run->invokeArgs($command, ['recording', $work, &$coordinated]));
+        $this->assertSame('2002', $resolver->configuredNode());
+        $this->assertDatabaseHas('scheduled_job_executions', ['job_type' => 's3_recording_upload', 'status' => 'completed']);
+        $this->assertFalse($run->invokeArgs($command, ['next-recording', fn () => $this->fail('Old owner ran.'), &$coordinated]));
+    }
+
+    public function test_s3_write_crossing_claim_expiry_rolls_back_and_keeps_cleanup_from_running(): void
+    {
+        $resolver = $this->configuredPair();
+        $this->setting('s3_upload_calls', 'true', 'boolean');
+        $command = $this->s3Command($resolver);
+        $coordinated = true;
+        try {
+            (new ReflectionMethod($command, 'runSelected'))->invokeArgs($command, ['recording',
+                function ($authorize, $write) {
+                    $write(function () {
+                        $this->setting('s3_must_rollback', 'true');
+                        $this->travel(901)->seconds();
+                    });
+                    $this->fail('Cleanup was reached after revocation.');
+                }, &$coordinated]);
+            $this->fail('Expired execution was accepted.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame(409, $exception->getCode());
+        }
+        $this->assertDatabaseMissing('v_default_settings', ['default_setting_subcategory' => 's3_must_rollback']);
+    }
+
+    public function test_s3_invocation_never_downgrades_to_mac_after_coordinated_ownership_is_lost(): void
+    {
+        $resolver = $this->configuredPair();
+        $this->setting('s3_upload_calls_aa:bb:cc:dd:ee:ff', 'true', 'boolean');
+        DB::table('v_default_settings')->where('default_setting_subcategory', 'active_node')
+            ->update(['default_setting_value' => 'unknown-owner']);
+        $command = $this->s3Command($resolver);
+        $coordinated = true;
+        $this->assertFalse((new ReflectionMethod($command, 'runSelected'))->invokeArgs($command, [
+            'recording', fn () => $this->fail('Fell back to MAC mid-run.'), &$coordinated,
+        ]));
+        $this->assertDatabaseCount('scheduled_job_executions', 0);
+    }
+
+    public function test_s3_legacy_run_uses_mac_but_stops_if_ownership_becomes_definite_before_writing(): void
+    {
+        $resolver = $this->resolver('1001', ['https://pbx-b.example.test']);
+        $this->setting('s3_upload_calls_aa:bb:cc:dd:ee:ff', 'true', 'boolean');
+        $command = $this->s3Command($resolver);
+        $coordinated = false;
+        try {
+            (new ReflectionMethod($command, 'runSelected'))->invokeArgs($command, ['recording',
+                function ($authorize, $write) {
+                    $authorize();
+                    $this->node('1001', 'pbx-a', 'https://pbx-a.example.test');
+                    $this->setting('active_node', '1001');
+                    $this->setting('active_node_generation', '1', 'numeric');
+                    $write(fn () => $this->fail('Legacy work wrote without a new claim.'));
+                }, &$coordinated]);
+            $this->fail('Legacy work continued after selection changed.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame(409, $exception->getCode());
+        }
+        $this->assertDatabaseCount('scheduled_job_executions', 0);
+    }
+
+    public function test_s3_scheduled_command_on_standby_skips_before_reading_recordings(): void
+    {
+        $this->configuredPair();
+        $this->setting('s3_upload_calls_aa:bb:cc:dd:ee:ff', 'true', 'boolean');
+        $resolver = $this->resolver('2002', ['https://pbx-a.example.test']);
+        $command = $this->s3Command($resolver);
+        $command->setInput(new \Symfony\Component\Console\Input\ArrayInput(['--scheduled' => true], $command->getDefinition()));
+        $output = new \Symfony\Component\Console\Output\BufferedOutput();
+        $command->setOutput(new \Illuminate\Console\OutputStyle(new \Symfony\Component\Console\Input\ArrayInput([]), $output));
+        $this->assertSame(0, $command->handle());
+        $this->assertStringContainsString('S3 upload skipped', $output->fetch());
+        $this->assertDatabaseCount('scheduled_job_executions', 0);
+    }
+
+    public function test_s3_manual_run_bypasses_disabled_uploads_and_standby_selection(): void
+    {
+        $this->configuredPair();
+        $this->setting('s3_upload_calls', 'false', 'boolean');
+        $command = $this->s3Command($this->resolver('2002', ['https://pbx-a.example.test']));
+        $coordinated = false;
+        $this->assertTrue((new ReflectionMethod($command, 'runSelected'))->invokeArgs($command, [
+            'manual-recording', function ($authorize, $write) {
+                $authorize();
+                $write(fn () => $this->setting('manual_s3_ran', 'true'));
+            }, &$coordinated, false,
+        ]));
+        $this->assertDatabaseHas('v_default_settings', ['default_setting_subcategory' => 'manual_s3_ran']);
+        $this->assertDatabaseCount('scheduled_job_executions', 0);
+    }
+
+    public function test_s3_seeding_preserves_existing_enablement_and_explicit_shared_choice(): void
+    {
+        $this->setting('s3_upload_calls_aa:bb:cc:dd:ee:ff', 'true', 'boolean');
+        $seeder = new class extends \Database\Seeders\DatabaseSeeder {
+            public function getMacAddress() { return 'aa:bb:cc:dd:ee:ff'; }
+        };
+        $seed = new ReflectionMethod(\Database\Seeders\DatabaseSeeder::class, 'createDefaultSettings');
+        $seed->invoke($seeder);
+        $this->assertDatabaseHas('v_default_settings', [
+            'default_setting_subcategory' => 's3_upload_calls',
+            'default_setting_value' => 'true', 'default_setting_enabled' => false,
+        ]);
+        $this->assertDatabaseHas('v_default_settings', [
+            'default_setting_subcategory' => 's3_upload_calls_aa:bb:cc:dd:ee:ff',
+            'default_setting_value' => 'true', 'default_setting_enabled' => true,
+        ]);
+        DB::table('v_default_settings')->where('default_setting_subcategory', 's3_upload_calls')
+            ->update(['default_setting_value' => 'false', 'default_setting_enabled' => true]);
+        $seed->invoke($seeder);
+        $this->assertSame(1, DB::table('v_default_settings')->where('default_setting_subcategory', 's3_upload_calls')->count());
+        $this->assertDatabaseHas('v_default_settings', [
+            'default_setting_subcategory' => 's3_upload_calls',
+            'default_setting_value' => 'false', 'default_setting_enabled' => true,
+        ]);
+    }
+
+    public function test_s3_scheduler_uses_scheduled_mode_and_preserves_time_and_timezone(): void
+    {
+        $this->setting('s3_upload_calls_time', '03:45');
+        $this->setting('scheduled_jobs_timezone', 'America/New_York');
+        $schedule = new \Illuminate\Console\Scheduling\Schedule();
+        $kernel = app(\App\Console\Kernel::class);
+        (new ReflectionMethod($kernel, 'schedule'))->invoke($kernel, $schedule);
+        $event = collect($schedule->events())->first(fn ($event) =>
+            str_contains($event->command ?? '', 'fs:upload-call-recordings-to-s3-storage'));
+        $this->assertNotNull($event);
+        $this->assertStringContainsString('--scheduled', $event->command);
+        $this->assertSame('45 3 * * *', $event->expression);
+        $this->assertSame('America/New_York', $event->timezone);
+        $this->assertTrue($event->withoutOverlapping);
+
+        $selector = Mockery::mock(\App\Services\S3UploadServerSelector::class);
+        $selector->shouldReceive('resolve')->twice()->andReturn(['allowed' => false], ['allowed' => true]);
+        $this->app->instance(\App\Services\S3UploadServerSelector::class, $selector);
+        $this->assertFalse($event->filtersPass($this->app));
+        $this->assertTrue($event->filtersPass($this->app));
+    }
+
+    private function s3Command(ActiveNodeResolver $resolver): \App\Console\Commands\UploadCallRecordingsToS3Storage
+    {
+        $selector = new class($resolver) extends \App\Services\S3UploadServerSelector {
+            public function macAddress(): ?string { return 'aa:bb:cc:dd:ee:ff'; }
+        };
+        return new \App\Console\Commands\UploadCallRecordingsToS3Storage(
+            Mockery::mock(\App\Services\S3StorageConfigService::class), $selector, $resolver,
+            Mockery::mock(\App\Services\S3RecordingArchiver::class),
+        );
     }
 
     private function ldapFixture(): \App\Models\LdapDirectory
