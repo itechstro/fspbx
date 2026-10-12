@@ -33,7 +33,6 @@ use App\Data\ExtensionDetailData;
 use App\Imports\ExtensionsImport;
 use Illuminate\Support\Facades\DB;
 use App\Exports\ExtensionsTemplate;
-use Nwidart\Modules\Facades\Module;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Maatwebsite\Excel\Facades\Excel;
@@ -129,8 +128,8 @@ class ExtensionsController extends Controller
                     'import' => route('extensions.import'),
                     'create_user' => route('extensions.make.user'),
                     'create_users' => Route::has('extensions.make.users') ? route('extensions.make.users') : null,
-                    'create_contact_center_user' => (Module::has('ContactCenter') && Module::collections()->has('ContactCenter') && Route::has('contact-center.user.store')) ? route('contact-center.user.store') : null,
-                    'create_contact_center_agents' => (Module::has('ContactCenter') && Module::collections()->has('ContactCenter') && Route::has('contact-center.users.bulk.store')) ? route('contact-center.users.bulk.store') : null,
+                    'create_contact_center_user' => Route::has('contact-center.user.store') ? route('contact-center.user.store') : null,
+                    'create_contact_center_agents' => Route::has('contact-center.users.bulk.store') ? route('contact-center.users.bulk.store') : null,
                     'export' => route('extensions.export'),
                     'duplicate' => route('extensions.duplicate'),
                     'bulk_create_contacts' => route('phonebook-contacts.bulk-from-extensions'),

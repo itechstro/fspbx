@@ -34,6 +34,7 @@ use App\Http\Controllers\ConferenceRoomController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\ContactSyncController;
 use App\Http\Controllers\ContactsController;
+use App\Http\Controllers\ContactCenter\UserController as ContactCenterUserController;
 use App\Http\Controllers\CustomerNotesController;
 use App\Http\Controllers\DatabaseTransactionController;
 use App\Http\Controllers\DashboardController;
@@ -1064,6 +1065,8 @@ Route::group(['middleware' => ['auth:sanctum', 'api.cookie.auth']], function () 
     Route::get('domains/registration-summary', [DomainController::class, 'registrationSummary'])->name('domains.registration-summary');
     Route::post('domains/item-options', [DomainController::class, 'getItemOptions'])->name('domains.item.options');
     Route::post('domains/bulk-delete', [DomainController::class, 'bulkDelete'])->name('domains.bulk.delete');
+
+    Route::post('contact-center/user', [ContactCenterUserController::class, 'store'])->name('contact-center.user.store');
 });
 
 Route::group(['middleware' => ['auth:sanctum']], function () {

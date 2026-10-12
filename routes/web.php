@@ -22,6 +22,8 @@ use App\Http\Controllers\CallHistoryAnalyticsController;
 use App\Http\Controllers\RecorderController;
 use App\Http\Controllers\RecorderAnalyticsController;
 use App\Http\Controllers\ConferenceCenterController;
+use App\Http\Controllers\ContactCenter\AgentStatusController as ContactCenterAgentStatusController;
+use App\Http\Controllers\ContactCenter\DashboardController as ContactCenterDashboardController;
 use App\Http\Controllers\ConferenceController;
 use App\Http\Controllers\ConferenceControlController;
 use App\Http\Controllers\ConferenceProfileController;
@@ -530,6 +532,24 @@ Route::group(['middleware' => 'auth'], function () {
 
     // Whitelisted Numbers
     Route::get('whitelisted-numbers', [WhitelistedNumbersController::class, 'index'])->name('whitelisted-numbers.index');
+
+    // Contact Center
+    Route::prefix('contact-center')->group(function () {
+        Route::get('/', [ContactCenterDashboardController::class, 'index'])->name('contactcenter.index');
+        Route::post('/', [ContactCenterDashboardController::class, 'index']);
+        Route::get('/create', [ContactCenterDashboardController::class, 'create'])->name('contactcenter.create');
+        Route::get('/settings', [ContactCenterDashboardController::class, 'showSettings'])->name('contactcenter.settings.list');
+        Route::post('/settings/queue/item-options', [ContactCenterDashboardController::class, 'getQueueItemOptions'])->name('contactcenter.settings.queue-item-options');
+        Route::get('/settings/{callCenterQueues}', [ContactCenterDashboardController::class, 'showSettings'])->name('contactcenter.settings.show');
+        Route::delete('/delete/{callCenterQueues}', [ContactCenterDashboardController::class, 'destroy'])->name('contactcenter.destroy');
+        Route::put('/settings/{callCenterQueues}', [ContactCenterDashboardController::class, 'update'])->name('contactcenter.settings.update');
+        Route::get('/settings/{callCenterQueues}/assign-agent/{callCenterAgents}', [ContactCenterDashboardController::class, 'assignAgent'])->name('contactcenter.settings.agents.assign');
+        Route::get('/settings/{callCenterQueues}/unassign-agent/{callCenterAgents}', [ContactCenterDashboardController::class, 'unAssignAgent'])->name('contactcenter.settings.agents.unassign');
+        Route::post('/update-agent-status', [ContactCenterDashboardController::class, 'updateAgentStatus'])->name('contactcenter.agents.update_status');
+        Route::post('/stats/refresh', [ContactCenterDashboardController::class, 'getStatsData'])->name('contactcenter.stats.refresh');
+        Route::post('/info/refresh', [ContactCenterDashboardController::class, 'getQueueInfoData'])->name('contactcenter.info.refresh');
+        Route::post('/agent/status/update', [ContactCenterAgentStatusController::class, 'update'])->name('agent.status.update');
+    });
 });
 
 

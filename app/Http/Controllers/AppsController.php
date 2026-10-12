@@ -61,6 +61,7 @@ class AppsController extends Controller
         return Inertia::render(
             'CloudPlayAppSettings',
             [
+                'data' => $this->listing($request),
                 'pagination' => [
                     'per_page' => fspbx_pagination_per_page(),
                     'per_page_options' => fspbx_pagination_options(),
@@ -117,6 +118,30 @@ class AppsController extends Controller
         });
 
         return $data;
+    }
+
+    /**
+     * Page listing for the initial visit and Inertia partial reloads.
+     * Search from the page is sent as filterData; the API uses filter[search].
+     */
+    private function listing(Request $request)
+    {
+        $search = $request->input('filter.search');
+        if ($search === null || $search === '') {
+            $search = $request->input('filterData.search');
+        }
+
+        $sort = $request->input('sort');
+        if (! is_string($sort) || $sort === '') {
+            $sortField = (string) $request->input('sortField', 'domain_name');
+            $sort = $request->input('sortOrder') === 'desc' ? '-'.$sortField : $sortField;
+        }
+
+        $query = $request->query->all();
+        $query['filter'] = ['search' => $search];
+        $query['sort'] = $sort;
+
+        return $this->getData($request->duplicate($query));
     }
 
     /**

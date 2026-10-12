@@ -43,7 +43,9 @@ use App\Support\Localization\LocaleFileLoader;
 use App\Support\Localization\LocaleRegistry;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\Paginator;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
@@ -159,6 +161,18 @@ class AppServiceProvider extends ServiceProvider
             return $this->where($column, 'ILIKE', '%' . trim($search) . '%');
         });
 
+
+        View::addNamespace('contactcenter', resource_path('views/contact-center'));
+        View::composer(
+            ['layouts.dashboard.index'],
+            \App\View\Composers\ContactCenterDashboardComposer::class
+        );
+        Blade::directive('durationToHuman', function ($data) {
+            return "<?php echo durationToHuman($data); ?>";
+        });
+        Blade::directive('agentDurationToHuman', function ($data) {
+            return "<?php echo agentDurationToHuman($data); ?>";
+        });
 
         Password::defaults(function () {
             $rule = Password::min(10)

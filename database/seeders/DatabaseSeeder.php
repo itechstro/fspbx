@@ -47,6 +47,8 @@ class DatabaseSeeder extends Seeder
 
         $this->createCallTranscriptionProviders();
 
+        $this->call(ContactCenterDatabaseSeeder::class);
+
         Model::reguard();
 
         $this->runEnabledModuleSeeders();

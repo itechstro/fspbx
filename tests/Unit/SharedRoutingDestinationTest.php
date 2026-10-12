@@ -65,9 +65,10 @@ class SharedRoutingDestinationTest extends TestCase
             $this->assertSame(['application' => $application, 'data' => $data], $this->invoke(DynamicRouteService::class, 'destinationAction', [$type, $value, 'example.test']));
         }
 
-        // The optional module must not be needed by any main-repo consumer.
-        $moduleRequest = 'Modules\\ContactCenter\\Http\\Requests\\UpdateSettingsRequest';
-        if (class_exists($moduleRequest)) {
+        // Contact Center ships with the application. Its settings request only
+        // normalizes timeout actions when that helper is present.
+        $moduleRequest = \App\Http\Requests\ContactCenter\UpdateSettingsRequest::class;
+        if (method_exists($moduleRequest, 'normalizeVueTimeoutAction')) {
             $request = new $moduleRequest(['timeout_action' => $type, 'timeout_target' => $value]);
             $this->assertSame($application.':'.$data, (new \ReflectionMethod($request, 'normalizeVueTimeoutAction'))->invoke($request));
         }

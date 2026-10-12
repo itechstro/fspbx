@@ -398,10 +398,6 @@ class ProFeaturesService
     protected function moduleMap(): array
     {
         return [
-            'CONTACT_CENTER_MODULE' => [
-                'module' => 'ContactCenter',
-                'artifact' => fn(string $version) => "fspbx-contact-module-{$version}.tar.gz",
-            ],
             'STIR_SHAKEN_MODULE' => [
                 'module' => 'StirShaken',
                 'artifact' => fn(string $version) => "fspbx-stir-shaken-module-{$version}.tar.gz",

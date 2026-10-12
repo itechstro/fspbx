@@ -16,6 +16,8 @@ use App\Events\ExtensionSuspendedStatusChanged;
 use App\Listeners\NotifyModelsOnGreetingDeleted;
 use App\Listeners\UpdateUserWhenExtensionIsUpdated;
 use App\Listeners\UpdateAgentWhenExtensionIsUpdated;
+use App\Listeners\ContactCenter\DeleteAgentWhenExtensionIsDeleted as DeleteContactCenterAgentWhenExtensionIsDeleted;
+use App\Listeners\ContactCenter\UpdateAgentWhenExtensionIsUpdated as UpdateContactCenterAgentWhenExtensionIsUpdated;
 use App\Listeners\SuspendUserWhenExtensionIsDeleted;
 use App\Listeners\HandleExtensionSuspendedStatusChange;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
@@ -36,10 +38,12 @@ class EventServiceProvider extends ServiceProvider
         ExtensionUpdated::class => [
             UpdateUserWhenExtensionIsUpdated::class,
             UpdateAgentWhenExtensionIsUpdated::class,
+            UpdateContactCenterAgentWhenExtensionIsUpdated::class,
         ],
         ExtensionDeleted::class => [
             SuspendUserWhenExtensionIsDeleted::class,
             \App\Listeners\DeleteAgentWhenExtensionIsDeleted::class,
+            DeleteContactCenterAgentWhenExtensionIsDeleted::class,
         ],
         ExtensionSuspendedStatusChanged::class => [
             HandleExtensionSuspendedStatusChange::class,

@@ -243,7 +243,7 @@ class DashboardController extends Controller
                 ->count();
         }
 
-        if (Module::has('ContactCenter') && Module::collections()->has('ContactCenter') && (userCheckPermission("contact_center_settings_edit") || userCheckPermission("contact_center_dashboard_view"))) {
+        if (userCheckPermission("contact_center_settings_edit") || userCheckPermission("contact_center_dashboard_view")) {
             $counts['queues'] = CallCenterQueues::where('domain_uuid', $domain_uuid)->count();
         }
 
@@ -520,11 +520,7 @@ class DashboardController extends Controller
 
     private function agentStatusUpdateRoute(): ?string
     {
-        if (
-            !Module::has('ContactCenter')
-            || !Module::collections()->has('ContactCenter')
-            || !Route::has('agent.status.update')
-        ) {
+        if (!Route::has('agent.status.update')) {
             return null;
         }
 
@@ -645,7 +641,7 @@ class DashboardController extends Controller
             $apps[] = ['name' => __('Wakeup Calls'), 'href' => route('wakeup-calls.index'), 'icon' => 'ClockIcon', 'slug' => 'wakeup_calls'];
         }
 
-        if (Module::has('ContactCenter') && Module::collections()->has('ContactCenter') && (userCheckPermission("contact_center_settings_edit") || userCheckPermission("contact_center_dashboard_view"))) {
+        if (userCheckPermission("contact_center_settings_edit") || userCheckPermission("contact_center_dashboard_view")) {
 
             $queue_count = CallCenterQueues::where('domain_uuid', Session::get('domain_uuid'))->count();
 
