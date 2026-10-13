@@ -1067,6 +1067,7 @@ Route::group(['middleware' => ['auth:sanctum', 'api.cookie.auth']], function () 
     Route::post('domains/bulk-delete', [DomainController::class, 'bulkDelete'])->name('domains.bulk.delete');
 
     Route::post('contact-center/user', [ContactCenterUserController::class, 'store'])->name('contact-center.user.store');
+    Route::post('contact-center/users/bulk-store', [ContactCenterUserController::class, 'bulkStore'])->name('contact-center.users.bulk.store');
 });
 
 Route::group(['middleware' => ['auth:sanctum']], function () {

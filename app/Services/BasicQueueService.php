@@ -362,11 +362,18 @@ class BasicQueueService
             );
         }
 
-        $lines[] = sprintf(
-            "\t\t" . '<action application="callcenter" data="%s@%s"/>',
-            $this->xml($queue->queue_extension),
-            $this->xml(session('domain_name'))
-        );
+        if (app(\App\Services\ContactCenter\ContactCenterRuntime::class)->usesQueueScript($queue)) {
+            $domainName = Domain::query()->whereKey($queue->domain_uuid)->value('domain_name') ?: session('domain_name');
+            $lines[] = sprintf("\t\t".'<action application="set" data="domain_uuid=%s"/>', $this->xml($queue->domain_uuid));
+            $lines[] = sprintf("\t\t".'<action application="set" data="domain_name=%s"/>', $this->xml($domainName));
+            $lines[] = "\t\t".'<action application="lua" data="contact_center_queue.lua"/>';
+        } else {
+            $lines[] = sprintf(
+                "\t\t".'<action application="callcenter" data="%s@%s"/>',
+                $this->xml($queue->queue_extension),
+                $this->xml(session('domain_name'))
+            );
+        }
 
         if ($queue->queue_timeout_action && str_contains($queue->queue_timeout_action, ':')) {
             [$application, $data] = explode(':', $queue->queue_timeout_action, 2);
@@ -381,6 +388,13 @@ class BasicQueueService
         $lines[] = '</extension>';
 
         return implode("\n", $lines);
+    }
+
+    public function refreshDialplan(CallCenterQueues $queue): void
+    {
+        $this->saveDialplan($queue, false);
+        $this->clearCaches();
+        $this->reloadRuntimeQueues(collect([$queue]));
     }
 
     private function clearCaches(): void

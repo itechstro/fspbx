@@ -48,8 +48,9 @@
                         </div>
 
                         <BasicQueueForm v-else-if="itemOptions" :show="true" :inline="true" :extended-fields="true"
-                            mode="update" :options="itemOptions" :loading="false" header="Contact Center Settings"
-                            @success="handleSaveSuccess" @error="handleFormError" @refresh-data="loadItemOptions" />
+                            mode="update" :options="itemOptions" :routes="routes" :loading="false"
+                            header="Contact Center Settings" @success="handleSaveSuccess" @error="handleFormError"
+                            @refresh-data="loadItemOptions" @notify="notify" />
 
                         <div class="mt-6 flex justify-end border-t border-gray-200 pt-6">
                             <button type="button"
@@ -137,6 +138,10 @@ watch(() => props.selectedQueueUuid, () => {
 });
 
 const handleSaveSuccess = (type, messages) => {
+    showNotification(type, messages);
+};
+
+const notify = (type, messages) => {
     showNotification(type, messages);
 };
 

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\CallCenterQueues;
+use App\Models\ContactCenterAudioConfiguration;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -40,10 +41,15 @@ class ContactCenterQueueService
 
     public function saveFromContactCenterSettings(array $attributes, CallCenterQueues $queue): CallCenterQueues
     {
-        return $this->basicQueueService->saveQueue(
-            $this->mapSettingsToPayload($attributes),
-            $queue,
-        );
+        $payload = $this->mapSettingsToPayload($attributes);
+        $audio = ContactCenterAudioConfiguration::query()
+            ->where('queue_uuid', $queue->call_center_queue_uuid)
+            ->first();
+        if ($audio && $audio->mode === 'sequence' && $audio->status === 'ready' && is_file((string) $queue->queue_moh_sound)) {
+            $payload['queue_moh_sound'] = $queue->queue_moh_sound;
+        }
+
+        return $this->basicQueueService->saveQueue($payload, $queue);
     }
 
     public function deleteQueue(CallCenterQueues $queue): void

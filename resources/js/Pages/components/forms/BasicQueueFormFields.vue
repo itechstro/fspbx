@@ -27,6 +27,8 @@
                                                     'advanced_submit',
                                                 ]" />
                                                 <FormTab v-if="extendedFields" name="contact_center" label="Tier Rules & More" :elements="contactCenterTabElements" />
+                                                <FormTab v-if="showRuntimeTabs" name="callbacks" :label="$t('Queue callbacks')" :elements="['queue_callbacks']" />
+                                                <FormTab v-if="showRuntimeTabs" name="hold_audio" :label="$t('Hold audio')" :elements="['hold_audio']" />
                                             </FormTabs>
                                         </div>
 
@@ -329,6 +331,22 @@
                                                 <ButtonElement v-if="extendedFields" name="contact_center_submit"
                                                     button-label="Save" :submits="true" align="right" />
 
+                                                <StaticElement v-if="showRuntimeTabs" name="queue_callbacks">
+                                                    <template #default>
+                                                        <RuntimePanel part="callbacks" :routes="routes"
+                                                            :greeting-route="options?.routes?.greeting_route"
+                                                            @notify="(type, messages) => emit('notify', type, messages)" />
+                                                    </template>
+                                                </StaticElement>
+
+                                                <StaticElement v-if="showRuntimeTabs" name="hold_audio">
+                                                    <template #default>
+                                                        <RuntimePanel part="audio" :routes="routes"
+                                                            :greeting-route="options?.routes?.greeting_route"
+                                                            @notify="(type, messages) => emit('notify', type, messages)" />
+                                                    </template>
+                                                </StaticElement>
+
                                                 <UpdateGreetingModal :greeting="greetingLabel" :show="showEditModal"
                                                     :loading="isGreetingUpdating" @confirm="handleGreetingUpdate"
                                                     @close="showEditModal = false" />
@@ -365,6 +383,7 @@ import ConfirmationModal from "../modal/ConfirmationModal.vue";
 import NewGreetingForm from "./NewGreetingForm.vue";
 import Spinner from "../general/Spinner.vue";
 import UpdateGreetingModal from "../modal/UpdateGreetingModal.vue";
+import RuntimePanel from "../../ContactCenter/components/RuntimePanel.vue";
 
 const props = defineProps({
     options: Object,
@@ -377,9 +396,15 @@ const props = defineProps({
         type: String,
         default: "create",
     },
+    routes: {
+        type: Object,
+        default: () => ({}),
+    },
 });
 
-const emit = defineEmits(["close", "error", "success", "refresh-data"]);
+const emit = defineEmits(["close", "error", "success", "refresh-data", "notify"]);
+
+const showRuntimeTabs = computed(() => props.extendedFields && !!props.routes?.runtime);
 const form$ = ref(null);
 const availableGreetings = ref(null);
 const currentAudio = ref(null);

@@ -1,8 +1,9 @@
 <template>
     <div v-if="inline" v-show="show">
         <BasicQueueFormFields ref="fieldsRef" :options="options" :loading="loading" :mode="mode"
-            :extended-fields="extendedFields" @close="emit('close')" @error="(...args) => emit('error', ...args)"
-            @success="(...args) => emit('success', ...args)" @refresh-data="emit('refresh-data')" />
+            :extended-fields="extendedFields" :routes="routes" @close="emit('close')"
+            @error="(...args) => emit('error', ...args)" @success="(...args) => emit('success', ...args)"
+            @refresh-data="emit('refresh-data')" @notify="(...args) => emit('notify', ...args)" />
     </div>
 
     <TransitionRoot v-else as="div" :show="show">
@@ -33,8 +34,9 @@
                             </button>
 
                             <BasicQueueFormFields ref="fieldsRef" :options="options" :loading="loading" :mode="mode"
-                                :extended-fields="extendedFields" @close="emit('close')" @error="(...args) => emit('error', ...args)"
-                                @success="(...args) => emit('success', ...args)" @refresh-data="emit('refresh-data')" />
+                                :extended-fields="extendedFields" :routes="routes" @close="emit('close')"
+                                @error="(...args) => emit('error', ...args)" @success="(...args) => emit('success', ...args)"
+                                @refresh-data="emit('refresh-data')" @notify="(...args) => emit('notify', ...args)" />
                         </DialogPanel>
                     </TransitionChild>
                 </div>
@@ -66,7 +68,11 @@ defineProps({
         type: String,
         default: "create",
     },
+    routes: {
+        type: Object,
+        default: () => ({}),
+    },
 });
 
-const emit = defineEmits(["close", "error", "success", "refresh-data"]);
+const emit = defineEmits(["close", "error", "success", "refresh-data", "notify"]);
 </script>

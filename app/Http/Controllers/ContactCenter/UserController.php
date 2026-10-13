@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Spatie\QueryBuilder\QueryBuilder;
 use App\Services\FreeswitchEslService;
+use App\Http\Requests\ContactCenter\BulkMakeAgentsRequest;
 
 class UserController extends Controller
 {
@@ -28,121 +29,154 @@ class UserController extends Controller
      */
     public function store()
     {
-        $group_name = ucfirst(request('role'));
+        $group_name = ucfirst((string) request('role'));
         try {
-            DB::beginTransaction();
-
-            $currentDomain = session('domain_uuid');
-
-            $extension = QueryBuilder::for(Extensions::class)
-                // only extensions in the current domain
-                ->where('domain_uuid', $currentDomain)
-                ->with(['voicemail' => function ($query) use ($currentDomain) {
-                    $query->where('domain_uuid', $currentDomain)
-                        ->select('voicemail_id', 'domain_uuid', 'voicemail_mail_to');
-                }])
-                ->select([
-                    'extension_uuid',
-                    'domain_uuid',
-                    'extension',
-                    'directory_first_name',
-                    'directory_last_name',
-                ])
-                ->whereKey(request('extension_uuid'))
-                ->firstOrFail();
-
-            $user = $this->resolveUserForExtension($extension, $currentDomain);
-
-
-            $groupNames = [
-                'Contact Center ' . $group_name, // Contact Center group
-                'user',                          // Regular user group
-            ];
-
-            foreach ($groupNames as $name) {
-                $group = Groups::where('group_name', $name)->first();
-
-                if ($group) {
-                    UserGroup::firstOrCreate(
-                        [
-                            'group_uuid' => $group->group_uuid,
-                            'user_uuid'  => $user->user_uuid,
-                        ],
-                        [
-                            'domain_uuid' => $currentDomain,
-                            'group_name'  => $name,
-                            'insert_date' => now(),
-                            'insert_user' => session('user_uuid'),
-                        ]
-                    );
-                }
-            }
-
-            // Create Contact Center Agent
-            if ($group_name === 'Agent') {
-                $agentData = [
-                    'domain_uuid'               => $currentDomain,
-                    'agent_name'                => trim($extension->directory_first_name . ' ' . $extension->directory_last_name),
-                    'agent_type'                => 'callback',
-                    'agent_call_timeout'        => 20,
-                    'agent_id'                  => $extension->extension,
-                    'agent_password'            => $extension->extension,
-                    'agent_contact'             => 'user/' . $extension->extension . '@' . session('domain_name'),
-                    'agent_max_no_answer'       => 0,
-                    'agent_wrap_up_time'        => 10,
-                    'agent_reject_delay_time'   => 90,
-                    'agent_busy_delay_time'     => 90,
-                    'agent_no_answer_delay_time' => 30,
-                    'agent_record'              => 'false',
-                    'insert_date'               => now(),
-                    'insert_user'               => session('user_uuid'),
-                ];
-
-                // Check if the agent already exists
-                $agent = CallCenterAgents::where('domain_uuid', $agentData['domain_uuid'])
-                    ->where('agent_id', $agentData['agent_id'])
-                    ->first();
-
-                if ($agent) {
-                    throw new \Exception('Agent already exists');
-                }
-
-                // Create new agent
-                $agent = CallCenterAgents::create($agentData);
-
-                $eslService = new FreeswitchEslService();
-
-                // Add agent config to Freeswitch
-                $command = sprintf(
-                    'bgapi callcenter_config agent add %s %s',
-                    $agent->call_center_agent_uuid,
-                    'callback',
-                );
-                $result = $eslService->executeCommand($command, $disconnect = false);
-
-                // Reload agent to update all settings
-                $command = sprintf(
-                    'bgapi callcenter_config agent reload %s',
-                    $agent->call_center_agent_uuid,
-                );
-                $result = $eslService->executeCommand($command, $disconnect = false);
-                $eslService->disconnect();
-            }
-
-            DB::commit();
+            $agent = DB::transaction(fn () => $this->provisionExtension(
+                (string) request('extension_uuid'),
+                (string) request('role')
+            ));
 
             return response()->json([
                 'messages' => ['success' => [$group_name .' created successfully']],
-                'agent' => $agent ?? null,
+                'agent' => $agent,
             ], 200);
         } catch (\Throwable $e) {
-            DB::rollBack();
             logger('UserController@store error: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
             return response()->json([
                 'success' => false,
                 'errors' => ['error' => [$e->getMessage()]],
             ], 500);
         }
+    }
+
+    public function bulkStore(BulkMakeAgentsRequest $request)
+    {
+        $created = 0;
+        $skipped = 0;
+
+        foreach ($request->validated('items') as $extensionUuid) {
+            try {
+                DB::transaction(fn () => $this->provisionExtension($extensionUuid, 'agent'));
+                $created++;
+            } catch (\Throwable $e) {
+                $skipped++;
+                logger('UserController@bulkStore item error: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine(), [
+                    'extension_uuid' => $extensionUuid,
+                ]);
+            }
+        }
+
+        if ($created === 0) {
+            return response()->json([
+                'success' => false,
+                'errors' => ['error' => [$skipped . ' ' . __('skipped') . '.']],
+            ], 422);
+        }
+
+        $message = __(':name created successfully', ['name' => $created]);
+        if ($skipped > 0) {
+            $message .= ' ' . $skipped . ' ' . __('skipped') . '.';
+        }
+
+        return response()->json([
+            'messages' => ['success' => [$message]],
+            'created' => $created,
+            'skipped' => $skipped,
+        ]);
+    }
+
+    private function provisionExtension(string $extensionUuid, string $role): ?CallCenterAgents
+    {
+        $group_name = ucfirst($role);
+        $currentDomain = session('domain_uuid');
+
+        $extension = QueryBuilder::for(Extensions::class)
+            ->where('domain_uuid', $currentDomain)
+            ->with(['voicemail' => function ($query) use ($currentDomain) {
+                $query->where('domain_uuid', $currentDomain)
+                    ->select('voicemail_id', 'domain_uuid', 'voicemail_mail_to');
+            }])
+            ->select([
+                'extension_uuid',
+                'domain_uuid',
+                'extension',
+                'directory_first_name',
+                'directory_last_name',
+            ])
+            ->whereKey($extensionUuid)
+            ->firstOrFail();
+
+        $user = $this->resolveUserForExtension($extension, $currentDomain);
+
+        $groupNames = [
+            'Contact Center ' . $group_name,
+            'user',
+        ];
+
+        foreach ($groupNames as $name) {
+            $group = Groups::where('group_name', $name)->first();
+
+            if ($group) {
+                UserGroup::firstOrCreate(
+                    [
+                        'group_uuid' => $group->group_uuid,
+                        'user_uuid'  => $user->user_uuid,
+                    ],
+                    [
+                        'domain_uuid' => $currentDomain,
+                        'group_name'  => $name,
+                        'insert_date' => now(),
+                        'insert_user' => session('user_uuid'),
+                    ]
+                );
+            }
+        }
+
+        if ($group_name !== 'Agent') {
+            return null;
+        }
+
+        $agentData = [
+            'domain_uuid'               => $currentDomain,
+            'agent_name'                => trim($extension->directory_first_name . ' ' . $extension->directory_last_name),
+            'agent_type'                => 'callback',
+            'agent_call_timeout'        => 20,
+            'agent_id'                  => $extension->extension,
+            'agent_password'            => $extension->extension,
+            'agent_contact'             => 'user/' . $extension->extension . '@' . session('domain_name'),
+            'agent_max_no_answer'       => 0,
+            'agent_wrap_up_time'        => 10,
+            'agent_reject_delay_time'   => 90,
+            'agent_busy_delay_time'     => 90,
+            'agent_no_answer_delay_time' => 30,
+            'agent_record'              => 'false',
+            'insert_date'               => now(),
+            'insert_user'               => session('user_uuid'),
+        ];
+
+        $agent = CallCenterAgents::where('domain_uuid', $agentData['domain_uuid'])
+            ->where('agent_id', $agentData['agent_id'])
+            ->first();
+
+        if ($agent) {
+            throw new \Exception('Agent already exists');
+        }
+
+        $agent = CallCenterAgents::create($agentData);
+
+        $eslService = new FreeswitchEslService();
+        $eslService->executeCommand(sprintf(
+            'bgapi callcenter_config agent add %s %s',
+            $agent->call_center_agent_uuid,
+            'callback',
+        ), false);
+        $eslService->executeCommand(sprintf(
+            'bgapi callcenter_config agent reload %s',
+            $agent->call_center_agent_uuid,
+        ), false);
+        $eslService->disconnect();
+
+        return $agent;
     }
 
     private function resolveUserForExtension(Extensions $extension, string $currentDomain): User

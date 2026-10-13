@@ -2,7 +2,7 @@
     "private": true,
     "scripts": {
         "dev": "vite",
-        "build": "vite build",
+        "build": "node --max-old-space-size=3072 ./node_modules/vite/bin/vite.js build",
         "test:i18n": "node .github/scripts/test-vue-i18n.mjs"
     },
     "devDependencies": {

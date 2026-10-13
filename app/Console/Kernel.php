@@ -123,6 +123,7 @@ class Kernel extends ConsoleKernel
         }
 
         $schedule->command('ldap:dispatch-due')->everyFiveMinutes()->withoutOverlapping();
+        $schedule->command('contact-center:callbacks')->everyMinute()->withoutOverlapping();
         $schedule->command('scheduled-jobs:maintain')->everyFiveMinutes()->withoutOverlapping();
 
         if (isset($jobSettings['delete_old_faxes']) && $jobSettings['delete_old_faxes'] === "true") {

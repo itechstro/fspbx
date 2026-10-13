@@ -1013,6 +1013,15 @@ class DashboardController extends Controller
                 'destroy' => $callCenterQueues
                     ? route('contactcenter.destroy', ['callCenterQueues' => $callCenterQueues])
                     : null,
+                'runtime' => $callCenterQueues
+                    ? route('contactcenter.runtime.show', ['callCenterQueues' => $callCenterQueues])
+                    : null,
+                'runtime_callbacks' => $callCenterQueues
+                    ? route('contactcenter.runtime.callbacks', ['callCenterQueues' => $callCenterQueues])
+                    : null,
+                'runtime_audio' => $callCenterQueues
+                    ? route('contactcenter.runtime.audio', ['callCenterQueues' => $callCenterQueues])
+                    : null,
             ],
         ];
     }

@@ -24,6 +24,7 @@ use App\Http\Controllers\RecorderAnalyticsController;
 use App\Http\Controllers\ConferenceCenterController;
 use App\Http\Controllers\ContactCenter\AgentStatusController as ContactCenterAgentStatusController;
 use App\Http\Controllers\ContactCenter\DashboardController as ContactCenterDashboardController;
+use App\Http\Controllers\ContactCenter\RuntimeController as ContactCenterRuntimeController;
 use App\Http\Controllers\ConferenceController;
 use App\Http\Controllers\ConferenceControlController;
 use App\Http\Controllers\ConferenceProfileController;
@@ -543,6 +544,10 @@ Route::group(['middleware' => 'auth'], function () {
         Route::get('/settings/{callCenterQueues}', [ContactCenterDashboardController::class, 'showSettings'])->name('contactcenter.settings.show');
         Route::delete('/delete/{callCenterQueues}', [ContactCenterDashboardController::class, 'destroy'])->name('contactcenter.destroy');
         Route::put('/settings/{callCenterQueues}', [ContactCenterDashboardController::class, 'update'])->name('contactcenter.settings.update');
+        Route::get('/settings/{callCenterQueues}/runtime', [ContactCenterRuntimeController::class, 'show'])->name('contactcenter.runtime.show');
+        Route::put('/settings/{callCenterQueues}/callbacks', [ContactCenterRuntimeController::class, 'updateCallbacks'])->name('contactcenter.runtime.callbacks');
+        Route::put('/settings/{callCenterQueues}/audio', [ContactCenterRuntimeController::class, 'updateAudio'])->name('contactcenter.runtime.audio');
+        Route::post('/settings/{callCenterQueues}/callbacks/{callback}/cancel', [ContactCenterRuntimeController::class, 'cancel'])->name('contactcenter.runtime.callbacks.cancel');
         Route::get('/settings/{callCenterQueues}/assign-agent/{callCenterAgents}', [ContactCenterDashboardController::class, 'assignAgent'])->name('contactcenter.settings.agents.assign');
         Route::get('/settings/{callCenterQueues}/unassign-agent/{callCenterAgents}', [ContactCenterDashboardController::class, 'unAssignAgent'])->name('contactcenter.settings.agents.unassign');
         Route::post('/update-agent-status', [ContactCenterDashboardController::class, 'updateAgentStatus'])->name('contactcenter.agents.update_status');
