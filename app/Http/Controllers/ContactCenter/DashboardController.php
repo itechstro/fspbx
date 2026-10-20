@@ -16,8 +16,11 @@ use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
 use App\Models\CallCenterQueueAgents;
 use Illuminate\Support\Facades\Cache;
+use App\Services\CallCenterAgentRuntimeStatus;
+use App\Services\ContactCenter\ContactCenterRuntime;
 use App\Services\ContactCenterQueueService;
 use App\Services\FreeswitchEslService;
+use App\Services\QueueCallOutcome;
 use App\Services\CallRoutingOptionsService;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Storage;
@@ -217,24 +220,16 @@ class DashboardController extends Controller
                 return [];
             }
 
-            $agents = array_map(function ($agent) {
-                $state  = $agent['state'] ?? '';
-                $status = $agent['status'] ?? '';
+            $runtime = app(ContactCenterRuntime::class);
+            $domainUuid = (string) session('domain_uuid');
+            $queueUuid = $queue->call_center_queue_uuid;
+            $recordHistory = app(\App\Services\Ha\ActiveNodeResolver::class)->isActive();
+            $agents = array_map(function ($agent) use ($runtime, $domainUuid, $queueUuid, $recordHistory) {
+                $row = CallCenterAgentRuntimeStatus::normalize($agent);
+                $row['cooldown_seconds'] = max(0, (int) ($row['ready_time'] ?? 0) - time());
+                $runtime->recordAgentSample($domainUuid, $queueUuid, $row, $recordHistory);
 
-                if ($state === 'Receiving') {
-                    $status = 'Receiving';
-                } elseif ($state === 'In a queue call') {
-                    $status = 'On a Call';
-                }
-
-                return [
-                    'name' => $agent['name'] ?? '',
-                    'status' => $status,
-                    'state' => $state,
-                    'last_status_change' => $agent['last_status_change'] ?? null,
-                    'talk_time' => $agent['talk_time'] ?? null,
-                    'calls_answered' => $agent['calls_answered'] ?? null,
-                ];
+                return $row;
             }, $fs_agents);
 
             // logger($agents);
@@ -574,6 +569,8 @@ class DashboardController extends Controller
 
             $data['callVolumeChartData'] = $this->getCallVolumeChartData();
             $data['callDurationChartData'] = $this->getAvgCallDurationChartData();
+            $data['queue_outcomes'] = empty($this->selectedAgents) ? $this->queueOutcomes() : null;
+            $data['agent_history'] = app(ContactCenterRuntime::class)->agentHistory((string) session('domain_uuid'));
 
             // $this->handledCalls =  $this->inbound + $this->outbound;
 
@@ -585,6 +582,41 @@ class DashboardController extends Controller
             // Log the file where the error occurred
             logger("File: " . $e->getFile() . ":" . $e->getLine());
         }
+    }
+
+    protected function queueOutcomes(): array
+    {
+        $order = ['answered', 'abandoned', 'queue_exited', 'queue_timeout', 'callback_requested', 'queue_other'];
+        $counts = array_fill_keys($order, 0);
+        $rows = CDR::query()
+            ->whereIn('call_center_queue_uuid', $this->selectedQueues)
+            ->where('start_stamp', '>=', $this->startPeriod)
+            ->where('start_stamp', '<=', $this->endPeriod)
+            ->where('cc_side', 'member')
+            ->get([
+                'status',
+                'cc_side',
+                'cc_cause',
+                'cc_cancel_reason',
+                'cc_agent_bridged',
+                'hangup_cause',
+            ]);
+
+        foreach ($rows as $cdr) {
+            $outcome = QueueCallOutcome::fromAttributes($cdr->getAttributes());
+            if ($outcome && array_key_exists($outcome, $counts)) {
+                $counts[$outcome]++;
+            }
+        }
+
+        $total = array_sum($counts);
+
+        return array_map(fn (string $key) => [
+            'key' => $key,
+            'label' => QueueCallOutcome::label($key),
+            'count' => $counts[$key],
+            'percent' => $total > 0 ? (int) round($counts[$key] / $total * 100) : 0,
+        ], $order);
     }
 
     public function getQueueInfoData()

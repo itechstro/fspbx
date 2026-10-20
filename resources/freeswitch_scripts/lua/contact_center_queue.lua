@@ -188,8 +188,22 @@ local offer_key = settings and tostring(settings.offer_key or "") or ""
 local already_used = session:getVariable("cc_callback_used") == "true"
 local closed = settings and tostring(settings.closed) == "true"
 
+local audio = dbh:first_row([[
+	SELECT mode, steps::text AS steps
+	FROM contact_center_audio_configurations
+	WHERE queue_uuid = :queue_uuid AND mode = 'sequence' AND status = 'ready'
+	LIMIT 1
+]], { queue_uuid = queue_uuid })
+
+local uuid = session:get_uuid()
+if audio and audio.steps then
+	api:executeString("luarun lua/contact_center_sequence.lua " .. uuid .. " " .. queue_uuid .. " " .. extension .. " " .. domain)
+end
+
+local sequence_callback = audio and audio.steps and audio.steps:find('"type"%s*:%s*"callback"')
 local enabled = settings and tostring(settings.enabled or "") or ""
-if settings and (enabled == "true" or enabled == "t" or enabled == "1") and offer_key ~= "" and not already_used and not closed then
+local offer_allowed = not audio or sequence_callback
+if settings and (enabled == "true" or enabled == "t" or enabled == "1") and offer_key ~= "" and not already_used and not closed and offer_allowed then
 	local existing = session:getVariable("cc_exit_keys") or ""
 	if not existing:find(offer_key, 1, true) then
 		existing = existing .. offer_key
@@ -197,19 +211,12 @@ if settings and (enabled == "true" or enabled == "t" or enabled == "1") and offe
 	session:setVariable("cc_exit_keys", existing)
 
 	local delay = tonumber(settings.offer_after_seconds) or 90
-	local audio = dbh:first_row([[
-		SELECT mode, steps::text AS steps
-		FROM contact_center_audio_configurations
-		WHERE queue_uuid = :queue_uuid AND mode = 'sequence' AND status = 'ready'
-		LIMIT 1
-	]], { queue_uuid = queue_uuid })
-	if audio and audio.steps and audio.steps:find('"type"%s*:%s*"callback"') then
+	if sequence_callback then
 		local offset = audio.steps:match('"type"%s*:%s*"callback".-"offset_seconds"%s*:%s*(%d+)')
 			or audio.steps:match('"offset_seconds"%s*:%s*(%d+).-"type"%s*:%s*"callback"')
 		if offset then delay = tonumber(offset) or delay end
 	end
 
-	local uuid = session:get_uuid()
 	api:executeString("sched_broadcast +" .. tostring(delay) .. " " .. uuid .. " " .. SOUNDS .. "/offer.wav aleg")
 elseif closed and not already_used then
 	-- The offer is not played after the daily cutoff. Callers stay in the queue.

@@ -638,16 +638,19 @@ class BasicQueueService
     private function queueXml(): string
     {
         $audioAvailable = class_exists(\Modules\ContactCenter\Services\Ha\HaSettings::class);
+        $runtime = app(\App\Services\ContactCenter\ContactCenterRuntime::class);
         return CallCenterQueues::query()
             ->with(['domain:domain_uuid,domain_name', 'dialplan:dialplan_uuid,domain_uuid,dialplan_xml'])
             ->orderBy('queue_name')
             ->get()
-            ->map(function (CallCenterQueues $queue) use ($audioAvailable) {
+            ->map(function (CallCenterQueues $queue) use ($audioAvailable, $runtime) {
                 $domainName = $this->domainName($queue->domain_uuid, $queue->domain);
                 $queueLabel = str_replace(' ', '-', (string) $queue->queue_name);
                 $mohSound = $queue->queue_moh_sound ?: 'local_stream://default';
-                $managedAudio = $audioAvailable && $queue->dialplan?->domain_uuid === $queue->domain_uuid
-                    && str_contains($queue->dialplan?->dialplan_xml ?? '', 'cc_queue_audio_managed=true');
+                $sequenceAudio = $runtime->sequenceManagesAudio($queue);
+                $managedAudio = $sequenceAudio || ($audioAvailable && $queue->dialplan?->domain_uuid === $queue->domain_uuid
+                    && str_contains($queue->dialplan?->dialplan_xml ?? '', 'cc_queue_audio_managed=true'));
+                $skipBusyAgents = $runtime->participates($queue);
 
                 return implode("\n", [
                     sprintf(
@@ -674,6 +677,7 @@ class BasicQueueService
                     sprintf("\t\t\t<param name=\"abandoned-resume-allowed\" value=\"%s\"/>", $this->xml($queue->queue_abandoned_resume_allowed ?? 'false')),
                     $managedAudio ? null : sprintf("\t\t\t<param name=\"announce-sound\" value=\"%s\"/>", $this->xml($queue->queue_announce_sound)),
                     $managedAudio ? null : sprintf("\t\t\t<param name=\"announce-frequency\" value=\"%s\"/>", $this->xml($queue->queue_announce_frequency)),
+                    $skipBusyAgents ? "\t\t\t<param name=\"skip-agents-with-external-calls\" value=\"true\"/>" : null,
                     "\t\t</queue>",
                 ]);
             })

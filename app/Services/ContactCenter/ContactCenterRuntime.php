@@ -4,6 +4,7 @@ namespace App\Services\ContactCenter;
 
 use App\Models\CallCenterAgents;
 use App\Models\CallCenterQueues;
+use App\Models\ContactCenterAgentEvent;
 use App\Models\ContactCenterAudioConfiguration;
 use App\Models\ContactCenterCallback;
 use App\Models\ContactCenterCallbackAttempt;
@@ -12,6 +13,7 @@ use App\Models\Domain;
 use App\Services\BasicQueueService;
 use App\Services\FreeswitchEslService;
 use App\Services\Ha\ActiveNodeResolver;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Schema;
@@ -31,6 +33,96 @@ class ContactCenterRuntime
             ->where('queue_uuid', $queue->call_center_queue_uuid)
             ->where('enabled', true)
             ->exists();
+    }
+
+    public function participates(CallCenterQueues $queue): bool
+    {
+        if (Schema::hasTable('contact_center_callback_settings')
+            && ContactCenterCallbackSetting::query()->where('queue_uuid', $queue->call_center_queue_uuid)->exists()) {
+            return true;
+        }
+
+        return Schema::hasTable('contact_center_audio_configurations')
+            && ContactCenterAudioConfiguration::query()->where('queue_uuid', $queue->call_center_queue_uuid)->exists();
+    }
+
+    public function sequenceManagesAudio(CallCenterQueues $queue): bool
+    {
+        if (! Schema::hasTable('contact_center_audio_configurations')) {
+            return false;
+        }
+
+        return ContactCenterAudioConfiguration::query()
+            ->where('queue_uuid', $queue->call_center_queue_uuid)
+            ->where('mode', 'sequence')
+            ->where('status', 'ready')
+            ->exists();
+    }
+
+    public function recordAgentSample(string $domainUuid, ?string $queueUuid, array $agent, bool $active = true): void
+    {
+        if (! $active || ! Schema::hasTable('contact_center_agent_events')) {
+            return;
+        }
+
+        $agentUuid = (string) ($agent['name'] ?? '');
+        if ($agentUuid === '') {
+            return;
+        }
+
+        $status = (string) ($agent['status'] ?? '');
+        $activity = (string) ($agent['activity'] ?? '');
+        $signature = $status.'|'.$activity.'|'.(int) ($agent['ready_time'] ?? 0);
+        $cacheKey = 'cc-agent-sample:'.$agentUuid;
+        $previous = Cache::get($cacheKey);
+        Cache::put($cacheKey, $signature, 3600);
+        if (! is_string($previous) || $previous === $signature) {
+            return;
+        }
+
+        if (! Cache::has('cc-agent-events-pruned')) {
+            ContactCenterAgentEvent::query()->where('created_at', '<', now()->subDays(90))->delete();
+            Cache::put('cc-agent-events-pruned', true, 3600);
+        }
+
+        [$previousStatus] = array_pad(explode('|', $previous, 3), 3, null);
+        $ready = (int) ($agent['ready_time'] ?? 0);
+
+        ContactCenterAgentEvent::query()->create([
+            'contact_center_agent_event_uuid' => (string) Str::uuid(),
+            'domain_uuid' => $domainUuid,
+            'agent_uuid' => $agentUuid,
+            'queue_uuid' => $queueUuid,
+            'event_identity' => (string) Str::uuid(),
+            'event_us' => (int) round(microtime(true) * 1000000),
+            'event_type' => 'status_change',
+            'previous_status' => $previousStatus,
+            'status' => $status,
+            'reason' => $activity !== '' ? $activity : null,
+            'cooldown_end' => $ready > time() ? $ready : null,
+            'created_at' => now(),
+        ]);
+    }
+
+    public function agentHistory(string $domainUuid)
+    {
+        if (! Schema::hasTable('contact_center_agent_events')) {
+            return collect();
+        }
+
+        return ContactCenterAgentEvent::query()
+            ->leftJoin('v_call_center_agents as agents', 'agents.call_center_agent_uuid', '=', 'contact_center_agent_events.agent_uuid')
+            ->where('contact_center_agent_events.domain_uuid', $domainUuid)
+            ->orderByDesc('contact_center_agent_events.event_us')
+            ->limit(40)
+            ->get([
+                'contact_center_agent_events.contact_center_agent_event_uuid',
+                'contact_center_agent_events.status',
+                'contact_center_agent_events.previous_status',
+                'contact_center_agent_events.reason',
+                'contact_center_agent_events.created_at',
+                'agents.agent_name',
+            ]);
     }
 
     public function saveCallbackSettings(CallCenterQueues $queue, array $input): ContactCenterCallbackSetting
@@ -88,6 +180,10 @@ class ContactCenterRuntime
 
         $mode = $input['mode'] === 'sequence' ? 'sequence' : 'continuous';
         $steps = array_values($input['steps'] ?? []);
+        $callbackSteps = count(array_filter($steps, fn ($step) => ($step['type'] ?? '') === 'callback'));
+        if ($callbackSteps > 1) {
+            throw new RuntimeException(__('A sequence can include one callback offer.'));
+        }
         $previousMoh = $config->steps['previous_moh'] ?? $queue->queue_moh_sound;
 
         if ($mode === 'continuous') {

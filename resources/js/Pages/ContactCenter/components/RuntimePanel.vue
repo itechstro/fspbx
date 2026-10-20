@@ -22,6 +22,8 @@
                 <label class="text-sm text-gray-700">
                     {{ $t('Key the caller presses to accept') }}
                     <input v-model="callbacks.offer_key" maxlength="1" class="mt-1 block w-full rounded-md border-gray-300 text-sm" />
+                    <span class="mt-1 block text-xs text-gray-500">{{ $t('The D exit key is reserved for callback deadlines.') }}</span>
+                    <span v-if="audio.mode === 'sequence'" class="mt-1 block text-xs text-gray-500">{{ $t('In a sequence, the callback step sets when the offer plays. This wait is kept but not used.') }}</span>
                 </label>
                 <label class="text-sm text-gray-700">
                     {{ $t('Stop calling people back at') }}
@@ -49,6 +51,7 @@
 
         <div v-if="part === 'audio'">
             <p class="text-sm text-gray-500">{{ $t('Continuous stream keeps the queue music. Audio sequence starts at the first clip for each caller.') }}</p>
+            <p class="mt-2 text-sm text-gray-500">{{ $t('Position is spoken on every loop and skipped when the position is unknown. One callback offer plays once per queue visit.') }}</p>
             <div class="mt-4 space-y-3" @keydown.enter.prevent="saveAudio">
                 <label class="text-sm text-gray-700">
                     {{ $t('Mode') }}
@@ -81,7 +84,7 @@
                 </div>
                 <div class="flex gap-3">
                     <button type="button" class="text-sm font-medium text-indigo-600 hover:text-indigo-500" @click="audio.steps.push({ type: 'clip', recording: '', duration_seconds: null })">{{ $t('Add audio') }}</button>
-                    <button type="button" class="text-sm font-medium text-indigo-600 hover:text-indigo-500" @click="audio.steps.push({ type: 'callback' })">{{ $t('Add callback offer') }}</button>
+                    <button type="button" class="text-sm font-medium text-indigo-600 hover:text-indigo-500 disabled:opacity-40" :disabled="audio.steps.some(step => step.type === 'callback')" @click="audio.steps.push({ type: 'callback' })">{{ $t('Add callback offer') }}</button>
                     <button type="button" class="text-sm font-medium text-indigo-600 hover:text-indigo-500" @click="audio.steps.push({ type: 'position' })">{{ $t('Add queue position') }}</button>
                 </div>
                 <div class="flex justify-end">

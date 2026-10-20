@@ -56,6 +56,30 @@
 
                         </div>
 
+                        <div v-if="stats.queue_outcomes && selectedAgents.length === 0" class="mt-6 rounded-lg bg-white p-4 shadow">
+                            <div class="text-sm font-semibold text-gray-700">{{ $t('Queue outcomes') }}</div>
+                            <ul class="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-3">
+                                <li v-for="row in stats.queue_outcomes" :key="row.key" class="text-sm text-gray-600">
+                                    <span class="font-medium text-gray-900">{{ row.count }}</span>
+                                    {{ row.label }}
+                                    <span class="text-gray-400">({{ row.percent }}%)</span>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div v-if="stats.agent_history && stats.agent_history.length" class="mt-6 rounded-lg bg-white p-4 shadow">
+                            <div class="text-sm font-semibold text-gray-700">{{ $t('Agent history') }}</div>
+                            <p class="mt-1 text-xs text-gray-500">{{ $t('Status changes from the last 90 days. Live busy state stays on the server that handled the call.') }}</p>
+                            <table class="mt-3 min-w-full text-sm">
+                                <tr v-for="row in stats.agent_history" :key="row.contact_center_agent_event_uuid" class="border-t border-gray-100">
+                                    <td class="py-2 pr-3 text-gray-900">{{ row.agent_name }}</td>
+                                    <td class="py-2 pr-3">{{ row.previous_status }} → {{ row.status }}</td>
+                                    <td class="py-2 pr-3">{{ row.reason === 'non_queue_call' ? $t('On a non-queue call') : (row.reason || '') }}</td>
+                                    <td class="py-2 text-gray-500">{{ row.created_at }}</td>
+                                </tr>
+                            </table>
+                        </div>
+
                     </div>
                 </div>
 
@@ -264,6 +288,8 @@
                                                                         <ChevronDownIcon
                                                                             class="ml-1 hidden h-5 w-5 flex-shrink-0 text-gray-400 lg:block"
                                                                             aria-hidden="true" />
+                                                                        <span v-if="agent.activity_label" class="ml-2 text-xs text-gray-500">{{ agent.activity_label }}</span>
+                                                                        <span v-if="agent.cooldown_seconds > 0" class="ml-2 text-xs text-gray-500">{{ $t('Ready in :seconds s', { seconds: agent.cooldown_seconds }) }}</span>
                                                                     </MenuButton>
                                                                 </div>
                                                                 <transition
@@ -390,6 +416,8 @@
                                                                         <ChevronDownIcon
                                                                             class="ml-1 hidden h-5 w-5 flex-shrink-0 text-gray-400 lg:block"
                                                                             aria-hidden="true" />
+                                                                        <span v-if="agent.activity_label" class="ml-2 text-xs text-gray-500">{{ agent.activity_label }}</span>
+                                                                        <span v-if="agent.cooldown_seconds > 0" class="ml-2 text-xs text-gray-500">{{ $t('Ready in :seconds s', { seconds: agent.cooldown_seconds }) }}</span>
                                                                     </MenuButton>
                                                                 </div>
                                                                 <transition
@@ -517,6 +545,8 @@
                                                                         <ChevronDownIcon
                                                                             class="ml-1 hidden h-5 w-5 flex-shrink-0 text-gray-400 lg:block"
                                                                             aria-hidden="true" />
+                                                                        <span v-if="agent.activity_label" class="ml-2 text-xs text-gray-500">{{ agent.activity_label }}</span>
+                                                                        <span v-if="agent.cooldown_seconds > 0" class="ml-2 text-xs text-gray-500">{{ $t('Ready in :seconds s', { seconds: agent.cooldown_seconds }) }}</span>
                                                                     </MenuButton>
                                                                 </div>
                                                                 <transition
