@@ -89,5 +89,6 @@ class ExtensionDetailData extends Data
 
         public ?MobileAppData $mobile_app,
         public ?string $phonebook_contact_uuid = null,
+        public ?string $emergency_location = null,
     ) {}
 }

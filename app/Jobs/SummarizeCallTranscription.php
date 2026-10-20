@@ -84,7 +84,7 @@ class SummarizeCallTranscription implements ShouldQueue
             $openAiService = app(\App\Services\OpenAIService::class);
             $outputLanguage = app(\App\Services\CallTranscription\CallTranscriptionService::class)
                 ->summaryOutputLanguage($row->domain_uuid);
-            $start  = $openAiService->createBackgroundSummary($lines, 'gpt-5-nano', $outputLanguage);
+            $start  = $openAiService->createBackgroundSummary($lines, 'gpt-5.6-luna', $outputLanguage);
 
             $responseId = $start['id'] ?? null;
             $status     = $start['status'] ?? 'queued';

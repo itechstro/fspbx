@@ -15,6 +15,9 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\Contracts\Foundation\Application;
 use App\Http\Requests\UpdateSipCaptureSettingsRequest;
 use App\Http\Requests\UpdateSystemSettingsRequest;
+use App\Http\Requests\UpdateMessagingSettingsRequest;
+use App\Services\Messaging\PhotoCompressionSettings;
+use App\Services\Messaging\PhotoCompressionService;
 use App\Services\Settings\SettingsManagementService;
 use App\Services\Settings\SystemSettingsSchema;
 use App\Services\SipCaptureService;
@@ -51,6 +54,7 @@ class SystemSettingsController extends Controller
                 'routes' => [
                     'dashboard_route' => route('dashboard'),
                     'settings_update' => route('system-settings.update'),
+                    'messaging_update' => route('system-settings.messaging.update'),
                     'number_translations' => [
                         'index' => route('number-translations.index'),
                         'store' => route('number-translations.store'),
@@ -85,6 +89,12 @@ class SystemSettingsController extends Controller
                         ? $this->sipCapture->settings()
                         : null;
                 },
+                'messagingSettings' => function () {
+                    return userCheckPermission('default_setting_view') ? [
+                        ...app(PhotoCompressionSettings::class)->settings(),
+                        'available' => app(PhotoCompressionService::class)->available(),
+                    ] : null;
+                },
                 'scheduled_jobs' => function () {
                     return userCheckPermission('scheduled_jobs_manage')
                         ? app(ScheduledJobCoordinationController::class)->controlProps()
@@ -96,6 +106,15 @@ class SystemSettingsController extends Controller
                 'initial_tab' => $initialTab,
             ]
         );
+    }
+
+    public function updateMessaging(UpdateMessagingSettingsRequest $request, PhotoCompressionSettings $settings): JsonResponse
+    {
+        return response()->json([
+            ...$settings->save(null, $request->validated()),
+            'available' => app(PhotoCompressionService::class)->available(),
+            'messages' => ['success' => [__('Messaging settings saved.')]],
+        ]);
     }
 
     public function updateSipCapture(UpdateSipCaptureSettingsRequest $request): JsonResponse

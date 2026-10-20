@@ -142,6 +142,9 @@ use App\Console\Commands\Updates\Update274;
 use App\Console\Commands\Updates\Update285;
 use App\Console\Commands\Updates\Update286;
 use App\Console\Commands\Updates\Update287;
+use App\Console\Commands\Updates\Update288;
+use App\Console\Commands\Updates\Update289;
+use App\Console\Commands\Updates\Update290;
 use App\Console\Commands\Updates\Update0917;
 use App\Console\Commands\Updates\Update0918;
 use App\Console\Commands\Updates\Update0924;
@@ -363,6 +366,9 @@ class UpdateApp extends Command
             '2.0.0' => Update285::class,
             '2.0.3' => Update286::class,
             '2.0.4' => Update287::class,
+            '2.0.5' => Update288::class,
+            '2.0.6' => Update289::class,
+            '2.0.7' => Update290::class,
             // Add more versions as needed
         ];
 

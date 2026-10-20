@@ -658,7 +658,7 @@ const ringotelStatusFor = (row) => {
 
 const ringotelDotClass = (status) => {
     if (Number(status?.state) === 0) {
-        return 'bg-white border-gray-400'
+        return 'bg-gray-300 border-white'
     }
 
     return {
