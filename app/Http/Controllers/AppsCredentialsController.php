@@ -50,7 +50,7 @@ class AppsCredentialsController extends Controller
         $mobileApp = MobileAppUsers::where('extension_uuid', $appCredentials->extension_uuid)->first();
         $username = $extension->extension;
 
-        if (get_mobile_app_provider() === 'cloudplay' && $extension) {
+        if ($extension && get_mobile_app_provider($extension->domain_uuid) === 'cloudplay') {
             $username = app(CloudPlayApiService::class)->buildMobileAppUsername(
                 $extension->domain_uuid,
                 (string) $extension->extension,

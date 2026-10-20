@@ -9,6 +9,11 @@ class MobileAppProviderResolver
 {
     public function resolve(?string $provider = null): MobileAppProviderInterface
     {
-        return app(CloudPlayApiService::class);
+        $provider ??= get_mobile_app_provider(session('domain_uuid'));
+
+        return match ($provider) {
+            'ringotel' => app(RingotelMobileAppProvider::class),
+            default => app(CloudPlayApiService::class),
+        };
     }
 }

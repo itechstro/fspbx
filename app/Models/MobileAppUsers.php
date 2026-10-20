@@ -19,6 +19,10 @@ class MobileAppUsers extends Model
     public $incrementing = false;
     protected $keyType = 'string';
 
+    protected $casts = [
+        'settings' => 'array',
+    ];
+
     /**
      * Get extesnion that this mobile app belongs to 
      */

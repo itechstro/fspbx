@@ -323,6 +323,7 @@
                                                     'enable_mobile_app_contact',
                                                     'mobile_app_connection',
                                                     'mobile_app_credentials',
+                                                    'talkphone_panel',
                                                     'submit_enabling_mobile_app',
                                                     'reset_mobile_app_password',
                                                     'deactivate_mobile_app',
@@ -1404,7 +1405,7 @@
                                                 </StaticElement>
 
                                                 <StaticElement name="mobile_app_ringotel_state"
-                                                    :conditions="[() => !!mobileAppOptions?.mobile_app && mobileAppOptions?.mobile_app?.status == 1]">
+                                                    :conditions="[() => mobileAppOptions?.provider !== 'talkphone' && !!mobileAppOptions?.mobile_app && mobileAppOptions?.mobile_app?.status == 1]">
                                                     <div class="mt-4 space-y-4 rounded-md border border-gray-200 bg-gray-50 p-4">
                                                         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                                             <div>
@@ -1490,7 +1491,17 @@
                                                         <div class="grow">
                                                             <h3 class="text-lg font-semibold mb-4">{{ $t('Mobile App Details') }}
                                                             </h3>
-                                                            <ul class="mb-4 space-y-1 text-sm">
+                                                            <div v-if="mobileAppOptions?.provider === 'talkphone'" class="mb-4 space-y-2 text-sm">
+                                                                <div><strong>{{ $t('MAC Address') }}:</strong> <span class="font-mono">{{ mobileAppOptions?.talkphone?.mac }}</span></div>
+                                                                <div class="break-all"><strong>{{ $t('Link') }}:</strong> {{ mobileAppOptions?.talkphone?.url }}</div>
+                                                                <p class="text-xs text-gray-500">{{ $t('Scan the QR code in TalkPhone. The phone stores this MAC and uses it to download the address book.') }}</p>
+                                                                <button type="button" class="rounded-md bg-white px-2.5 py-1.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+                                                                    :disabled="talkphoneEmailSending"
+                                                                    @click="emailTalkPhone">
+                                                                    {{ $t('Email QR code') }}
+                                                                </button>
+                                                            </div>
+                                                            <ul v-else class="mb-4 space-y-1 text-sm">
                                                                 <li v-if="mobileAppOptions?.provider === 'cloudplay'"
                                                                     class="text-xs font-semibold uppercase tracking-wide text-gray-500 pt-1">
                                                                     CloudPLAY app login
@@ -1592,7 +1603,7 @@
                                                     :loading="isMobileAppLoading.reset"
                                                     @click="handleMobileAppResetButtonClick"
                                                     :description="$t('Generate new app credentials and sign out all currently logged-in devices.')"
-                                                    :conditions="[() => !!mobileAppOptions?.mobile_app && mobileAppOptions?.mobile_app?.status == 1]" />
+                                                    :conditions="[() => mobileAppOptions?.provider !== 'talkphone' && !!mobileAppOptions?.mobile_app && mobileAppOptions?.mobile_app?.status == 1]" />
 
                                                 <GroupElement name="container3"
                                                     :conditions="[() => !!mobileAppOptions?.mobile_app && mobileAppOptions?.mobile_app?.status == 1]" />
@@ -1603,14 +1614,14 @@
                                                     @click="handleMobileAppDeactivateButtonClick"
                                                     :description="$t('Prevent this extension from signing in to the mobile app. The user will remain visible in the address book.')"
                                                     :secondary="true"
-                                                    :conditions="[() => !!mobileAppOptions?.mobile_app && mobileAppOptions?.mobile_app?.status == 1]" />
+                                                    :conditions="[() => mobileAppOptions?.provider !== 'talkphone' && !!mobileAppOptions?.mobile_app && mobileAppOptions?.mobile_app?.status == 1]" />
 
 
                                                 <ButtonElement name="activate_mobile_app" :button-label="$t('Activate')"
                                                     :label="$t('Activate Mobile App')" :loading="isMobileAppLoading.activate"
                                                     @click="handleMobileAppActivateButtonClick"
                                                     :description="$t('Allow this extension to sign in and use the mobile app.')"
-                                                    :conditions="[() => !!mobileAppOptions?.mobile_app && mobileAppOptions?.mobile_app?.status == -1]" />
+                                                    :conditions="[() => mobileAppOptions?.provider !== 'talkphone' && !!mobileAppOptions?.mobile_app && mobileAppOptions?.mobile_app?.status == -1]" />
 
                                                 <GroupElement name="container4"
                                                     :conditions="[() => !!mobileAppOptions?.mobile_app && mobileAppOptions?.mobile_app?.status == -1]" />
@@ -1625,8 +1636,56 @@
                                                 <GroupElement name="container5"
                                                     :conditions="[() => !!mobileAppOptions?.mobile_app]" />
 
+                                                <StaticElement name="talkphone_panel"
+                                                    :conditions="[() => mobileAppOptions?.provider === 'talkphone' && mobileAppOptions?.mobile_app?.status == 1]">
+                                                    <div class="mt-4 space-y-3 rounded-md border border-gray-200 bg-gray-50 p-4 text-sm">
+                                                        <h3 class="font-semibold text-gray-900">{{ $t('TalkPhone settings') }}</h3>
+                                                        <p class="text-xs text-gray-500">{{ $t('Tenant defaults are shown. Change a field to override it for this extension.') }}</p>
+                                                        <label class="block">{{ $t('Transport') }}
+                                                            <select v-model="talkphoneSettings.transport" class="mt-1 block w-full rounded-md border-gray-300 text-sm">
+                                                                <option value="">{{ talkphoneDefaultLabel(talkphoneDefaults.transport) }}</option>
+                                                                <option>WSS</option>
+                                                                <option>WS</option>
+                                                                <option>TLS</option>
+                                                                <option>TCP</option>
+                                                            </select>
+                                                        </label>
+                                                        <label class="block">{{ $t('Port') }}
+                                                            <input v-model="talkphoneSettings.port" class="mt-1 block w-full rounded-md border-gray-300 text-sm" :placeholder="talkphoneDefaults.port || ''" />
+                                                        </label>
+                                                        <label class="block">{{ $t('WebSocket path') }}
+                                                            <input v-model="talkphoneSettings.ws_path" class="mt-1 block w-full rounded-md border-gray-300 text-sm" :placeholder="talkphoneDefaults.ws_path || ''" />
+                                                        </label>
+                                                        <label class="block">{{ $t('Media') }}
+                                                            <select v-model="talkphoneSettings.media_transport" class="mt-1 block w-full rounded-md border-gray-300 text-sm">
+                                                                <option value="">{{ talkphoneDefaultLabel(talkphoneDefaults.media_transport) }}</option>
+                                                                <option>SRTP</option>
+                                                                <option>RTP</option>
+                                                            </select>
+                                                        </label>
+                                                        <label class="block">{{ $t('Voicemail number') }}
+                                                            <input v-model="talkphoneSettings.voicemail_number" class="mt-1 block w-full rounded-md border-gray-300 text-sm" :placeholder="talkphoneDefaults.voicemail_number || ''" />
+                                                        </label>
+                                                        <label class="block">{{ $t('Codecs') }}
+                                                            <input v-model="talkphoneSettings.codecs" class="mt-1 block w-full rounded-md border-gray-300 text-sm" :placeholder="talkphoneDefaults.codecs || 'opus,G722,PCMU,PCMA'" />
+                                                        </label>
+                                                        <label class="flex items-center gap-2">
+                                                            <input type="checkbox" v-model="talkphoneSettings.allow_bad_certificate" />
+                                                            {{ $t('Allow self-signed certificate') }}
+                                                        </label>
+                                                        <label class="block">{{ $t('Register expiry') }}
+                                                            <input v-model="talkphoneSettings.register_expires" class="mt-1 block w-full rounded-md border-gray-300 text-sm" :placeholder="talkphoneDefaults.register_expires || ''" />
+                                                        </label>
+                                                        <button type="button" class="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white"
+                                                            :disabled="talkphoneSettingsSaving"
+                                                            @click="saveTalkPhoneSettings">
+                                                            {{ $t('Save settings') }}
+                                                        </button>
+                                                    </div>
+                                                </StaticElement>
+
                                                 <StaticElement name="mobile_app_devices"
-                                                    :conditions="[() => !!mobileAppOptions?.mobile_app && mobileAppOptions?.mobile_app?.status == 1]">
+                                                    :conditions="[() => mobileAppOptions?.provider !== 'talkphone' && !!mobileAppOptions?.mobile_app && mobileAppOptions?.mobile_app?.status == 1]">
                                                     <div class="mt-5">
                                                         <h3 class="text-sm font-semibold text-gray-900">{{ $t('Mobile App Devices') }}</h3>
                                                         <div v-if="ringotelUser?.devices?.length"
@@ -2218,6 +2277,42 @@ const devices = ref([])
 const sip_credentials = ref(null)
 const mobileApp = ref(null)
 const mobileAppOptions = ref(null)
+const talkphoneEmailSending = ref(false)
+const talkphoneSettingsSaving = ref(false)
+const talkphoneSettings = ref({
+    transport: '',
+    port: '',
+    ws_path: '',
+    media_transport: '',
+    voicemail_number: '',
+    codecs: '',
+    allow_bad_certificate: false,
+    register_expires: '',
+})
+const talkphoneDefaults = ref({})
+const talkphoneTruthy = (value) => ['1', 'true', 'yes', 'on', true].includes(
+    typeof value === 'string' ? value.toLowerCase() : value
+)
+const talkphoneOwnValue = (saved, key) => {
+    const value = saved?.[key]
+    return value !== undefined && value !== null && String(value).trim() !== ''
+}
+const talkphoneDefaultLabel = (value) => value ? `Default (${value})` : 'Default'
+const applyTalkPhoneForm = (saved = {}, defaults = {}) => {
+    talkphoneDefaults.value = defaults || {}
+    talkphoneSettings.value = {
+        transport: talkphoneOwnValue(saved, 'transport') ? saved.transport : (defaults.transport || ''),
+        port: talkphoneOwnValue(saved, 'port') ? saved.port : (defaults.port || ''),
+        ws_path: talkphoneOwnValue(saved, 'ws_path') ? saved.ws_path : (defaults.ws_path || ''),
+        media_transport: talkphoneOwnValue(saved, 'media_transport') ? saved.media_transport : (defaults.media_transport || ''),
+        voicemail_number: talkphoneOwnValue(saved, 'voicemail_number') ? saved.voicemail_number : (defaults.voicemail_number || ''),
+        codecs: talkphoneOwnValue(saved, 'codecs') ? saved.codecs : (defaults.codecs || ''),
+        allow_bad_certificate: talkphoneOwnValue(saved, 'allow_bad_certificate')
+            ? talkphoneTruthy(saved.allow_bad_certificate)
+            : talkphoneTruthy(defaults.allow_bad_certificate),
+        register_expires: talkphoneOwnValue(saved, 'register_expires') ? saved.register_expires : (defaults.register_expires || ''),
+    }
+}
 const showApiTokenModal = ref(false)
 const isDownloading = ref(false);
 const isNameAudioPlaying = ref(false);
@@ -2578,6 +2673,9 @@ const getMobileAppOptions = async () => {
                     qr_error: response.data.mobile_app_qr_error ?? null,
                 };
             }
+            if (response.data.talkphone) {
+                applyTalkPhoneForm(response.data.talkphone.settings || {}, response.data.talkphone.defaults || {})
+            }
 
         }).catch((error) => {
             emit('error', error)
@@ -2640,6 +2738,55 @@ const handleMobileAppDeviceDeleteClick = async (device) => {
         emit('error', error)
     } finally {
         isMobileAppLoading.device = false
+    }
+}
+
+const emailTalkPhone = async () => {
+    talkphoneEmailSending.value = true
+    try {
+        const response = await axios.post(props.options.routes.talkphone_email, {
+            extension_uuid: props.options.item.extension_uuid,
+        })
+        emit('success', 'success', response.data.messages)
+    } catch (error) {
+        emit('error', error)
+    } finally {
+        talkphoneEmailSending.value = false
+    }
+}
+
+const saveTalkPhoneSettings = async () => {
+    talkphoneSettingsSaving.value = true
+    try {
+        const settings = {}
+        for (const [key, value] of Object.entries(talkphoneSettings.value)) {
+            if (key === 'allow_bad_certificate') {
+                const checked = !!value
+                if (checked === talkphoneTruthy(talkphoneDefaults.value[key])) {
+                    continue
+                }
+                settings[key] = checked ? 'true' : 'false'
+                continue
+            }
+            const current = String(value ?? '').trim()
+            const tenantDefault = String(talkphoneDefaults.value[key] ?? '').trim()
+            if (current === '' || current === tenantDefault) {
+                continue
+            }
+            settings[key] = current
+        }
+        const response = await axios.post(props.options.routes.talkphone_settings, {
+            extension_uuid: props.options.item.extension_uuid,
+            settings,
+        })
+        if (response.data.talkphone) {
+            applyTalkPhoneForm(response.data.talkphone.settings || {}, response.data.talkphone.defaults || {})
+        }
+        emit('success', 'success', response.data.messages)
+    } catch (error) {
+        emit('error', error)
+    } finally {
+        talkphoneSettingsSaving.value = false
     }
 }
 

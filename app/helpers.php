@@ -968,21 +968,48 @@ if (!function_exists('get_domain_setting')) {
 }
 
 if (!function_exists('get_mobile_app_provider')) {
-    function get_mobile_app_provider(): string
+    function get_mobile_app_provider(?string $domainUuid = null): string
     {
+        $allowed = ['cloudplay', 'ringotel', 'talkphone'];
+        if ($domainUuid === null) {
+            $domainUuid = session('domain_uuid');
+        }
+
+        if (is_string($domainUuid) && $domainUuid !== '') {
+            $value = DomainSettings::query()
+                ->where('domain_uuid', $domainUuid)
+                ->where('domain_setting_subcategory', 'mobile_app_provider')
+                ->where('domain_setting_enabled', 'true')
+                ->value('domain_setting_value');
+
+            if (in_array($value, $allowed, true)) {
+                return $value;
+            }
+
+            $cloudplayUsername = DomainSettings::query()
+                ->where('domain_uuid', $domainUuid)
+                ->where('domain_setting_subcategory', 'cloudplay_cust_username')
+                ->where('domain_setting_enabled', 'true')
+                ->value('domain_setting_value');
+
+            if (is_string($cloudplayUsername) && $cloudplayUsername !== '') {
+                return 'cloudplay';
+            }
+        }
+
         $value = DefaultSettings::where('default_setting_category', 'mobile_apps')
             ->where('default_setting_subcategory', 'mobile_app_provider')
             ->where('default_setting_enabled', 'true')
             ->value('default_setting_value');
 
-        return in_array($value, ['cloudplay', 'ringotel'], true) ? $value : '';
+        return in_array($value, $allowed, true) ? $value : 'cloudplay';
     }
 }
 
 if (!function_exists('cloudplay_phonebook_sync_enabled')) {
     function cloudplay_phonebook_sync_enabled(?string $domainUuid = null): bool
     {
-        if (get_mobile_app_provider() !== 'cloudplay') {
+        if (get_mobile_app_provider($domainUuid) !== 'cloudplay') {
             return false;
         }
 

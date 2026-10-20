@@ -8,7 +8,7 @@
             <template #action>
                 <button type="button" @click.prevent="handleSettingsButtonClick()"
                     class="rounded-md bg-indigo-600 px-2.5 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500">
-                    Admin API Settings
+                    CloudPLAY Admin API
                 </button>
             </template>
 
@@ -29,9 +29,8 @@
             <template #table-header>
                 <TableColumnHeader class="px-4 py-1.5 text-left text-sm font-semibold text-gray-900">Tenant</TableColumnHeader>
                 <TableColumnHeader class="px-2 py-3.5 text-left text-sm font-semibold text-gray-900">Tenant Domain</TableColumnHeader>
-                <TableColumnHeader class="px-2 py-3.5 text-left text-sm font-semibold text-gray-900">CloudPLAY Customer</TableColumnHeader>
-                <TableColumnHeader class="px-2 py-3.5 text-left text-sm font-semibold text-gray-900">Profile</TableColumnHeader>
-                <TableColumnHeader class="px-2 py-3.5 text-left text-sm font-semibold text-gray-900">Status</TableColumnHeader>
+                <TableColumnHeader class="px-2 py-3.5 text-left text-sm font-semibold text-gray-900">Mobile App</TableColumnHeader>
+                <TableColumnHeader class="px-2 py-3.5 text-left text-sm font-semibold text-gray-900">Settings</TableColumnHeader>
                 <TableColumnHeader header="" class="px-2 py-3.5 text-right text-sm font-semibold text-gray-900" />
             </template>
 
@@ -42,35 +41,44 @@
                     </TableField>
                     <TableField class="px-2 py-2 text-sm text-gray-500" :text="row.domain_name" />
                     <TableField class="px-2 py-2 text-sm text-gray-500">
-                        <span v-if="row.ringotel_status == 'true'">
-                            {{ row.cloudplay_cust_username || 'Connected' }}
-                            <span v-if="row.cloudplay_cust_id" class="text-xs text-gray-400">(ID {{ row.cloudplay_cust_id }})</span>
+                        <select :value="row.mobile_app_provider" @change="updateTenantProvider(row, $event.target.value)"
+                            class="rounded-md border-gray-300 text-sm">
+                            <option value="cloudplay">CloudPLAY Softphone</option>
+                            <option value="ringotel">Ringotel</option>
+                            <option value="talkphone">TalkPhone</option>
+                        </select>
+                    </TableField>
+                    <TableField class="px-2 py-2 text-sm text-gray-500">
+                        <span v-if="row.mobile_app_provider === 'talkphone'">
+                            {{ row.talkphone?.transport || 'WSS' }} · {{ row.talkphone?.codecs || 'Default codecs' }} · {{ row.talkphone?.voicemail_number || '*97' }}
                         </span>
-                        <span v-else class="text-gray-400">—</span>
-                    </TableField>
-                    <TableField class="px-2 py-2 text-sm text-gray-500">
-                        <span v-if="row.cloudplay_profile_id">ID {{ row.cloudplay_profile_id }}</span>
-                        <span v-else class="text-amber-600">Not set</span>
-                    </TableField>
-                    <TableField class="px-2 py-2 text-sm text-gray-500">
-                        <Badge v-if="row.ringotel_status == 'true'" text="Activated" backgroundColor="bg-green-50"
-                            textColor="text-green-700" ringColor="ring-green-600/20" />
-                        <Badge v-else text="Inactive" backgroundColor="bg-rose-50" textColor="text-rose-700"
-                            ringColor="ring-rose-600/20" />
+                        <span v-else-if="row.mobile_app_provider === 'ringotel'">
+                            <Badge v-if="row.ringotel_status == 'true'" text="Activated" backgroundColor="bg-green-50"
+                                textColor="text-green-700" ringColor="ring-green-600/20" />
+                            <Badge v-else text="Inactive" backgroundColor="bg-rose-50" textColor="text-rose-700"
+                                ringColor="ring-rose-600/20" />
+                        </span>
+                        <span v-else>
+                            <span v-if="row.ringotel_status == 'true'">{{ row.cloudplay_cust_username || 'Connected' }}</span>
+                            <span v-else class="text-gray-400">Not connected</span>
+                            <span v-if="row.cloudplay_profile_id"> · Profile {{ row.cloudplay_profile_id }}</span>
+                        </span>
                     </TableField>
                     <TableField class="px-2 py-1 text-sm text-gray-500">
                         <template #action-buttons>
                             <div class="flex items-center justify-end gap-1">
-                                <PowerIcon v-if="row.ringotel_status == 'false'" @click="handleActivateButtonClick(row.domain_uuid)"
+                                <Cog6ToothIcon v-if="row.mobile_app_provider === 'talkphone'" @click="openTalkPhoneSettings(row)"
+                                    class="h-9 w-9 py-2 rounded-full text-gray-400 hover:bg-gray-200 cursor-pointer" title="TalkPhone settings" />
+                                <PowerIcon v-if="row.mobile_app_provider === 'cloudplay' && row.ringotel_status == 'false'" @click="handleActivateButtonClick(row.domain_uuid)"
                                     class="h-9 w-9 py-2 rounded-full text-gray-400 hover:bg-gray-200 cursor-pointer" title="Activate tenant" />
-                                <BookOpenIcon v-if="row.ringotel_status == 'true'"
+                                <BookOpenIcon v-if="row.mobile_app_provider === 'cloudplay' && row.ringotel_status == 'true'"
                                     @click="handleSyncEnterprisePhonebookClick(row.domain_uuid)"
                                     class="h-9 w-9 py-2 rounded-full text-gray-400 hover:bg-gray-200 cursor-pointer"
                                     :class="{ 'opacity-50 pointer-events-none': syncingPhonebookDomainUuid === row.domain_uuid }"
                                     title="Sync enterprise phonebook" />
-                                <Cog6ToothIcon v-if="row.ringotel_status == 'true'" @click="handleEditCustomerButtonClick(row.domain_uuid)"
+                                <Cog6ToothIcon v-if="row.mobile_app_provider === 'cloudplay' && row.ringotel_status == 'true'" @click="handleEditCustomerButtonClick(row.domain_uuid)"
                                     class="h-9 w-9 py-2 rounded-full text-gray-400 hover:bg-gray-200 cursor-pointer" title="Edit tenant connection" />
-                                <XCircleIcon v-if="row.ringotel_status == 'true'" @click="handleDeactivateButtonClick(row.domain_uuid)"
+                                <XCircleIcon v-if="row.mobile_app_provider === 'cloudplay' && row.ringotel_status == 'true'" @click="handleDeactivateButtonClick(row.domain_uuid)"
                                     class="h-9 w-9 py-2 rounded-full text-gray-400 hover:bg-gray-200 cursor-pointer" title="Disconnect tenant" />
                             </div>
                         </template>
@@ -110,6 +118,54 @@
         <template #modal-body>
             <UpdateCloudPlayCustomerForm :customer="cloudPlayCustomer" :profiles="cloudPlayProfiles" :errors="formErrors"
                 :is-submitting="editCustomerFormSubmiting" @submit="handleUpdateCustomerRequest" @cancel="handleModalClose" />
+        </template>
+    </AddEditItemModal>
+
+    <AddEditItemModal :show="showTalkPhoneModal" header="TalkPhone tenant settings" :loading="loadingModal"
+        @close="handleModalClose">
+        <template #modal-body>
+            <form class="space-y-4" @submit.prevent="saveTalkPhoneTenantSettings">
+                <p class="text-sm text-gray-600">These defaults apply to every TalkPhone on this tenant. An extension can override them on its Mobile App tab. Leave a field blank to use the TalkPhone default.</p>
+                <label class="block text-sm">Transport
+                    <select v-model="talkphoneForm.transport" class="mt-1 block w-full rounded-md border-gray-300">
+                        <option value="">Default (WSS)</option>
+                        <option>WSS</option>
+                        <option>WS</option>
+                        <option>TLS</option>
+                        <option>TCP</option>
+                    </select>
+                </label>
+                <label class="block text-sm">Port
+                    <input v-model="talkphoneForm.port" class="mt-1 block w-full rounded-md border-gray-300" />
+                </label>
+                <label class="block text-sm">WebSocket path
+                    <input v-model="talkphoneForm.ws_path" class="mt-1 block w-full rounded-md border-gray-300" />
+                </label>
+                <label class="block text-sm">Media
+                    <select v-model="talkphoneForm.media_transport" class="mt-1 block w-full rounded-md border-gray-300">
+                        <option value="">Default (SRTP)</option>
+                        <option>SRTP</option>
+                        <option>RTP</option>
+                    </select>
+                </label>
+                <label class="block text-sm">Voicemail number
+                    <input v-model="talkphoneForm.voicemail_number" class="mt-1 block w-full rounded-md border-gray-300" placeholder="*97" />
+                </label>
+                <label class="block text-sm">Codecs
+                    <input v-model="talkphoneForm.codecs" class="mt-1 block w-full rounded-md border-gray-300" placeholder="opus,G722,PCMU,PCMA" />
+                </label>
+                <label class="flex items-center gap-2 text-sm">
+                    <input type="checkbox" v-model="talkphoneForm.allow_bad_certificate" />
+                    Allow self-signed certificate
+                </label>
+                <label class="block text-sm">Register expiry
+                    <input v-model="talkphoneForm.register_expires" class="mt-1 block w-full rounded-md border-gray-300" placeholder="600" />
+                </label>
+                <div class="flex justify-end gap-3">
+                    <button type="button" class="text-sm font-semibold text-gray-700" @click="handleModalClose">Cancel</button>
+                    <button type="submit" class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white" :disabled="talkphoneSaving">Save</button>
+                </div>
+            </form>
         </template>
     </AddEditItemModal>
 
@@ -159,6 +215,7 @@ const props = defineProps({
     data: Object,
     routes: Object,
     pagination: Object,
+    mobileAppProvider: String,
 });
 
 const loading = ref(false);
@@ -167,6 +224,20 @@ const showActivateModal = ref(false);
 const showPairModal = ref(false);
 const showEditCustomerModal = ref(false);
 const showSettingsModal = ref(false);
+const showTalkPhoneModal = ref(false);
+const talkphoneSaving = ref(false);
+const talkphoneDomainUuid = ref(null);
+const emptyTalkPhoneForm = () => ({
+    transport: '',
+    port: '',
+    ws_path: '',
+    media_transport: '',
+    voicemail_number: '',
+    codecs: '',
+    allow_bad_certificate: false,
+    register_expires: '',
+});
+const talkphoneForm = ref(emptyTalkPhoneForm());
 const showConfirmationModal = ref(false);
 const showSetupConfirmationModal = ref(false);
 const activateFormSubmiting = ref(false);
@@ -415,11 +486,72 @@ const renderRequestedPage = (page) => {
     });
 };
 
+const updateTenantProvider = (row, provider) => {
+    const previous = row.mobile_app_provider;
+    row.mobile_app_provider = provider;
+    axios.post(props.routes.update_tenant_provider, {
+        domain_uuid: row.domain_uuid,
+        provider,
+    })
+        .then((response) => {
+            showNotification('success', response.data.messages);
+        })
+        .catch((error) => {
+            row.mobile_app_provider = previous;
+            handleFormErrorResponse(error);
+        });
+};
+
+const openTalkPhoneSettings = (row) => {
+    talkphoneDomainUuid.value = row.domain_uuid;
+    formErrors.value = null;
+    showTalkPhoneModal.value = true;
+    loadingModal.value = true;
+    axios.post(props.routes.get_talkphone_settings, { domain_uuid: row.domain_uuid })
+        .then((response) => {
+            const saved = response.data.settings || {};
+            talkphoneForm.value = {
+                transport: saved.transport || '',
+                port: saved.port || '',
+                ws_path: saved.ws_path || '',
+                media_transport: saved.media_transport || '',
+                voicemail_number: saved.voicemail_number || '',
+                codecs: saved.codecs || '',
+                allow_bad_certificate: ['1', 'true', 'yes', 'on'].includes(String(saved.allow_bad_certificate).toLowerCase()),
+                register_expires: saved.register_expires || '',
+            };
+        })
+        .catch(handleFormErrorResponse)
+        .finally(() => {
+            loadingModal.value = false;
+        });
+};
+
+const saveTalkPhoneTenantSettings = () => {
+    talkphoneSaving.value = true;
+    const settings = { ...talkphoneForm.value };
+    settings.allow_bad_certificate = settings.allow_bad_certificate ? 'true' : '';
+    axios.post(props.routes.update_talkphone_settings, {
+        domain_uuid: talkphoneDomainUuid.value,
+        settings,
+    })
+        .then((response) => {
+            showNotification('success', response.data.messages);
+            handleSearchButtonClick();
+            handleModalClose();
+        })
+        .catch(handleFormErrorResponse)
+        .finally(() => {
+            talkphoneSaving.value = false;
+        });
+};
+
 const handleModalClose = () => {
     showActivateModal.value = false;
     showPairModal.value = false;
     showEditCustomerModal.value = false;
     showSettingsModal.value = false;
+    showTalkPhoneModal.value = false;
     formErrors.value = null;
 };
 

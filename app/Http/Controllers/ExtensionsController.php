@@ -647,6 +647,8 @@ class ExtensionsController extends Controller
             $routes['mobile_app_options'] = route('apps.user.options', $extension);
             $routes['create_mobile_app'] = route('apps.user.create');
             $routes['delete_mobile_app'] = route('apps.user.delete');
+            $routes['talkphone_email'] = route('apps.user.talkphone.email');
+            $routes['talkphone_settings'] = route('apps.user.talkphone.settings');
             $routes['reset_mobile_app'] = route('apps.user.reset');
             $routes['activate_mobile_app'] = route('apps.user.activate');
             $routes['deactivate_mobile_app'] = route('apps.user.deactivate');
@@ -884,7 +886,7 @@ class ExtensionsController extends Controller
                 ->where('domain_setting_enabled', true)
                 ->value('domain_setting_value');
 
-            if (!empty($mobileAppOrgId)) {
+            if (!empty($mobileAppOrgId) && get_mobile_app_provider(session('domain_uuid')) !== 'talkphone') {
                 try {
                     $mobileAppConnections = app(\App\Services\MobileApp\MobileAppProviderResolver::class)
                         ->resolve()
@@ -950,7 +952,7 @@ class ExtensionsController extends Controller
             'mobile_app' => [
                 'org_id' => $mobileAppOrgId ?? null,
                 'connections' => $mobileAppConnections ?? [],
-                'provider' => get_mobile_app_provider(),
+                'provider' => get_mobile_app_provider($currentDomain),
                 'requires_connection' => app(\App\Services\MobileApp\MobileAppProviderResolver::class)
                     ->resolve()
                     ->requiresConnectionSelection(),
@@ -1523,7 +1525,7 @@ public function store(StoreExtensionRequest $request)
             $phonebookContactChanged = array_key_exists('phonebook_contact_uuid', $data)
                 && ($data['phonebook_contact_uuid'] ?: null) !== ($previousPhonebookContactUuid ?: null);
 
-            if (get_mobile_app_provider() === 'cloudplay') {
+            if (get_mobile_app_provider($extension->domain_uuid) === 'cloudplay') {
                 $extension->refresh();
                 $extension->loadMissing('mobile_app');
                 $contactUserLinkService = app(ContactUserLinkService::class);

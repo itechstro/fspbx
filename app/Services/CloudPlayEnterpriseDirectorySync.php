@@ -406,7 +406,7 @@ class CloudPlayEnterpriseDirectorySync
 
     public function bulkSyncPhonebookOnlyExtensions(string $domainUuid): array
     {
-        if (get_mobile_app_provider() !== 'cloudplay') {
+        if (get_mobile_app_provider($domainUuid) !== 'cloudplay') {
             throw new \RuntimeException('CloudPLAY is not the configured mobile app provider.');
         }
 

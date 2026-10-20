@@ -70,6 +70,7 @@ use App\Http\Controllers\PolycomLogController;
 use App\Http\Controllers\PolycomProvisioningFileController;
 use App\Http\Controllers\ProFeaturesController;
 use App\Http\Controllers\ProvisioningController;
+use App\Http\Controllers\TalkPhoneProvisionController;
 use App\Http\Controllers\PhonebookController;
 use App\Http\Controllers\PhonebookManagerController;
 use App\Http\Controllers\RecordingsController;
@@ -177,6 +178,13 @@ Route::match(['GET', 'HEAD'], '/prov/directory/{book}/{path}', [PhonebookControl
     ->middleware(['throttle:provision', 'provision.digest'])
     ->withoutMiddleware(['auth', 'web'])
     ->name('provision.directory');
+
+// TalkPhone softphone provisioning. The device UUID is the secret.
+// Registered before the /prov/{path} catch-all.
+Route::match(['GET', 'HEAD'], '/prov/talkphone/{device_uuid}.json', [TalkPhoneProvisionController::class, 'show'])
+    ->where('device_uuid', '[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}')
+    ->middleware('throttle:provision')
+    ->name('provision.talkphone');
 
 Route::match(['GET', 'HEAD'], '/prov/{path}', [ProvisioningController::class, 'serve'])
     ->where('path', '.*')
@@ -448,6 +456,12 @@ Route::group(['middleware' => 'auth'], function () {
     Route::post('/apps/user/state', [AppsController::class, 'setUserState'])->name('apps.user.state');
     Route::post('/apps/user/device/delete', [AppsController::class, 'deleteDevice'])->name('apps.user.device.delete');
     Route::post('/apps/user/reset-password', [AppsController::class, 'resetPassword'])->name('apps.user.reset');
+    Route::post('/apps/provider', [AppsController::class, 'updateProvider'])->name('apps.provider.update');
+    Route::post('/apps/provider/tenant', [AppsController::class, 'updateTenantProvider'])->name('apps.provider.tenant');
+    Route::post('/apps/user/talkphone/settings', [AppsController::class, 'updateTalkPhoneSettings'])->name('apps.user.talkphone.settings');
+    Route::post('/apps/user/talkphone/email', [AppsController::class, 'emailTalkPhone'])->name('apps.user.talkphone.email');
+    Route::post('/apps/talkphone/settings/get', [AppsController::class, 'getTalkPhoneTenantSettings'])->name('apps.talkphone.settings.get');
+    Route::post('/apps/talkphone/settings/update', [AppsController::class, 'updateTalkPhoneTenantSettings'])->name('apps.talkphone.settings.update');
     Route::post('/apps/users/{extension}/status', [AppsController::class, 'SetStatus'])->name('appsSetStatus');
     Route::get('/apps/email', [AppsController::class, 'emailUser'])->name('emailUser');
 

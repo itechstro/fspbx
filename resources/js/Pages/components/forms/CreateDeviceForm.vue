@@ -121,7 +121,9 @@
                                                 <StaticElement name="h4" tag="h4" :content="$t('Device Settings')" />
 
                                                 <TextElement name="device_address" :label="$t('MAC Address')"
-                                                    :placeholder="$t('Enter MAC address')" :floating="false" :columns="{
+                                                    :placeholder="$t('Leave blank for TalkPhone')"
+                                                    :description="$t('A TalkPhone device can be saved without a MAC. One is assigned and sent to the app with the QR code. The app uses it to download this device\'s phone book.')"
+                                                    :floating="false" :columns="{
                                                         sm: {
                                                             container: 6,
                                                         },

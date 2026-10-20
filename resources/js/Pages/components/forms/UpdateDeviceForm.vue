@@ -161,6 +161,16 @@
                                                 ]"
                                                     :conditions="[() => options?.item?.device_vendor == 'grandstream' || options?.item?.device_vendor == 'yealink']" />
 
+                                                <FormTab name="talkphone" :label="$t('TalkPhone')" :elements="[
+                                                    'talkphone_title',
+                                                    'talkphone_help',
+                                                    'talkphone_preview',
+                                                    'talkphone_qr',
+                                                    'talkphone_email',
+                                                    'talkphone_container',
+                                                ]"
+                                                    :conditions="[() => String(options?.item?.device_vendor || '').toLowerCase() === 'talkphone']" />
+
                                                 <FormTab name="cloud_provisioning" :label="vendorCloudServiceName" :elements="[
                                                     'cloud_provisioning_title',
                                                     'cloud_provisioning_status',
@@ -1061,6 +1071,62 @@
                                                 <ButtonElement name="submit_phonebook" :button-label="$t('Save')"
                                                     :submits="true" align="right" />
 
+                                                <StaticElement name="talkphone_title" tag="h4" :content="$t('TalkPhone provisioning')"
+                                                    :description="$t('Scan this QR code in TalkPhone, or email it to the extension. The code is a link. The email does not include the password.')" />
+
+                                                <StaticElement name="talkphone_help">
+                                                    <p class="text-sm text-gray-600">
+                                                        {{ $t('Set these on the Advanced tab as device settings. Leave one out to use the account default, then the TalkPhone default.') }}
+                                                    </p>
+                                                    <ul class="mt-2 list-disc pl-5 text-sm text-gray-600">
+                                                        <li><span class="font-mono">transport</span> — WSS, WS, TLS, TCP</li>
+                                                        <li><span class="font-mono">port</span></li>
+                                                        <li><span class="font-mono">ws_path</span></li>
+                                                        <li><span class="font-mono">media_transport</span> — SRTP or RTP</li>
+                                                        <li><span class="font-mono">voicemail_number</span></li>
+                                                        <li><span class="font-mono">codecs</span> — opus, G722, PCMU, PCMA</li>
+                                                        <li><span class="font-mono">allow_bad_certificate</span></li>
+                                                        <li><span class="font-mono">register_expires</span></li>
+                                                    </ul>
+                                                    <p class="mt-2 text-sm text-gray-600">
+                                                        {{ $t('Account-wide defaults use the same names with a talkphone_ prefix, for example talkphone_transport.') }}
+                                                    </p>
+                                                </StaticElement>
+
+                                                <StaticElement name="talkphone_preview">
+                                                    <div v-if="talkphonePreviewError" class="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                                                        {{ talkphonePreviewError }}
+                                                    </div>
+                                                    <div v-else-if="talkphonePreview" class="text-sm text-gray-700 space-y-1">
+                                                        <div v-if="talkphonePreview.summary?.displayName"><strong>{{ $t('Name') }}:</strong> {{ talkphonePreview.summary.displayName }}</div>
+                                                        <div><strong>{{ $t('Extension') }}:</strong> {{ talkphonePreview.summary?.sipUri }}</div>
+                                                        <div><strong>{{ $t('Server') }}:</strong> {{ talkphonePreview.summary?.server }}</div>
+                                                        <div><strong>{{ $t('Transport') }}:</strong> {{ talkphonePreview.summary?.transport }} :{{ talkphonePreview.summary?.port }}</div>
+                                                        <div><strong>{{ $t('Voicemail') }}:</strong> {{ talkphonePreview.summary?.voicemailNumber || $t('Hidden') }}</div>
+                                                        <div><strong>{{ $t('Codecs') }}:</strong> {{ (talkphonePreview.summary?.codecs || []).join(', ') }}</div>
+                                                        <div v-if="talkphonePreview.summary?.mac"><strong>{{ $t('MAC Address') }}:</strong> {{ talkphonePreview.summary.mac }}</div>
+                                                        <div class="break-all"><strong>{{ $t('Link') }}:</strong> {{ talkphonePreview.url }}</div>
+                                                        <button type="button" class="mt-2 text-indigo-600 hover:text-indigo-800"
+                                                            @click="handleCopyToClipboard(talkphonePreview.url)">
+                                                            {{ $t('Copy link') }}
+                                                        </button>
+                                                    </div>
+                                                </StaticElement>
+
+                                                <StaticElement name="talkphone_qr">
+                                                    <img v-if="talkphonePreview?.url && options?.routes?.talkphone_qr_route"
+                                                        :src="options.routes.talkphone_qr_route + '?t=' + talkphoneQrStamp"
+                                                        width="240" height="240" alt="TalkPhone QR code"
+                                                        class="mt-3 rounded border border-gray-200 bg-white p-2">
+                                                </StaticElement>
+
+                                                <ButtonElement name="talkphone_email" :button-label="$t('Email QR code')"
+                                                    :secondary="true" :loading="talkphoneEmailSending"
+                                                    :disabled="!talkphonePreview?.url"
+                                                    @click="sendTalkPhoneEmail" />
+
+                                                <GroupElement name="talkphone_container" />
+
                                                 <!-- Cloud Provisioning tab-->
                                                 <StaticElement name="cloud_provisioning_title" tag="h4"
                                                     :content="vendorCloudServiceName"
@@ -1590,9 +1656,46 @@ const keyTypes = computed(() => getKeyTypes(selectedDeviceVendor()))
 const keyTypesWithSelect = KEY_TYPES_WITH_VALUE_SELECT
 const keyTypesWithValueText = KEY_TYPES_WITH_VALUE_TEXT
 
+const talkphonePreview = ref(null)
+const talkphonePreviewError = ref('')
+const talkphoneEmailSending = ref(false)
+const talkphoneQrStamp = ref(Date.now())
+
+const loadTalkPhonePreview = async () => {
+    const previewRoute = props.options?.routes?.talkphone_preview_route
+    if (!previewRoute) return
+    talkphonePreview.value = null
+    talkphonePreviewError.value = ''
+    try {
+        const response = await axios.get(previewRoute)
+        talkphonePreview.value = response.data
+        talkphoneQrStamp.value = Date.now()
+    } catch (error) {
+        talkphonePreviewError.value = error?.response?.data?.message
+            || trans('Assign an extension line before provisioning.')
+    }
+}
+
+const sendTalkPhoneEmail = async () => {
+    const emailRoute = props.options?.routes?.talkphone_email_route
+    if (!emailRoute || talkphoneEmailSending.value || !talkphonePreview.value?.url) return
+    talkphoneEmailSending.value = true
+    try {
+        const response = await axios.post(emailRoute)
+        emit('success', 'success', response.data.messages)
+    } catch (error) {
+        emit('error', error)
+    } finally {
+        talkphoneEmailSending.value = false
+    }
+}
+
 const handleTabSelected = (activeTab, previousTab) => {
     if (activeTab.name == 'cloud_provisioning') {
         getCloudProvisioningStatus();
+    }
+    if (activeTab.name == 'talkphone') {
+        loadTalkPhonePreview();
     }
 }
 

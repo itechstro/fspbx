@@ -6,6 +6,8 @@ use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
+use App\Models\Devices;
+use App\Models\MobileAppUsers;
 use App\Services\Provisioning\ProvisionDeviceResolver;
 use App\Services\Provisioning\ProvisioningAuthPolicy;
 use App\Services\Provisioning\ProvisioningSettingsResolver;
@@ -45,6 +47,10 @@ class DigestProvisionAuth
             $token = ProvisionDeviceResolver::tokenFromRequest($request);
         }
         $device = $token ? VendorRouter::findDeviceByToken($token) : null;
+
+        if (! $device && $token && ProvisionDeviceResolver::isContactDirectoryId($id)) {
+            $device = $this->talkPhoneDirectoryDevice($token);
+        }
 
         if (!$device) {
             // Some phones append a fixed filename to a directory path (e.g.
@@ -208,6 +214,30 @@ class DigestProvisionAuth
      * Used when the basename is a fixed filename (e.g. phonebook.xml) rather
      * than the device identifier.
      */
+    private function talkPhoneDirectoryDevice(string $mac): ?Devices
+    {
+        $user = MobileAppUsers::query()
+            ->where('device_mac', $mac)
+            ->where('provider', 'talkphone')
+            ->where('status', 1)
+            ->first();
+        if (! $user) {
+            return null;
+        }
+
+        $device = new Devices();
+        $device->forceFill([
+            'device_uuid' => $user->mobile_app_user_uuid,
+            'domain_uuid' => $user->domain_uuid,
+            'device_address' => $user->device_mac,
+            'device_vendor' => 'talkphone',
+            'device_enabled' => 'true',
+        ]);
+        $device->exists = true;
+
+        return $device;
+    }
+
     private function deviceFromPathSegments(Request $request)
     {
         $path = (string) ($request->route('path') ?? $request->path());

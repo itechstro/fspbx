@@ -12,13 +12,18 @@ use App\Models\DomainSettings;
 use App\Models\MobileAppUsers;
 use App\Models\DefaultSettings;
 use App\Jobs\SendAppCredentials;
+use App\Mail\TalkPhoneProvisionMail;
 use App\Contracts\MobileAppProviderInterface;
 use App\Services\CloudPlayApiService;
 use App\Services\CloudPlayEnterpriseDirectorySync;
 use App\Services\MobileApp\MobileAppProviderResolver;
+use App\Services\Provisioning\TalkPhoneProvisionException;
+use App\Services\Provisioning\TalkPhoneProvisionService;
+use App\Services\Provisioning\TalkPhoneSettings;
 use App\Services\RingotelApiService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 use Spatie\QueryBuilder\QueryBuilder;
 use App\Models\MobileAppPasswordResetLinks;
@@ -66,8 +71,11 @@ class AppsController extends Controller
                     'per_page' => fspbx_pagination_per_page(),
                     'per_page_options' => fspbx_pagination_options(),
                 ],
+                'mobileAppProvider' => get_mobile_app_provider() ?: 'cloudplay',
                 'routes' => [
                     'current_page' => route('apps.index'),
+                    'update_provider' => route('apps.provider.update'),
+                    'update_tenant_provider' => route('apps.provider.tenant'),
                     'data_route' => route('apps.data'),
                     'select_all' => route('apps.select.all'),
                     'create_organization' => route('apps.organization.create'),
@@ -88,6 +96,8 @@ class AppsController extends Controller
                     'get_settings' => route('apps.cloudplay.settings.get'),
                     'update_settings' => route('apps.cloudplay.settings.update'),
                     'sync_enterprise_phonebook' => route('apps.cloudplay.enterprise-phonebook.sync'),
+                    'get_talkphone_settings' => route('apps.talkphone.settings.get'),
+                    'update_talkphone_settings' => route('apps.talkphone.settings.update'),
                 ],
             ]
         );
@@ -106,6 +116,7 @@ class AppsController extends Controller
         // Normalize the query-level sort flag into the existing UI payload shape.
         $data->each(function ($domain) {
             $domain->ringotel_status = !empty($domain->ringotel_status_sort) ? 'true' : 'false';
+            $domain->mobile_app_provider = get_mobile_app_provider($domain->domain_uuid);
             $domain->cloudplay_cust_id = $domain->settings
                 ->firstWhere('domain_setting_subcategory', 'org_id')
                 ?->domain_setting_value;
@@ -115,6 +126,16 @@ class AppsController extends Controller
             $domain->cloudplay_profile_id = $domain->settings
                 ->firstWhere('domain_setting_subcategory', 'cloudplay_profile_id')
                 ?->domain_setting_value;
+            $talkphone = [];
+            foreach (TalkPhoneSettings::DEVICE_KEYS as $key) {
+                $value = $domain->settings
+                    ->firstWhere('domain_setting_subcategory', 'talkphone_'.$key)
+                    ?->domain_setting_value;
+                if ($value !== null && $value !== '') {
+                    $talkphone[$key] = $value;
+                }
+            }
+            $domain->talkphone = $talkphone;
         });
 
         return $data;
@@ -155,8 +176,18 @@ class AppsController extends Controller
         $data->where('domain_enabled', 'true')
             ->with(['settings' => function ($query) {
                 $query->select('domain_uuid', 'domain_setting_uuid', 'domain_setting_category', 'domain_setting_subcategory', 'domain_setting_value')
-                    ->where('domain_setting_category', 'app shell')
-                    ->whereIn('domain_setting_subcategory', ['org_id', 'cloudplay_cust_username', 'cloudplay_profile_id'])
+                    ->where(function ($query) {
+                        $query->where(function ($query) {
+                            $query->where('domain_setting_category', 'app shell')
+                                ->whereIn('domain_setting_subcategory', ['org_id', 'cloudplay_cust_username', 'cloudplay_profile_id']);
+                        })->orWhere(function ($query) {
+                            $query->where('domain_setting_category', 'mobile_apps')
+                                ->whereIn('domain_setting_subcategory', array_merge(
+                                    ['mobile_app_provider'],
+                                    array_map(fn (string $key) => 'talkphone_'.$key, TalkPhoneSettings::DEVICE_KEYS)
+                                ));
+                        });
+                    })
                     ->where('domain_setting_enabled', true);
             }]);
 
@@ -721,6 +752,10 @@ class AppsController extends Controller
      */
     public function getMobileAppOptions(MobileAppProviderResolver $providerResolver)
     {
+        if (get_mobile_app_provider(session('domain_uuid')) === 'talkphone') {
+            return $this->talkPhoneMobileAppOptions();
+        }
+
         try {
             $provider = $providerResolver->resolve();
             $mobile_app = QueryBuilder::for(MobileAppUsers::query())
@@ -865,6 +900,10 @@ class AppsController extends Controller
                 ->whereKey(request('extension_uuid'))
                 ->firstOrFail();
 
+            if (get_mobile_app_provider($extension->domain_uuid) === 'talkphone') {
+                return $this->enableTalkPhoneUser($extension);
+            }
+
             if ((int) request('status') === 1) {
                 $existingMobileApp = MobileAppUsers::query()
                     ->where('extension_uuid', $extension->extension_uuid)
@@ -997,6 +1036,13 @@ class AppsController extends Controller
 
         try {
             $mobileApp = MobileAppUsers::find(request('mobile_app_user_uuid'));
+            if ($mobileApp && $mobileApp->provider === 'talkphone') {
+                $mobileApp->delete();
+
+                return response()->json([
+                    'messages' => ['success' => [__('Mobile app has been removed')]],
+                ], 200);
+            }
             app(CloudPlayEnterpriseDirectorySync::class)->remove($provider, $mobileApp);
             $mobileApp?->delete();
 
@@ -1936,10 +1982,38 @@ class AppsController extends Controller
         ]);
     }
 
+    public function updateTenantProvider(Request $request)
+    {
+        $data = $request->validate([
+            'domain_uuid' => ['required', 'uuid'],
+            'provider' => ['required', 'in:ringotel,cloudplay,talkphone'],
+        ]);
+        $this->assertTalkPhoneDomain($data['domain_uuid']);
+
+        DomainSettings::updateOrCreate(
+            [
+                'domain_uuid' => $data['domain_uuid'],
+                'domain_setting_category' => 'mobile_apps',
+                'domain_setting_subcategory' => 'mobile_app_provider',
+            ],
+            [
+                'domain_setting_name' => 'text',
+                'domain_setting_value' => $data['provider'],
+                'domain_setting_enabled' => 'true',
+                'domain_setting_description' => 'Mobile app for this tenant',
+            ]
+        );
+
+        return response()->json([
+            'messages' => ['success' => ['Mobile app updated for this tenant.']],
+            'provider' => $data['provider'],
+        ]);
+    }
+
     public function updateProvider(Request $request)
     {
         $data = $request->validate([
-            'provider' => ['required', 'in:ringotel,cloudplay'],
+            'provider' => ['required', 'in:ringotel,cloudplay,talkphone'],
         ]);
 
         DefaultSettings::updateOrCreate(
@@ -2463,11 +2537,7 @@ class AppsController extends Controller
 
     protected function usesCloudPlayQrPayload(?string $domainUuid): bool
     {
-        if ($domainUuid && app(CloudPlayApiService::class)->isConfiguredForDomain($domainUuid)) {
-            return true;
-        }
-
-        return app(MobileAppProviderResolver::class)->resolve()->getProviderKey() === 'cloudplay';
+        return get_mobile_app_provider($domainUuid) === 'cloudplay';
     }
 
     protected function resolveMobileAppQrError($provider, array $user, $hidePassInEmail, int $status): ?string
@@ -2510,5 +2580,281 @@ class AppsController extends Controller
         SendAppCredentials::dispatch(
             $this->prepareMobileAppCredentialsEmail($user, $extension, $domainUuid, $status)
         )->onQueue('emails');
+    }
+
+    public function getTalkPhoneTenantSettings(Request $request)
+    {
+        $data = $request->validate([
+            'domain_uuid' => ['required', 'uuid'],
+        ]);
+        $this->assertTalkPhoneDomain($data['domain_uuid']);
+
+        return response()->json([
+            'domain_uuid' => $data['domain_uuid'],
+            'settings' => $this->talkPhoneTenantSettings($data['domain_uuid']),
+        ]);
+    }
+
+    public function updateTalkPhoneTenantSettings(Request $request)
+    {
+        $data = $request->validate([
+            'domain_uuid' => ['required', 'uuid'],
+            'settings' => ['required', 'array'],
+        ]);
+        $this->assertTalkPhoneDomain($data['domain_uuid']);
+
+        foreach (TalkPhoneSettings::DEVICE_KEYS as $key) {
+            $value = trim((string) ($data['settings'][$key] ?? ''));
+            $match = [
+                'domain_uuid' => $data['domain_uuid'],
+                'domain_setting_category' => 'mobile_apps',
+                'domain_setting_subcategory' => 'talkphone_'.$key,
+            ];
+            if ($value === '') {
+                DomainSettings::query()->where($match)->delete();
+                continue;
+            }
+            DomainSettings::updateOrCreate($match, [
+                'domain_setting_name' => 'text',
+                'domain_setting_value' => $value,
+                'domain_setting_enabled' => 'true',
+                'domain_setting_description' => 'TalkPhone default',
+            ]);
+        }
+
+        return response()->json([
+            'messages' => ['success' => [__('TalkPhone settings saved.')]],
+            'settings' => $this->talkPhoneTenantSettings($data['domain_uuid']),
+        ]);
+    }
+
+    public function updateTalkPhoneSettings(Request $request, TalkPhoneProvisionService $provision)
+    {
+        $data = $request->validate([
+            'extension_uuid' => ['required', 'uuid'],
+            'settings' => ['required', 'array'],
+        ]);
+
+        $user = $this->talkPhoneUserForExtension($data['extension_uuid']);
+        $settings = [];
+        foreach (TalkPhoneSettings::DEVICE_KEYS as $key) {
+            if (! array_key_exists($key, $data['settings'])) {
+                continue;
+            }
+            $value = $data['settings'][$key];
+            if (is_bool($value)) {
+                $value = $value ? 'true' : 'false';
+            }
+            $value = trim((string) $value);
+            if ($value === '') {
+                continue;
+            }
+            $settings[$key] = $value;
+        }
+        $user->settings = $settings;
+        $user->save();
+
+        return response()->json([
+            'messages' => ['success' => [__('TalkPhone settings saved.')]],
+            'talkphone' => $this->talkPhoneSummary($user, $provision),
+        ]);
+    }
+
+    public function emailTalkPhone(Request $request, TalkPhoneProvisionService $provision)
+    {
+        $data = $request->validate([
+            'extension_uuid' => ['required', 'uuid'],
+        ]);
+
+        $user = $this->talkPhoneUserForExtension($data['extension_uuid']);
+        $extension = Extensions::query()->whereKey($user->extension_uuid)->firstOrFail();
+
+        try {
+            $payload = $provision->payloadForMobileApp($user);
+        } catch (TalkPhoneProvisionException $e) {
+            return response()->json([
+                'errors' => ['server' => [$e->getMessage()]],
+            ], 422);
+        }
+
+        $emails = $provision->recipientEmailsForExtension($extension);
+        if ($emails === []) {
+            return response()->json([
+                'errors' => ['server' => [__('This extension has no voicemail email address.')]],
+            ], 422);
+        }
+
+        try {
+            $url = $provision->provisionUrlForMobileApp($user);
+            Mail::to($emails)->send(new TalkPhoneProvisionMail([
+                'domain_uuid' => $user->domain_uuid,
+                'display_name' => $payload['displayName'],
+                'extension' => $payload['sipUri'],
+                'server' => $payload['server'],
+                'provision_url' => $url,
+                'qr_png' => $provision->qrPng($url),
+                'email_subject' => config('app.name', 'FS PBX').' TalkPhone setup',
+            ]));
+        } catch (\Throwable $e) {
+            logger('AppsController@emailTalkPhone error: '.$e->getMessage());
+
+            return response()->json([
+                'errors' => ['server' => [__('Failed to send the provisioning email.')]],
+            ], 500);
+        }
+
+        return response()->json([
+            'messages' => ['success' => [__('Provisioning email sent.')]],
+        ]);
+    }
+
+    private function talkPhoneMobileAppOptions()
+    {
+        try {
+            $extension = Extensions::query()
+                ->where('domain_uuid', session('domain_uuid'))
+                ->whereKey(request('extension_uuid'))
+                ->firstOrFail();
+
+            $user = MobileAppUsers::query()
+                ->where('extension_uuid', $extension->extension_uuid)
+                ->where('domain_uuid', session('domain_uuid'))
+                ->where('provider', 'talkphone')
+                ->first();
+
+            $response = [
+                'mobile_app' => $user,
+                'org_id' => null,
+                'connections' => [],
+                'provider' => 'talkphone',
+                'requires_connection' => false,
+                'supports_contact_only' => false,
+            ];
+
+            if ($user && (int) $user->status === 1) {
+                $provision = app(TalkPhoneProvisionService::class);
+                $summary = $this->talkPhoneSummary($user, $provision);
+                $response['talkphone'] = $summary;
+                $response['mobile_app_credentials'] = [
+                    'username' => $extension->extension,
+                    'domain' => $summary['server'] ?? '',
+                ];
+                $response['mobile_app_qrcode'] = base64_encode($provision->qrPng($summary['url']));
+            }
+
+            return response()->json($response);
+        } catch (\Throwable $e) {
+            logger('AppsController@talkPhoneMobileAppOptions error: '.$e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'errors' => ['error' => [$e->getMessage()]],
+            ], 404);
+        }
+    }
+
+    private function enableTalkPhoneUser(Extensions $extension)
+    {
+        $existing = MobileAppUsers::query()
+            ->where('extension_uuid', $extension->extension_uuid)
+            ->first();
+        $seatsRequired = ($existing && (int) $existing->status === 1) ? 0 : 1;
+
+        if ($resp = $this->enforceLimit(
+            'mobile_app_users',
+            MobileAppUsers::class,
+            'domain_uuid',
+            null,
+            $extension->domain_uuid,
+            $seatsRequired,
+        )) {
+            return $resp;
+        }
+
+        $provision = app(TalkPhoneProvisionService::class);
+        $user = $existing ?? new MobileAppUsers();
+        if (! $existing) {
+            $user->extension_uuid = $extension->extension_uuid;
+            $user->domain_uuid = $extension->domain_uuid;
+        }
+        $user->provider = 'talkphone';
+        $user->org_id = $user->org_id ?: 'talkphone';
+        $user->conn_id = $user->conn_id ?: 'talkphone';
+        $user->user_id = $extension->extension;
+        $user->status = 1;
+        if (TalkPhoneSettings::normalizeMac((string) $user->device_mac) === null) {
+            $user->device_mac = $provision->allocateMac();
+        }
+        $user->save();
+
+        $summary = $this->talkPhoneSummary($user, $provision);
+
+        return response()->json([
+            'user' => [
+                'username' => $extension->extension,
+                'domain' => $summary['server'] ?? '',
+            ],
+            'qrcode' => base64_encode($provision->qrPng($summary['url'])),
+            'talkphone' => $summary,
+            'messages' => ['success' => [__('TalkPhone has been enabled')]],
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function talkPhoneSummary(MobileAppUsers $user, TalkPhoneProvisionService $provision): array
+    {
+        $payload = $provision->payloadForMobileApp($user);
+        unset($payload['password']);
+
+        return [
+            'mac' => $payload['mac'],
+            'url' => $provision->provisionUrlForMobileApp($user),
+            'server' => $payload['server'],
+            'settings' => is_array($user->settings) ? $user->settings : [],
+            'defaults' => $this->talkPhoneTenantSettings($user->domain_uuid),
+            'summary' => $payload,
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function talkPhoneTenantSettings(string $domainUuid): array
+    {
+        $stored = DomainSettings::query()
+            ->where('domain_uuid', $domainUuid)
+            ->where('domain_setting_category', 'mobile_apps')
+            ->whereIn('domain_setting_subcategory', array_map(
+                fn (string $key) => 'talkphone_'.$key,
+                TalkPhoneSettings::DEVICE_KEYS
+            ))
+            ->pluck('domain_setting_value', 'domain_setting_subcategory');
+
+        $settings = [];
+        foreach (TalkPhoneSettings::DEVICE_KEYS as $key) {
+            $settings[$key] = (string) ($stored['talkphone_'.$key] ?? '');
+        }
+
+        return $settings;
+    }
+
+    private function assertTalkPhoneDomain(string $domainUuid): void
+    {
+        $exists = Domain::query()->where('domain_uuid', $domainUuid)->where('domain_enabled', 'true')->exists();
+        if (! $exists) {
+            abort(404);
+        }
+    }
+
+    private function talkPhoneUserForExtension(string $extensionUuid): MobileAppUsers
+    {
+        return MobileAppUsers::query()
+            ->where('extension_uuid', $extensionUuid)
+            ->where('domain_uuid', session('domain_uuid'))
+            ->where('provider', 'talkphone')
+            ->where('status', 1)
+            ->firstOrFail();
     }
 }

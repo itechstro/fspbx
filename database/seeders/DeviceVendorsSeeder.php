@@ -36,6 +36,11 @@ class DeviceVendorsSeeder extends Seeder
                 'enabled'     => 'true',
                 'description' => 'Intrade phones (Fanvil OEM)',
             ],
+            [
+                'name'        => 'talkphone',
+                'enabled'     => 'true',
+                'description' => 'TalkPhone softphone',
+            ],
             // Add more vendors here as needed
         ];
 

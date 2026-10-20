@@ -94,6 +94,7 @@ use App\Http\Controllers\PhoneNumbersController;
 use App\Http\Controllers\PinNumberController;
 use App\Http\Controllers\CallPermissionController;
 use App\Http\Controllers\ProvisioningController;
+use App\Http\Controllers\TalkPhoneProvisionController;
 use App\Http\Controllers\RegistrationsController;
 use App\Http\Controllers\RecordingsManagerController;
 use App\Http\Controllers\RingGroupsController;
@@ -548,6 +549,9 @@ Route::group(['middleware' => ['auth:sanctum', 'api.cookie.auth']], function () 
     Route::post('/devices/select-all', [DeviceController::class, 'selectAll'])->name('devices.select.all');
     Route::post('devices/item-options', [DeviceController::class, 'getItemOptions'])->name('devices.item.options');
     Route::post('devices/assign', [DeviceController::class, 'assign'])->name('devices.assign');
+    Route::get('devices/{device}/talkphone', [TalkPhoneProvisionController::class, 'preview'])->name('devices.talkphone.preview');
+    Route::get('devices/{device}/talkphone/qr', [TalkPhoneProvisionController::class, 'qr'])->name('devices.talkphone.qr');
+    Route::post('devices/{device}/talkphone/email', [TalkPhoneProvisionController::class, 'email'])->name('devices.talkphone.email');
     Route::post('devices/bulk-unassign', [DeviceController::class, 'bulkUnassign'])->name('devices.bulk.unassign');
 
     // Device Key Templates

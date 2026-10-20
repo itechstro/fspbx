@@ -26,6 +26,7 @@
                     class="rounded-md border-gray-300 text-sm mr-2">
                     <option value="ringotel">Ringotel</option>
                     <option value="cloudplay">CloudPLAY Softphone</option>
+                    <option value="talkphone">TalkPhone</option>
                 </select>
 
                 <button type="button" @click.prevent="handleApiTokenButtonClick()"

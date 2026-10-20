@@ -4,7 +4,9 @@ namespace App\Http\Requests;
 
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use App\Models\Devices;
 use App\Models\ProvisioningTemplate;
+use App\Services\Provisioning\TalkPhoneSettings;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
@@ -213,8 +215,10 @@ class StoreDeviceRequest extends FormRequest
 
     public function prepareForValidation(): void
     {
+        $rawMac = trim((string) ($this->input('device_address') ?? ''));
+
         // Normalize MAC
-        $macAddress = strtolower(trim(tokenizeMacAddress($this->input('device_address') ?? '')));
+        $macAddress = strtolower(trim(tokenizeMacAddress($rawMac)));
         $this->merge([
             'device_address'          => formatMacAddress($macAddress),
             'device_address_modified' => $macAddress,
@@ -277,5 +281,28 @@ class StoreDeviceRequest extends FormRequest
             if ($vendor === 'poly') $vendor = 'polycom';
             $this->merge(['device_vendor' => $vendor]);
         }
+
+        // TalkPhone has no hardware MAC until the app saves the account.
+        // Assign one here so the provisioning link and the phone book share it.
+        if ($vendor === 'talkphone' && $rawMac === '') {
+            $macAddress = $this->allocateTalkPhoneMac();
+            $this->merge([
+                'device_address' => formatMacAddress($macAddress),
+                'device_address_modified' => $macAddress,
+            ]);
+        }
+    }
+
+    private function allocateTalkPhoneMac(): string
+    {
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            $mac = TalkPhoneSettings::generateMac();
+            $taken = Devices::query()->where('device_address', $mac)->exists();
+            if (! $taken) {
+                return $mac;
+            }
+        }
+
+        return TalkPhoneSettings::generateMac();
     }
 }

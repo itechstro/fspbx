@@ -642,6 +642,9 @@ class DeviceController extends Controller
                 'import_commit' => route('devices.import.commit'),
                 'get_routing_options' => route('routing.options'),
                 'save_key_template_from_device' => $itemUuid ? route('devices.key-templates.store-from-device', ['device' => $itemUuid]) : null,
+                'talkphone_preview_route' => $itemUuid ? route('devices.talkphone.preview', ['device' => $itemUuid]) : null,
+                'talkphone_qr_route' => $itemUuid ? route('devices.talkphone.qr', ['device' => $itemUuid]) : null,
+                'talkphone_email_route' => $itemUuid ? route('devices.talkphone.email', ['device' => $itemUuid]) : null,
             ]);
 
 
