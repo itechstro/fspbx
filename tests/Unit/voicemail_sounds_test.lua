@@ -56,6 +56,42 @@ test('missing and empty selections use the same English defaults', function()
     end
 end)
 
+test('missing dialect directory keeps the installed sound prefix', function()
+    local original = sounds.voice_installed
+    sounds.voice_installed = function(path)
+        return path == '/usr/share/freeswitch/sounds/en/us/callie'
+    end
+    local variables = {
+        default_language = 'en', default_dialect = 'uk', default_voice = 'callie',
+        sounds_dir = '/usr/share/freeswitch/sounds',
+        sound_prefix = '$${sounds_dir}/en/us/callie', sound_prefix_enforced = 'false',
+    }
+    sounds.with_voice(make_session(variables), function()
+        assert(variables.sound_prefix == '/usr/share/freeswitch/sounds/en/us/callie')
+        assert(variables.sound_prefix_enforced == 'true')
+    end)
+    assert(variables.sound_prefix == '$${sounds_dir}/en/us/callie')
+    assert(variables.sound_prefix_enforced == 'false')
+    sounds.voice_installed = original
+end)
+
+test('an installed language pack still replaces the previous sound prefix', function()
+    local original = sounds.voice_installed
+    sounds.voice_installed = function(path)
+        return path == '/usr/share/freeswitch/sounds/de/de/piper'
+            or path == '/usr/share/freeswitch/sounds/en/us/callie'
+    end
+    local variables = {
+        default_language = 'de', default_dialect = 'de', default_voice = 'piper',
+        sound_prefix = '/usr/share/freeswitch/sounds/en/us/callie',
+    }
+    sounds.with_voice(make_session(variables), function()
+        assert(variables.sound_prefix == '/usr/share/freeswitch/sounds/de/de/piper')
+    end)
+    assert(variables.sound_prefix == '/usr/share/freeswitch/sounds/en/us/callie')
+    sounds.voice_installed = original
+end)
+
 test('playback failure restores an explicitly enforced caller prefix', function()
     local variables = {sound_prefix = '/custom/caller', sound_prefix_enforced = 'true'}
     local ok, failure = pcall(function()
