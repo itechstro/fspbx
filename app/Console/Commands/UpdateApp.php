@@ -435,7 +435,7 @@ class UpdateApp extends Command
 
         // Update Vue files
         $this->executeCommand('npm install');
-        $this->executeCommand('npm run build', 300);
+        $this->executeCommand('npm run build', 900);
 
         // Output the current working directory
         $currentDirectory = $this->getCurrentDirectory();
