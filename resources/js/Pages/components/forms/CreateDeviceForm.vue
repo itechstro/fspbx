@@ -261,7 +261,7 @@
                                                                 }" placeholder="Choose or enter Ext/Number"
                                                                 :floating="false"
                                                                 description="Pick a tenant extension or type an extension from another PBX."
-                                                                @change="(newValue, oldValue, el$) => handleAuthIdChange(index, newValue, el$)" />
+                                                                @change="(newValue, oldValue, el$) => handleAuthIdChange(index, newValue, oldValue, el$)" />
 
                                                             <TextElement v-else name="auth_id" label="Ext/Number"
                                                                 placeholder="Enter Ext/Number" :floating="false"
@@ -271,7 +271,7 @@
                                                                         container: 4,
                                                                     },
                                                                 }"
-                                                                @change="(newValue, oldValue, el$) => handleAuthIdChange(index, newValue, el$)" />
+                                                                @change="(newValue, oldValue, el$) => handleAuthIdChange(index, newValue, oldValue, el$)" />
 
                                                             <TextElement name="display_name" :label="$t('Display Name')"
                                                                 :columns="{
@@ -282,7 +282,7 @@
                                                                     sm: {
                                                                         container: 3,
                                                                     },
-                                                                }" :placeholder="$t('Display Name')" :floating="false" />
+                                                                }" :placeholder="lineDisplayNamePlaceholder(index)" :floating="false" />
 
                                                             <DeviceLinePasswordElement placeholder="Enter SIP password"
                                                                 :columns="{
@@ -689,6 +689,8 @@ import {
     keyLabelDisabledConditions,
     normalizeKeyForSubmit as normalizeDeviceKeyForSubmit,
 } from "./deviceKeyTypes.js"
+import { trans } from "@i18n";
+import { automaticKeyLabel, effectiveLineDisplayName } from "../../../composables/extensionLabel.js";
 
 
 const props = defineProps({
@@ -772,10 +774,34 @@ function isManualAuthId(index) {
     return !extensions.some((extension) => String(extension.value) === authId)
 }
 
-function handleAuthIdChange(index, newValue, el$) {
+function handleAuthIdChange(index, newValue, oldValue, el$) {
     const line = el$.form$.el$('device_lines').children$[index]
-    line.children$['display_name'].update(newValue)
+    if (oldValue && newValue !== oldValue) {
+        line.children$['display_name'].update('')
+    }
     line.children$['user_id'].update(newValue)
+}
+
+// A blank Display Name follows the account's line display name format.
+function lineDisplayName(form, index) {
+    const displayName = form?.el$(`device_lines.${index}.display_name`)?.value
+
+    if (form?.el$(`device_lines.${index}.line_type_id`)?.value === 'externalline') {
+        return String(displayName ?? '').trim()
+    }
+
+    return effectiveLineDisplayName(displayName, form?.el$(`device_lines.${index}.auth_id`)?.value, props.options)
+}
+
+function lineDisplayNamePlaceholder(index) {
+    if (isExternalLine(index)) {
+        return trans('Display Name')
+    }
+
+    const authId = form$.value?.el$(`device_lines.${index}.auth_id`)?.value
+    const automatic = effectiveLineDisplayName('', authId, props.options)
+
+    return automatic || trans('Display Name')
 }
 
 const handleTabSelected = (activeTab, previousTab) => {
@@ -821,7 +847,7 @@ const getKeyValueSelectItems = async (query, input, index, listName = 'device_ke
         const count = deviceLinesEl?.children$Array?.length ?? deviceLinesEl?.value?.length ?? 0
 
         return Array.from({ length: count }, (_, i) => {
-            const displayName = form$.el$(`device_lines.${i}.display_name`)?.value ?? ''
+            const displayName = lineDisplayName(form$, i)
             return {
                 extension: `${i + 1}`,
                 name: trans('Line :number', { number: i + 1 }) + (displayName ? ' - ' + displayName : ''),
@@ -898,7 +924,7 @@ const updateLabel = (newValue, oldValue, el$, index, listName = 'device_keys') =
         const selected = (keyValueOptionsByIndex[cacheKey] ?? [])
             .find(o => String(o.extension) === String(newValue))
 
-        label = nameOnlyFromOption(selected)
+        label = automaticKeyLabel(newValue, props.options) ?? nameOnlyFromOption(selected)
 
         generatedLabelEl.update(null)
         keyLabelEl.update(label)
@@ -910,7 +936,7 @@ const updateLabel = (newValue, oldValue, el$, index, listName = 'device_keys') =
         const form$ = el$?.form$
         const lineNum = parseInt(newValue, 10)
         const displayName = Number.isFinite(lineNum) && lineNum > 0
-            ? (form$?.el$(`device_lines.${lineNum - 1}.display_name`)?.value ?? '')
+            ? lineDisplayName(form$, lineNum - 1)
             : ''
 
         label = displayName !== '' ? displayName : (Number.isFinite(lineNum) ? `Line ${lineNum}` : null)

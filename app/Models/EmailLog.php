@@ -45,11 +45,21 @@ class EmailLog extends Model
 
     public function getCreatedAtFormattedAttribute()
     {
-        if (!$this->created_at) {
+        return $this->formatLogTimestamp($this->created_at);
+    }
+
+    public function getUpdatedAtFormattedAttribute()
+    {
+        return $this->formatLogTimestamp($this->updated_at);
+    }
+
+    private function formatLogTimestamp($value): ?string
+    {
+        if (!$value) {
             return null;
         }
         return format_domain_datetime(
-            $this->created_at,
+            $value,
             $this->domain_uuid ?? session('domain_uuid')
         );
     }

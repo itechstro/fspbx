@@ -26,6 +26,7 @@ use App\Http\Controllers\CdrsController;
 use App\Http\Controllers\RecorderController;
 use App\Http\Controllers\RecorderAnalyticsController;
 use App\Http\Controllers\CallHistoryAnalyticsController;
+use App\Http\Controllers\HomerApiController;
 use App\Http\Controllers\CharPmsWebhookController;
 use App\Http\Controllers\ConferenceCenterController;
 use App\Http\Controllers\ConferenceController;
@@ -137,6 +138,9 @@ Route::post('/ai-tools/retell/send-email', [AiToolController::class, 'sendEmail'
     ->name('ai-tools.retell.send-email');
 
 Route::group(['middleware' => ['auth:sanctum', 'api.cookie.auth']], function () {
+    Route::put('/system-settings/homer-api', [HomerApiController::class, 'update'])->name('homer-api.update');
+    Route::post('/system-settings/homer-api/test', [HomerApiController::class, 'test'])->middleware('throttle:6,1')->name('homer-api.test');
+    Route::post('/cdrs/sip-trace', [HomerApiController::class, 'trace'])->middleware('throttle:10,1')->name('cdrs.sip-trace');
     Route::get('/ai-agents/data', [AiAgentController::class, 'data'])->name('ai-agents.data');
     Route::post('/ai-agents/item-options', [AiAgentController::class, 'itemOptions'])->name('ai-agents.item-options');
     Route::get('/ai-agents/integration', [AiProviderIntegrationController::class, 'show'])->name('ai-agents.integration.show');
@@ -966,6 +970,7 @@ Route::group(['middleware' => ['auth:sanctum', 'api.cookie.auth']], function () 
     Route::post('contacts', [ContactController::class, 'store'])->name('contacts.store');
     Route::get('contacts/options', [ContactController::class, 'options'])->name('contacts.options');
     Route::get('contacts/{phoneNumber}', [ContactController::class, 'show'])->name('contacts.show');
+    Route::put('/contacts/{contact}', [ContactController::class, 'update'])->name('contacts.update');
     Route::delete('/contacts/{contact}', [ContactController::class, 'destroy'])->name('contacts.destroy');
 
     // Phonebook contacts (v_contacts)

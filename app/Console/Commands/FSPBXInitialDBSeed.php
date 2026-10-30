@@ -6,6 +6,7 @@ use App\Services\Install\InstallSchema;
 use App\Services\Install\BrandingAssets;
 use Database\Seeders\FreeswitchSettingsSeeder;
 use Database\Seeders\FreeswitchModulesSeeder;
+use Database\Seeders\MusicOnHoldSeeder;
 use App\Models\User;
 use App\Models\UserSetting;
 use App\Models\Domain;
@@ -44,6 +45,11 @@ class FSPBXInitialDBSeed extends Command
 
         $this->info('Initializing FreeSWITCH modules...');
         if ($this->call('db:seed', ['--class' => FreeswitchModulesSeeder::class, '--force' => true]) !== self::SUCCESS) {
+            return self::FAILURE;
+        }
+
+        $this->info('Initializing Music on Hold streams...');
+        if ($this->call('db:seed', ['--class' => MusicOnHoldSeeder::class, '--force' => true]) !== self::SUCCESS) {
             return self::FAILURE;
         }
 

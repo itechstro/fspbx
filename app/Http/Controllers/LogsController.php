@@ -57,6 +57,7 @@ class LogsController extends Controller
                     'dashboard_route' => route('dashboard'),
                     'email_logs' => route('email-logs.index'),
                     'email_retry' => route('email-logs.retry'),
+                    'email_log_details' => route('email-logs.show', ['email_log' => '__UUID__']),
                     'email_delivery_details' => $postmarkDeliveryDetailsEnabled
                         ? route('email-logs.delivery-details', ['uuid' => '__UUID__'])
                         : null,
@@ -240,8 +241,6 @@ class LogsController extends Controller
         $permissions['fax_log_delete'] = userCheckPermission('fax_log_delete');
         $permissions['fax_send'] = userCheckPermission('fax_send');
         $permissions['log_view'] = userCheckPermission('log_view');
-        $permissions['log_download'] = userCheckPermission('log_download');
-        $permissions['log_path_view'] = userCheckPermission('log_path_view');
         $permissions['email_test_send'] = userCheckPermission('email_test_send');
         $permissions['ai_agent_view'] = userCheckPermission('ai_agent_view');
 

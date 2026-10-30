@@ -48,7 +48,11 @@ class SpeedDialPhone extends Model
             return null;
         }
 
-        return formatPhoneNumber($number, 'US', PhoneNumberFormat::NATIONAL);
+        return app(\App\Services\PhoneNumberService::class)->formatForDomain(
+            $number,
+            $this->domain_uuid,
+            PhoneNumberFormat::NATIONAL
+        );
     }
 
     public function getPhoneListDisplayAttribute(): ?string

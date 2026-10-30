@@ -84,6 +84,7 @@ class CdrsController extends Controller
                     'analytics_page' => route('cdrs.analytics.index'),
                     'export' => route('cdrs.export'),
                     'item_options' => route('cdrs.item.options'),
+                    'sip_trace' => route('cdrs.sip-trace'),
                     'data_route' => route('cdrs.data'),
                     'entities_route' => route('cdrs.entities'),
                     'call_recording_route' => route('cdrs.recording.options'),
@@ -653,6 +654,8 @@ class CdrsController extends Controller
         $permissions = [];
         $permissions['all_cdr_view'] = userCheckPermission('xml_cdr_domain');
         $permissions['cdr_mos_view'] = userCheckPermission('xml_cdr_mos');
+        $permissions['cdr_pcap'] = \App\Services\HomerApiService::canView()
+            && app(\App\Services\HomerApiService::class)->settings()->enabled;
         $permissions['call_recording_play'] = userCheckPermission('call_recording_play');
         $permissions['call_recording_download'] = userCheckPermission('call_recording_download');
         $permissions['transcription_summary'] = userCheckPermission('transcription_summary');

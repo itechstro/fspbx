@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\PhoneNumberService;
 use Carbon\Carbon;
 use libphonenumber\PhoneNumberFormat;
 use Illuminate\Database\Eloquent\Model;
@@ -55,7 +56,7 @@ class CDR extends Model
 
     public function getCallerIdNumberFormattedAttribute()
     {
-        return $this->caller_id_number ? $this->formatCdrPhoneNumber($this->caller_id_number) : null;
+        return $this->caller_id_number ? $this->formatPhoneNumber($this->caller_id_number) : null;
     }
 
     public function getCallerIdNameFormattedAttribute()
@@ -66,11 +67,12 @@ class CDR extends Model
             return null;
         }
 
-        if ($this->callerIdNameLooksLikePhone($name)) {
-            return $this->formatCdrPhoneNumber($name);
+        // Preserve names: libphonenumber can also interpret letters as vanity numbers.
+        if (! preg_match('/^\+?[0-9\s().-]+$/D', trim($name))) {
+            return $name;
         }
 
-        return $name;
+        return $this->formatPhoneNumber($name);
     }
 
     protected function resolveCallerIdDisplayName(): ?string
@@ -83,35 +85,7 @@ class CDR extends Model
 
         $raw = trim((string) ($this->caller_id_name ?? ''));
 
-        if ($raw !== '' && ! $this->callerIdNameLooksLikePhone($raw) && ! $this->callerIdNameIsDigitsOnly($raw)) {
-            return $raw;
-        }
-
         return $raw !== '' ? $raw : null;
-    }
-
-    protected function callerIdNameLooksLikePhone(?string $name): bool
-    {
-        $name = trim((string) $name);
-
-        if ($name === '') {
-            return false;
-        }
-
-        if (preg_match('/^(?:\+?1)?[2-9]\d{9}$/', $name)) {
-            return true;
-        }
-
-        $digits = phoneNumberDigits($name);
-
-        return (bool) preg_match('/^1?[2-9]\d{9}$/', $digits);
-    }
-
-    protected function callerIdNameIsDigitsOnly(?string $name): bool
-    {
-        $digits = phoneNumberDigits($name);
-
-        return $digits !== '' && ctype_digit($digits);
     }
 
     public function getCallerDestinationFormattedAttribute()
@@ -119,8 +93,7 @@ class CDR extends Model
         if ($this->caller_destination === null || $this->caller_destination === '') {
             return null;
         }
-
-        return $this->formatCdrPhoneNumber($this->caller_destination);
+        return $this->formatPhoneNumber($this->caller_destination);
     }
 
     public function getCallerDestinationNameFormattedAttribute(): ?string
@@ -136,7 +109,7 @@ class CDR extends Model
             return null;
         }
 
-        return $this->formatCdrPhoneNumber($this->destination_number);
+        return $this->formatPhoneNumber($this->destination_number);
     }
 
     public function getDestinationNumberNameFormattedAttribute(): ?string
@@ -307,25 +280,15 @@ class CDR extends Model
 
     public function formatPhoneNumber($value)
     {
-        return $this->formatCdrPhoneNumber($value);
-    }
-
-    private function phoneCountryCode(): string
-    {
-        if (!$this->domain_uuid) {
-            return 'US';
-        }
-
-        return get_domain_setting('country', $this->domain_uuid) ?? 'US';
-    }
-
-    private function formatCdrPhoneNumber(?string $value): ?string
-    {
         if ($value === null || $value === '') {
             return null;
         }
 
-        return formatPhoneNumber($value, $this->phoneCountryCode(), PhoneNumberFormat::NATIONAL);
+        return app(PhoneNumberService::class)->formatForDomain(
+            $value,
+            $this->domain_uuid,
+            PhoneNumberFormat::NATIONAL
+        );
     }
 
     public function relatedQueueCalls()

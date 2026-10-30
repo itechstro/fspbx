@@ -145,6 +145,11 @@ use App\Console\Commands\Updates\Update287;
 use App\Console\Commands\Updates\Update288;
 use App\Console\Commands\Updates\Update289;
 use App\Console\Commands\Updates\Update290;
+use App\Console\Commands\Updates\Update291;
+use App\Console\Commands\Updates\Update292;
+use App\Console\Commands\Updates\Update293;
+use App\Console\Commands\Updates\Update294;
+use App\Console\Commands\Updates\Update295;
 use App\Console\Commands\Updates\Update0917;
 use App\Console\Commands\Updates\Update0918;
 use App\Console\Commands\Updates\Update0924;
@@ -163,6 +168,7 @@ use App\Console\Commands\Updates\Update0969;
 use App\Console\Commands\Updates\Update0970;
 use App\Services\GitHubApiService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Process as LaravelProcess;
 use Symfony\Component\Process\Process;
 
 class UpdateApp extends Command
@@ -369,6 +375,11 @@ class UpdateApp extends Command
             '2.0.5' => Update288::class,
             '2.0.6' => Update289::class,
             '2.0.7' => Update290::class,
+            '2.0.8' => Update291::class,
+            '2.0.9' => Update292::class,
+            '2.1.0' => Update293::class,
+            '2.1.1' => Update294::class,
+            '2.1.2' => Update295::class,
             // Add more versions as needed
         ];
 
@@ -378,7 +389,7 @@ class UpdateApp extends Command
             if (version_compare($currentVersion, $version, '<')) {
                 $this->info("Applying update steps for version $version...");
                 // Create instance of the class and call the apply() method
-                $updateInstance = new $updateClass();
+                $updateInstance = app($updateClass);
                 if (!$updateInstance->apply()) {
                     // If the update fails, stop further updates and exit with failure
                     $this->error("Update to version $version failed. Stopping further updates.");
@@ -412,10 +423,16 @@ class UpdateApp extends Command
         // Cache config and routes
         $this->executeCommand('php artisan config:cache');
 
-        // A missing or unmatched Pro license must not stop the core update.
-        $moduleRefreshExitCode = $this->call('modules:refresh');
+        // Optional module updates, including a missing or unmatched Pro license, must not stop the core update.
+        try {
+            $moduleRefreshExitCode = $this->call('modules:refresh');
+        } catch (\Throwable $exception) {
+            $moduleRefreshExitCode = 1;
+            $this->warn('Module refresh failed: '.$exception->getMessage());
+        }
+
         if ($moduleRefreshExitCode !== 0) {
-            $this->warn('Module refresh did not complete. Pro features were left unchanged.');
+            $this->warn('Module refresh did not complete. Pro features were left unchanged. Continuing the application update. Retry with php artisan modules:refresh after resolving the warning.');
         }
 
         $this->executeCommand('php artisan route:cache');
@@ -447,7 +464,7 @@ class UpdateApp extends Command
         $modulePrograms = app(\App\Services\ProFeaturesService::class)->getSupervisorProgramsToRestart();
         $supervisorProgramsToRestart = array_merge($supervisorProgramsToRestart, $modulePrograms);
         if (!empty($supervisorProgramsToRestart)) {
-            $this->restartSupervisorPrograms($supervisorProgramsToRestart, !empty($modulePrograms));
+            $this->restartSupervisorPrograms($supervisorProgramsToRestart);
         }
 
         try {
@@ -466,7 +483,6 @@ class UpdateApp extends Command
 
         $this->info('Update completed successfully!');
     }
-
 
     protected function executeCommand($command, $timeout = 60, $failOnError = true)
     {
@@ -525,7 +541,7 @@ class UpdateApp extends Command
         $this->executeCommand("chown -R www-data:www-data $directory");
     }
 
-    protected function restartSupervisorPrograms(array $programs, bool $failOnError = false)
+    protected function restartSupervisorPrograms(array $programs): void
     {
         $programs = array_values(array_filter(array_unique($programs)));
 
@@ -533,10 +549,63 @@ class UpdateApp extends Command
             return;
         }
 
-        $this->info('Restarting Supervisor programs: ' . implode(', ', $programs));
+        try {
+            $result = LaravelProcess::timeout(15)->run(['supervisorctl', 'status']);
+        } catch (\Throwable $exception) {
+            $this->warn('Could not read Supervisor status; continuing the update: '.$exception->getMessage());
+            return;
+        }
 
-        $escapedPrograms = implode(' ', array_map('escapeshellarg', $programs));
+        // Status exits nonzero when any program is stopped. Use the individual
+        // states so an intentionally disabled service does not affect others.
+        preg_match_all(
+            '/^(\S+)\s+(STOPPED|STARTING|RUNNING|BACKOFF|STOPPING|EXITED|FATAL|UNKNOWN)\b/m',
+            $result->output(),
+            $matches,
+            PREG_SET_ORDER
+        );
+        $states = array_column($matches, 2, 1);
 
-        $this->executeCommand("supervisorctl restart {$escapedPrograms}", 150, $failOnError);
+        if (empty($states) && $result->failed()) {
+            $this->warn('Could not read Supervisor status; continuing the update: '.trim($result->errorOutput().' '.$result->output()));
+            return;
+        }
+
+        $restartTargets = [];
+        foreach ($programs as $program) {
+            $group = str_ends_with($program, ':*') ? substr($program, 0, -2) : $program;
+            $programStates = array_filter($states, fn ($name) => $name === $program || str_starts_with($name, $group.':'), ARRAY_FILTER_USE_KEY);
+
+            if (empty($programStates)) {
+                $this->info("Skipping Supervisor program {$program}: not configured.");
+                continue;
+            }
+
+            foreach ($programStates as $name => $state) {
+                if ($state === 'RUNNING') {
+                    $restartTargets[$name] = true;
+                } else {
+                    $this->info("Skipping Supervisor program {$name}: {$state}.");
+                }
+            }
+        }
+
+        // Restart each running process separately, including group members, so
+        // stopped siblings stay stopped and a failure cannot block the update.
+        foreach (array_keys($restartTargets) as $program) {
+            $this->info("Restarting Supervisor program: {$program}");
+
+            try {
+                $result = LaravelProcess::timeout(150)->run(['supervisorctl', 'restart', $program], function (string $type, string $output) {
+                    $this->output->write($output);
+                });
+
+                if ($result->failed()) {
+                    $this->warn("Could not restart Supervisor program {$program}; continuing the update.");
+                }
+            } catch (\Throwable $exception) {
+                $this->warn("Could not restart Supervisor program {$program}; continuing the update: ".$exception->getMessage());
+            }
+        }
     }
 }
