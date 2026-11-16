@@ -78,7 +78,10 @@ class ActiveNodeResolver
             return $this->result(false, 'active_unknown', 'legacy', __('Confirm the existing hostname or IP selection before coordinated jobs can run.'), $configured, $nodeId, $generation, $subscriptions, ['effective_owner' => $effectiveOwner, 'legacy_match' => true]);
         }
         $local = $approvedNodes->firstWhere('system_identifier', $nodeId);
-        if (! $local || ! $this->matchesLocalHost($local)) {
+        if (! $local) {
+            return $this->result(false, 'active_unknown', 'unapproved', __('This server has not been approved for scheduled jobs. Discover and approve its current database identity below.'), $configured, $nodeId, $generation, $subscriptions, ['effective_owner' => $effectiveOwner]);
+        }
+        if (! $this->matchesLocalHost($local)) {
             return $this->result(false, 'active_unknown', 'identity_mismatch', __('This server does not match its approved host identity. Keep its workers stopped and verify the node registration.'), $configured, $nodeId, $generation, $subscriptions, ['effective_owner' => $effectiveOwner]);
         }
 
@@ -192,32 +195,61 @@ class ActiveNodeResolver
     /** @return array<int, array<string, mixed>> */
     public function discover(?string $manualEndpoint = null): array
     {
-        $endpoints = collect($this->subscriptionDiscovery()['endpoints'] ?? [])
-            ->merge($this->nodes()->pluck('endpoint'))
-            ->push($this->localEndpoint());
+        $registered = $this->nodes()->keyBy('system_identifier');
+        $endpoints = collect($this->discoveryEndpoints())
+            ->merge($registered->where('status', 'approved')->pluck('endpoint'));
         if (filled($manualEndpoint)) {
             $endpoints->push($this->normalizeEndpoint($manualEndpoint));
         }
 
-        $registered = $this->nodes()->keyBy('system_identifier');
-        $results = [];
-        foreach ($endpoints->filter()->unique()->values() as $endpoint) {
-            $candidate = Cache::remember('scheduled-jobs:peer-identity:'.sha1($endpoint), 15, function () use ($endpoint) {
-                try {
-                    return $this->peerClient->identify($endpoint) + ['endpoint' => $endpoint, 'reachable' => true];
-                } catch (Throwable $exception) {
-                    return ['endpoint' => $endpoint, 'reachable' => false, 'message' => $exception->getMessage()];
+        $results = $endpoints->filter()->unique()->values()
+            ->map(fn (string $endpoint) => $this->discoverCandidate($endpoint));
+
+        // The peer's subscriptions contain our address. APP_URL may follow
+        // failover DNS, so it cannot supply the local server's identity address.
+        // Follow only one hop, with a bounded number of additional probes.
+        $peerEndpoints = [];
+        foreach ($results as $candidate) {
+            if (! $candidate['reachable']
+                || $registered->get($candidate['system_identifier'] ?? '')?->status === 'retired'
+                || ! is_array($candidate['discovery_endpoints'] ?? null)) {
+                continue;
+            }
+            foreach (array_slice($candidate['discovery_endpoints'], 0, 16) as $endpoint) {
+                if (! is_string($endpoint) || strlen($endpoint) > 2048) {
+                    continue;
                 }
-            });
-            $candidate['registered'] = $registered->get($candidate['system_identifier'] ?? '')?->status;
-            $results[] = $candidate;
+                try {
+                    $endpoint = $this->normalizeEndpoint($endpoint);
+                } catch (RuntimeException) {
+                    continue;
+                }
+                if (! $endpoints->contains($endpoint)) {
+                    $peerEndpoints[$endpoint] = $endpoint;
+                }
+                if (count($peerEndpoints) >= 16) {
+                    break 2;
+                }
+            }
+        }
+        foreach ($peerEndpoints as $endpoint) {
+            $results->push($this->discoverCandidate($endpoint));
         }
 
-        $duplicates = collect($results)->where('reachable', true)->filter(fn (array $candidate) => filled($candidate['system_identifier'] ?? null))
+        // Match identities, not addresses: a replacement may reuse a retired
+        // server's endpoint, but the retired identity must not reappear.
+        $results = $results->map(function (array $candidate) use ($registered) {
+            $candidate['registered'] = $registered->get($candidate['system_identifier'] ?? '')?->status;
+            $candidate['registered_endpoint'] = $registered->get($candidate['system_identifier'] ?? '')?->endpoint;
+
+            return $candidate;
+        })->reject(fn (array $candidate) => $candidate['registered'] === 'retired')->values();
+
+        $duplicates = $results->where('reachable', true)->filter(fn (array $candidate) => filled($candidate['system_identifier'] ?? null))
             ->groupBy('system_identifier')->filter(fn (Collection $candidates) => $candidates->contains(fn ($candidate) => empty($candidate['host_fingerprint']))
                 || $candidates->pluck('host_fingerprint')->unique()->count() > 1)->keys();
 
-        return collect($results)->map(function (array $candidate) use ($duplicates) {
+        return $results->map(function (array $candidate) use ($duplicates) {
             $candidate['duplicate_identity'] = $duplicates->contains($candidate['system_identifier'] ?? null);
             if ($candidate['duplicate_identity']) {
                 $candidate['message'] = __('This PostgreSQL system identifier answered from more than one endpoint. Approval is blocked.');
@@ -227,15 +259,118 @@ class ActiveNodeResolver
         })->all();
     }
 
-    public function approveNode(string $endpoint, string $expectedNodeId, ?string $userUuid): ScheduledJobNode
+    /** Only sanitized addresses are shared with authenticated peers, never connection credentials. */
+    public function discoveryEndpoints(): array
+    {
+        return $this->subscriptionDiscovery()['endpoints'] ?? [];
+    }
+
+    private function discoverCandidate(string $endpoint): array
+    {
+        return Cache::remember('scheduled-jobs:peer-identity:'.sha1($endpoint), 15, function () use ($endpoint) {
+            try {
+                return array_merge($this->peerClient->identify($endpoint), ['endpoint' => $endpoint, 'reachable' => true]);
+            } catch (Throwable $exception) {
+                return ['endpoint' => $endpoint, 'reachable' => false, 'message' => $exception->getMessage()];
+            }
+        });
+    }
+
+    /** Approval writes stay on the authority, even when requested through another UI node. */
+    public function requestNodeApproval(string $endpoint, string $expectedNodeId, ?string $userUuid): array
     {
         $endpoint = $this->normalizeEndpoint($endpoint);
+        $candidates = collect($this->discover($endpoint));
+        $writer = $this->managementWriter($candidates);
+        if ($writer === $this->localNodeId()) {
+            return ['node' => $this->approveNode($endpoint, $expectedNodeId, $userUuid)->toArray(), 'forwarded' => false];
+        }
+
+        $writerEndpoint = $this->managementEndpoint($writer, $candidates, 'node_approval');
+        $targetIdentity = $this->approvalIdentity($endpoint, $expectedNodeId);
+        $result = $this->peerClient->approveNode($writerEndpoint, [
+            'writer_node_id' => $writer,
+            'target_node_id' => $expectedNodeId,
+            'target_endpoint' => $endpoint,
+            'target_host_fingerprint' => $targetIdentity['host_fingerprint'],
+            'requested_by' => $userUuid,
+        ]);
+        $node = $result['node'] ?? [];
+        if (($node['system_identifier'] ?? null) !== $expectedNodeId || ($node['endpoint'] ?? null) !== $endpoint
+            || ($node['status'] ?? null) !== 'approved'
+            || ($node['host_fingerprint'] ?? null) !== $targetIdentity['host_fingerprint']) {
+            throw new RuntimeException(__('The approval server returned an unexpected result. Refresh status before retrying.'), 409);
+        }
+
+        // The acknowledgement is not a local registry write. Replication must
+        // deliver the writer's original row, including its UUID.
+        return ['node' => $node, 'forwarded' => true];
+    }
+
+    private function managementEndpoint(string $writer, Collection $candidates, string $capability): string
+    {
+        $registeredWriter = $this->approvedNodes()->firstWhere('system_identifier', $writer);
+        $writerCandidates = $candidates->where('system_identifier', $writer)->where('reachable', true);
+        if ($writerCandidates->contains(fn ($candidate) => $candidate['duplicate_identity'] ?? true)) {
+            throw new RuntimeException(__('The approval server has conflicting host identities. Repair its registration before continuing.'), 409);
+        }
+        $writerName = $registeredWriter?->hostname ?: $writer;
+        $writerEndpoints = $writerCandidates->pluck('endpoint')->prepend($registeredWriter?->endpoint)->filter()->unique();
+        $writerEndpoint = null;
+        foreach ($writerEndpoints as $possibleEndpoint) {
+            try {
+                // Discovery is only a hint. Never forward a write until a fresh
+                // signed probe matches the authority's database and host identity.
+                $identity = $this->peerClient->identify($possibleEndpoint);
+                $fingerprint = $registeredWriter?->host_fingerprint
+                    ?: ($writerCandidates->firstWhere('endpoint', $possibleEndpoint)['host_fingerprint'] ?? null);
+                if (($identity['system_identifier'] ?? null) !== $writer || ! is_string($fingerprint)
+                    || ! hash_equals($fingerprint, (string) ($identity['host_fingerprint'] ?? ''))) {
+                    continue;
+                }
+            } catch (RuntimeException) {
+                continue;
+            }
+            if (! in_array($capability, $identity['capabilities'] ?? [], true)) {
+                if ($capability === 'initial_owner') {
+                    throw new RuntimeException(__('Update FS PBX on :server to select the first owner from either server.', ['server' => $writerName]), 409);
+                }
+                if ($capability === 'node_removal') {
+                    throw new RuntimeException(__('Update FS PBX on :server to support removing retired servers.', ['server' => $writerName]), 409);
+                }
+                throw new RuntimeException(__('Update FS PBX on :server to support forwarded approvals.', ['server' => $writerName]), 409);
+            }
+            $writerEndpoint = $possibleEndpoint;
+            break;
+        }
+        if ($writerEndpoint === null) {
+            if ($capability === 'initial_owner') {
+                throw new RuntimeException(__('Cannot reach the setup server :server at a verified address. Restore access before selecting the first owner.', ['server' => $writerName]), 409);
+            }
+            throw new RuntimeException(__('Cannot reach the approval server :server at a verified address. Restore access before approving. An unreachable owner does not authorize takeover.', ['server' => $writerName]), 409);
+        }
+
+        return $writerEndpoint;
+    }
+
+    private function approvalIdentity(string $endpoint, string $expectedNodeId, ?string $expectedFingerprint = null): array
+    {
         $identity = $this->peerClient->identify($endpoint);
         $nodeId = trim((string) ($identity['system_identifier'] ?? ''));
         if (! preg_match('/^\d{1,32}$/', $nodeId) || ! hash_equals($expectedNodeId, $nodeId)
-            || ! preg_match('/^[a-f0-9]{64}$/', (string) ($identity['host_fingerprint'] ?? ''))) {
+            || ! preg_match('/^[a-f0-9]{64}$/', (string) ($identity['host_fingerprint'] ?? ''))
+            || ($expectedFingerprint !== null && ! hash_equals($expectedFingerprint, $identity['host_fingerprint']))) {
             throw new RuntimeException('The peer identity changed while it was being approved.');
         }
+
+        return $identity;
+    }
+
+    public function approveNode(string $endpoint, string $expectedNodeId, ?string $userUuid, ?string $expectedFingerprint = null): ScheduledJobNode
+    {
+        $endpoint = $this->normalizeEndpoint($endpoint);
+        $identity = $this->approvalIdentity($endpoint, $expectedNodeId, $expectedFingerprint);
+        $nodeId = $expectedNodeId;
         $candidates = collect($this->discover($endpoint));
         $matchingFingerprints = $candidates
             ->where('reachable', true)
@@ -290,6 +425,51 @@ class ActiveNodeResolver
         });
     }
 
+    public function requestNodeRemoval(ScheduledJobNode $node): array
+    {
+        if ($node->status !== 'retired') {
+            throw new RuntimeException(__('Only retired servers can be removed from the list.'), 409);
+        }
+        $writer = $this->managementWriter();
+        if ($writer === $this->localNodeId()) {
+            $this->removeNode($node);
+
+            return ['forwarded' => false];
+        }
+
+        $endpoint = $this->managementEndpoint($writer, collect($this->discover()), 'node_removal');
+        $result = $this->peerClient->removeNode($endpoint, [
+            'writer_node_id' => $writer, 'node_uuid' => $node->getKey(),
+            'target_node_id' => $node->system_identifier,
+        ]);
+        if (($result['node_uuid'] ?? null) !== $node->getKey()
+            || ($result['target_node_id'] ?? null) !== $node->system_identifier) {
+            throw new RuntimeException(__('The removal server returned an unexpected result. Refresh status before retrying.'), 409);
+        }
+
+        return ['forwarded' => true];
+    }
+
+    public function removeNode(ScheduledJobNode $node): void
+    {
+        DB::transaction(function () use ($node) {
+            $this->lockOwnershipSettings();
+            $this->assertManagementWriter();
+            $current = ScheduledJobNode::query()->whereKey($node->getKey())->lockForUpdate()->first();
+            if (! $current) {
+                return;
+            }
+            if ($current->status !== 'retired' || $this->configuredNode() === $current->system_identifier) {
+                throw new RuntimeException(__('Only retired servers can be removed from the list.'), 409);
+            }
+            if (ScheduledJobHandoff::query()->whereIn('status', ['requested', 'draining'])
+                ->where(fn ($query) => $query->where('from_node_id', $current->system_identifier)->orWhere('to_node_id', $current->system_identifier))->exists()) {
+                throw new RuntimeException(__('Finish the pending ownership transfer before removing this server.'), 409);
+            }
+            $current->delete();
+        });
+    }
+
     /** @return array<string, mixed> */
     public function requestHandoff(string $targetNodeId, int $expectedGeneration, ?string $userUuid, ?string $idempotencyKey = null): array
     {
@@ -329,7 +509,15 @@ class ActiveNodeResolver
             if ($this->configuredNode() !== null || $decision['source'] === 'inconsistent') {
                 throw new RuntimeException('The existing owner is invalid. Repair the selection; it cannot be treated as a new installation.', 409);
             }
-            return ['status' => 'completed', 'handoff' => $this->bootstrapOwner($payload)];
+            $payload['initial_owner'] = true;
+            $payload['writer_node_id'] = $this->managementWriter();
+            if ($payload['writer_node_id'] === $this->localNodeId()) {
+                return $this->prepareInitialOwner($payload);
+            }
+
+            $endpoint = $this->managementEndpoint($payload['writer_node_id'], collect($this->discover()), 'initial_owner');
+
+            return $this->forwardHandoff($endpoint, $payload);
         }
         if ($ownerId === $this->localNodeId()) {
             return $this->prepareHandoff($payload);
@@ -340,8 +528,14 @@ class ActiveNodeResolver
             throw new RuntimeException('The selected owner is not an approved node. Fence it before using forced takeover.', 409);
         }
 
+        return $this->forwardHandoff($owner->endpoint, $payload);
+    }
+
+    private function forwardHandoff(string $endpoint, array $payload): array
+    {
+        $idempotency = $payload['idempotency_key'];
         try {
-            return $this->peerClient->prepareHandoff($owner->endpoint, $payload, $idempotency);
+            $result = $this->peerClient->prepareHandoff($endpoint, $payload, $idempotency);
         } catch (RuntimeException $exception) {
             if ($exception->getCode() >= 400 && $exception->getCode() < 500) {
                 throw $exception;
@@ -349,17 +543,54 @@ class ActiveNodeResolver
             // The owner may have committed despite a lost response. The status
             // endpoint also accepts the original idempotency UUID.
             try {
-                $recovered = $this->peerClient->handoffStatus($owner->endpoint, $idempotency);
-                if (($recovered['handoff']['to_node_id'] ?? null) !== $targetNodeId
-                    || ($recovered['handoff']['expected_generation'] ?? null) !== $expectedGeneration) {
+                $result = $this->peerClient->handoffStatus($endpoint, $idempotency);
+                if (($result['handoff']['to_node_id'] ?? null) !== $payload['target_node_id']
+                    || ($result['handoff']['expected_generation'] ?? null) !== $payload['expected_generation']) {
                     throw new RuntimeException('The recovered response belongs to a different handoff.', 409);
                 }
-
-                return $recovered;
             } catch (Throwable) {
                 throw $exception;
             }
         }
+
+        if (($payload['initial_owner'] ?? false)
+            && (($result['status'] ?? null) !== 'completed'
+                || ($result['handoff']['to_node_id'] ?? null) !== $payload['target_node_id']
+                || ($result['handoff']['expected_generation'] ?? null) !== $payload['expected_generation']
+                || ($result['handoff']['from_node_id'] ?? null) !== null)) {
+            throw new RuntimeException(__('The setup server returned an unexpected result. Refresh status before retrying.'), 409);
+        }
+
+        return $result;
+    }
+
+    /** A forwarded setup request executes only on the designated writer; it never forwards again. */
+    public function prepareInitialOwner(array $payload): array
+    {
+        if (($payload['writer_node_id'] ?? null) !== $this->localNodeId()) {
+            throw new RuntimeException(__('The initial owner request reached a different server. Refresh status and try again.'), 409);
+        }
+        $targetNodeId = trim((string) ($payload['target_node_id'] ?? ''));
+        $expectedGeneration = (int) ($payload['expected_generation'] ?? -1);
+        if ($existing = $this->existingHandoff((string) ($payload['idempotency_key'] ?? ''), $targetNodeId, $expectedGeneration)) {
+            return $existing;
+        }
+        $decision = $this->resolve();
+        if ($decision['source'] === 'inconsistent') {
+            throw new RuntimeException($decision['reason'], 409);
+        }
+        if ($this->configuredNode() !== null || $expectedGeneration !== (int) $decision['generation']) {
+            throw new RuntimeException('Scheduled-job ownership changed. Refresh the page and try again.', 409);
+        }
+        $this->assertManagementWriter();
+        $target = ScheduledJobNode::query()->where('system_identifier', $targetNodeId)->where('status', 'approved')->first();
+        if (! $target || $this->normalizeEndpoint((string) ($payload['target_endpoint'] ?? '')) !== $target->endpoint) {
+            throw new RuntimeException('The requested target does not match an approved node.');
+        }
+        $this->assertIdentity($target);
+        $handoff = $this->bootstrapOwner($payload);
+
+        return ['status' => $handoff->status, 'handoff' => $this->handoffArray($handoff)];
     }
 
     /** @return array<string, mixed> */
@@ -622,7 +853,7 @@ class ActiveNodeResolver
         if ($decision['this_node'] && ! $nodes->contains('id', $decision['this_node'])) {
             $nodes->push([
                 'id' => $decision['this_node'], 'hostname' => $this->hostname(),
-                'endpoint' => $this->localEndpoint(), 'status' => 'unapproved',
+                'endpoint' => null, 'status' => 'unapproved',
                 'local' => true, 'selected' => false, 'reachable' => true,
             ]);
         }
@@ -918,6 +1149,11 @@ class ActiveNodeResolver
         }
         return DB::transaction(function () use ($payload, $snapshot) {
             $this->lockOwnershipSettings();
+            if ($existing = ScheduledJobHandoff::query()->where('idempotency_key', $payload['idempotency_key'])->first()) {
+                $this->existingHandoff($payload['idempotency_key'], $payload['target_node_id'], (int) $payload['expected_generation']);
+
+                return $existing;
+            }
             $this->assertManagementWriter();
             if ($snapshot !== $this->coordinationSnapshot()) {
                 throw new RuntimeException('Initial coordination state changed while verifying peers. Try again.', 409);
@@ -1044,14 +1280,6 @@ class ActiveNodeResolver
         $value = is_string($value) ? trim($value) : '';
 
         return $value !== '' ? $value : null;
-    }
-
-    private function localEndpoint(): string
-    {
-        $host = parse_url((string) config('app.url'), PHP_URL_HOST) ?: $this->hostname();
-        $port = parse_url((string) config('app.url'), PHP_URL_PORT);
-
-        return 'https://'.$host.($port ? ':'.$port : '');
     }
 
     private function endpointForHost(string $host): string

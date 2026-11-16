@@ -26,10 +26,14 @@ class HolidayHoursController extends Controller
     public function index()
     {
 
-        $holidays = BusinessHourHoliday::with(['target', 'businessHour'])
-            ->where('business_hour_uuid', request('uuid'))
+        $businessHour = BusinessHour::where('domain_uuid', session('domain_uuid'))
+            ->findOrFail(request('uuid'));
+
+        $holidays = $businessHour->holidays()
+            ->with('target')
             ->orderBy('created_at', 'desc')
             ->get();
+        $holidays->each(fn ($holiday) => $holiday->setRelation('businessHour', $businessHour));
 
         return BusinessHourHolidayResource::collection($holidays);
     }

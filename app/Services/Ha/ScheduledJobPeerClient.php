@@ -30,7 +30,20 @@ class ScheduledJobPeerClient
 
     public function prepareHandoff(string $endpoint, array $payload, string $idempotencyKey): array
     {
-        return $this->post($endpoint, 'api/ha/scheduled-jobs/handoffs', $payload, $idempotencyKey);
+        // Initial selection verifies the target and both signed snapshots before writing.
+        return $this->post($endpoint, 'api/ha/scheduled-jobs/handoffs', $payload, $idempotencyKey,
+            timeoutSeconds: ($payload['initial_owner'] ?? false) ? 20 : 4);
+    }
+
+    public function approveNode(string $endpoint, array $payload): array
+    {
+        // The writer performs its own bounded identity probes before saving.
+        return $this->post($endpoint, 'api/ha/scheduled-jobs/nodes/approve', $payload, timeoutSeconds: 20);
+    }
+
+    public function removeNode(string $endpoint, array $payload): array
+    {
+        return $this->post($endpoint, 'api/ha/scheduled-jobs/nodes/remove', $payload, timeoutSeconds: 20);
     }
 
     public function handoffStatus(string $endpoint, string $handoffUuid): array
@@ -38,7 +51,7 @@ class ScheduledJobPeerClient
         return $this->get($endpoint, 'api/ha/scheduled-jobs/handoffs/'.$handoffUuid);
     }
 
-    private function post(string $endpoint, string $path, array $payload, ?string $idempotencyKey = null): array
+    private function post(string $endpoint, string $path, array $payload, ?string $idempotencyKey = null, int $timeoutSeconds = 4): array
     {
         $idempotencyKey ??= (string) Str::uuid();
         $headers = $this->authenticator->requestHeaders('POST', $path, $payload, $idempotencyKey);
@@ -49,7 +62,7 @@ class ScheduledJobPeerClient
                 ->withHeaders($headers)
                 ->withOptions(['verify' => false, 'allow_redirects' => false])
                 ->connectTimeout(2)
-                ->timeout(4)
+                ->timeout($timeoutSeconds)
                 ->post($this->url($endpoint, $path), $payload);
         } catch (Throwable $exception) {
             throw new RuntimeException('The scheduled-job peer could not be reached: '.$exception->getMessage(), 0, $exception);

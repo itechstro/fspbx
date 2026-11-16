@@ -9,6 +9,7 @@ use App\Support\Localization\ValidationMessages;
 
 class CreateMessageSettingRequest extends FormRequest
 {
+    use Concerns\ValidatesMessageWebhookRouting;
     /**
      * Determine if the user is authorized to make this request.
      *
@@ -29,6 +30,8 @@ class CreateMessageSettingRequest extends FormRequest
         // logger('validation');
         // logger(request()->all());
         return [
+            ...$this->webhookRules(),
+            'opt_out_enabled' => ['sometimes', 'boolean'],
             'destination' => [
                 'required',
                 'string',

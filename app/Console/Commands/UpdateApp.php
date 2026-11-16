@@ -150,6 +150,10 @@ use App\Console\Commands\Updates\Update292;
 use App\Console\Commands\Updates\Update293;
 use App\Console\Commands\Updates\Update294;
 use App\Console\Commands\Updates\Update295;
+use App\Console\Commands\Updates\Update296;
+use App\Console\Commands\Updates\Update297;
+use App\Console\Commands\Updates\Update298;
+use App\Console\Commands\Updates\Update299;
 use App\Console\Commands\Updates\Update0917;
 use App\Console\Commands\Updates\Update0918;
 use App\Console\Commands\Updates\Update0924;
@@ -209,6 +213,10 @@ class UpdateApp extends Command
         $versionConfigFile = base_path('config/version.php');
         $downloadedVersionArray = include($versionConfigFile);
         $downloadedVersion = $downloadedVersionArray['release'] ?? null;
+
+        // The published asset package does not include this fork's pages.
+        // A source mismatch must not stop the update; npm build publishes the local frontend later.
+        $this->executeCommand('php artisan frontend:install --prepare', 240, false);
 
         // Define version-specific steps using an array
         $updateSteps = [
@@ -380,6 +388,10 @@ class UpdateApp extends Command
             '2.1.0' => Update293::class,
             '2.1.1' => Update294::class,
             '2.1.2' => Update295::class,
+            '2.1.3' => Update296::class,
+            '2.2.0' => Update297::class,
+            '2.2.2' => Update298::class,
+            '2.2.5' => Update299::class,
             // Add more versions as needed
         ];
 
@@ -450,7 +462,7 @@ class UpdateApp extends Command
         // Create storage link
         $this->runArtisanCommand('storage:link', ['--force' => true]);
 
-        // Update Vue files
+        // Build this fork's frontend. The published package does not include local pages.
         $this->executeCommand('npm install');
         $this->executeCommand('npm run build', 900);
 
@@ -601,10 +613,10 @@ class UpdateApp extends Command
                 });
 
                 if ($result->failed()) {
-                    $this->warn("Could not restart Supervisor program {$program}; continuing the update.");
+                    $this->warn("Could not restart Supervisor program {$program}; continuing the update. Retry: supervisorctl restart {$program}");
                 }
             } catch (\Throwable $exception) {
-                $this->warn("Could not restart Supervisor program {$program}; continuing the update: ".$exception->getMessage());
+                $this->warn("Could not restart Supervisor program {$program}; continuing the update: ".$exception->getMessage().". Retry: supervisorctl restart {$program}");
             }
         }
     }

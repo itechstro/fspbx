@@ -45,7 +45,8 @@
 
                             <Vueform v-if="!loading" ref="form$" :endpoint="submitForm" @success="handleSuccess"
                                 @error="handleError" @response="handleResponse" :display-errors="false" :default="{
-                                    // destination: options.item.destination,
+                                    ...messageDeliveryDefaults(null, options.webhook),
+                                    opt_out_enabled: options.opt_out_available && options.opt_out_scope === 'number',
 
                                 }" @mounted="(form) => form.disableValidation()" @submit="clearServerFormErrors">
 
@@ -72,19 +73,14 @@
                                                 },
                                             }" />
 
-                                        <TagsElement name="allowed_extension_uuids" :items="options.extensions" :close-on-select="false"
-                                            :search="true" :native="false" :floating="false"
-                                            :label="$t('Allowed extensions')" :placeholder="$t('Choose extensions')"
-                                            :description="$t('Selected extensions can send and receive messages using this number and see each other’s replies. Leave empty for no extension access.')"
-                                            :columns="{ sm: { container: 12 } }" />
+                                        <MessageDeliveryFields :settings="options.webhook" :extensions="options.extensions" />
+                                        <ToggleElement v-if="options.opt_out_available && options.opt_out_scope === 'number'" name="opt_out_enabled" :text="$t('Enable opt out')"
+                                            :conditions="[form => !options.webhook?.available || form.data.inbound_delivery === 'members']"
+                                            :true-value="true" :false-value="false"
+                                            :description="$t('An SMS matching an opt-out keyword blocks further Messages and Ringotel sends to that recipient. Manage keywords in Account Settings. Customer API sends are excluded.')" />
 
-                                        <TextElement name="email" :label="$t('Email')" :placeholder="$t('Optional')" :floating="false"
-                                            :columns="{
-                                                sm: {
-                                                    container: 6,
-                                                },
-                                            }" />
-
+                                        <StaticElement v-if="options.opt_out_available && options.opt_out_scope === 'account'" name="opt_out_account"
+                                            :content="$t('Account-wide opt-out handling is enabled for every phone number. Individual numbers cannot be excluded.')" />
                                         <TextareaElement :label="$t('Description')" name="description" :rows="2" />
 
                                         <GroupElement name="container_3" />
@@ -110,6 +106,8 @@
 import { clearServerFormErrors } from '../../../composables/serverFormErrors.js';
 import { trans } from '@i18n';
 import { ref } from "vue";
+import MessageDeliveryFields from './MessageDeliveryFields.vue';
+import { messageDeliveryDefaults, messageDeliveryRequest } from '../../../composables/messageDelivery.js';
 import { Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot } from '@headlessui/vue'
 import { XMarkIcon } from "@heroicons/vue/24/solid";
 
@@ -128,8 +126,7 @@ const form$ = ref(null)
 const submitForm = async (FormData, form$) => {
     // Using form$.requestData will EXCLUDE conditional elements and it 
     // will submit the form as Content-Type: application/json . 
-    const requestData = form$.requestData
-    // console.log(requestData);
+    const requestData = messageDeliveryRequest(form$.requestData, null, props.options.webhook)
 
     return await form$.$vueform.services.axios.post(props.options.routes.store_route, requestData)
 };

@@ -59,6 +59,8 @@ class AccountSettingsController extends Controller
                     'settings_update' => route('account-settings.update'),
                     'messaging_update' => route('account-settings.messaging.update'),
                     'messaging_reset' => route('account-settings.messaging.destroy'),
+                    'message_webhook_update' => route('account-settings.message-webhook.update'),
+                    'message_webhook_secret' => route('account-settings.message-webhook.secret'),
                     'emergency_calls' => route('emergency-calls.index'),
                     'emergency_calls_store' => route('emergency-calls.store'),
                     'emergency_calls_item_options' => route('emergency-calls.item.options'),
@@ -96,9 +98,10 @@ class AccountSettingsController extends Controller
                 ],
                 'pms_provider_options' => app(PmsProviderSettings::class)->options(),
                 'messagingSettings' => [
-                    ...app(PhotoCompressionSettings::class)->settings(session('domain_uuid')),
-                    'available' => app(PhotoCompressionService::class)->available(),
+                    ...app(\App\Services\Messaging\MessagingPageSettings::class)->props(session('domain_uuid')),
                 ],
+                'messageWebhookSettings' => fn () => app(\App\Services\Messaging\MessageWebhookSettings::class)
+                    ->props((string) session('domain_uuid'), \App\Services\Messaging\MessageSettingsAccess::canManage()),
                 // Schema-driven General-tab settings: the declarative field
                 // list, its resolved option lists, and this account's own
                 // override values (null = inheriting the default).
@@ -316,7 +319,7 @@ class AccountSettingsController extends Controller
     public function updateMessaging(UpdateMessagingSettingsRequest $request, PhotoCompressionSettings $settings)
     {
         return response()->json([
-            ...$settings->save(session('domain_uuid'), $request->validated()),
+            ...app(\App\Services\Messaging\MessagingPageSettings::class)->save(session('domain_uuid'), $request->validated()),
             'available' => app(PhotoCompressionService::class)->available(),
             'messages' => ['success' => [__('Messaging settings saved.')]],
         ]);

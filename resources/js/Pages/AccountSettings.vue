@@ -67,6 +67,7 @@
             <!-- MESSAGING -->
             <section v-show="selectedMenuOption === 'messaging'">
                 <MessagingSettingsForm :settings="messagingSettings" :route="routes.messaging_update"
+                    :secret-route="routes.message_webhook_secret"
                     :reset-route="routes.messaging_reset"
                     :can-manage="permissions?.messaging_manage"
                     @success="messages => showNotification('success', messages)"
@@ -258,6 +259,7 @@ const props = defineProps({
     routes: Object,
     permissions: Object,
     messagingSettings: { type: Object, default: () => ({ enabled: false, available: false }) },
+    messageWebhookSettings: { type: Object, default: () => ({ available: false }) },
     pms_provider_options: {
         type: Array,
         default: () => [],

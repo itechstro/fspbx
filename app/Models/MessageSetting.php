@@ -30,11 +30,16 @@ class MessageSetting extends Model
         'chatplan_detail_data',
         'email',
         'enabled',
+        'inbound_delivery',
+        'inbound_webhook_url',
+        'opt_out_enabled',
     ];
 
     protected $appends = [
         'destination_formatted',
     ];
+
+    protected $casts = ['opt_out_enabled' => 'boolean', 'auto_replies_enabled' => 'boolean'];
 
     public function getDestinationFormattedAttribute()
     {

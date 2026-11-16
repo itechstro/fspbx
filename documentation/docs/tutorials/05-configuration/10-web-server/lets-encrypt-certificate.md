@@ -68,7 +68,7 @@ pbx1.example.com    A  203.0.113.10  # Node 1 direct name
 pbx2.example.com    A  203.0.113.20  # Node 2 direct name
 ```
 
-Use direct, unproxied A/AAAA records. The renewal guard compares the authoritative address for the floating hostname with the direct hostname of each node. A proxied record or a floating CNAME does not provide the address needed for that decision.
+Use direct, unproxied A/AAAA records for each node's hostname. The floating hostname can use a CNAME, including an Azure Traffic Manager profile. The renewal guard follows its authoritative DNS chain and compares the resulting addresses with each node's direct hostname. All authoritative servers must agree; proxied addresses that hide the selected node cannot identify the renewal owner.
 
 Run the installer on the node that the floating hostname currently points to and choose **2**. The command asks for:
 
@@ -125,6 +125,10 @@ Both nodes receive the renewal cron entry, but only the active node proceeds. FS
 After a DNS failover, renewal ownership follows the floating hostname automatically. An unchanged certificate is still checked and synchronized, allowing a temporary peer-copy failure to repair itself without requesting another certificate.
 
 All SAN hostnames must remain publicly reachable during renewal. If a node is offline when renewal is due, restore it or temporarily issue a certificate without that node's direct hostname.
+
+After every renewal check, including when no new certificate is needed, FS PBX connects to each certificate hostname on HTTPS port 443. It checks certificate trust, hostname, validity, and that the certificate being served matches the certificate issued by Let's Encrypt. For a redundant pair this includes the floating hostname and both direct node names. It also checks the floating hostname directly against each node, so the standby is verified before failover. These HTTPS endpoints must be reachable from the server running the check.
+
+Only errors during renewal checks send an email to the address in `.env`'s `MAIL_FROM_ADDRESS`, using the configured application mail service. This includes failures to renew, apply, or verify the certificate, and failures to identify the active node. The alert identifies the server, hostname, and error. Initial certificate installation, successful renewals, and normal standby skips do not send email. If the email address is blank, the command reports that no notification was sent. If email delivery fails, the renewal command still reports the original failure and logs the email error.
 
 ## Verify the certificate
 

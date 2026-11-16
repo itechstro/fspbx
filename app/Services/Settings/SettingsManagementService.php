@@ -6,6 +6,8 @@ use App\Models\DefaultSettings;
 use App\Models\Domain;
 use App\Models\DomainSettings;
 use App\Models\FusionCache;
+use App\Services\FlagFeature;
+use App\Services\FlagRuntimeService;
 use App\Services\SrsRecorderDialplanService;
 use App\Support\MobileAppSettingsCatalog;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -306,6 +308,7 @@ class SettingsManagementService
     public function saveDefault(array $data, ?DefaultSettings $setting = null): DefaultSettings
     {
         return DB::transaction(function () use ($data, $setting) {
+            $wasFlagSetting = FlagFeature::isSetting($setting);
             $setting ??= new DefaultSettings();
             $setting->forceFill([
                 'default_setting_uuid' => $setting->default_setting_uuid ?: Str::uuid()->toString(),
@@ -317,6 +320,10 @@ class SettingsManagementService
                 'default_setting_enabled' => (bool) $data['default_setting_enabled'],
                 'default_setting_description' => $data['default_setting_description'] ?? null,
             ])->save();
+
+            if ($wasFlagSetting || FlagFeature::isSetting($setting)) {
+                app(FlagRuntimeService::class)->reconcile();
+            }
 
             $this->applySettingSideEffects('default', [
                 'category' => $setting->default_setting_category,
@@ -361,20 +368,26 @@ class SettingsManagementService
 
     public function toggleDefault(array $uuids): int
     {
-        $settings = DefaultSettings::query()->whereIn('default_setting_uuid', $uuids)->get();
-        $settings->each(function (DefaultSettings $setting) {
-            $setting->default_setting_enabled = ! $this->boolValue($setting->default_setting_enabled);
-            $setting->save();
+        return DB::transaction(function () use ($uuids) {
+            $settings = DefaultSettings::query()->whereIn('default_setting_uuid', $uuids)->get();
+            $settings->each(function (DefaultSettings $setting) {
+                $setting->default_setting_enabled = ! $this->boolValue($setting->default_setting_enabled);
+                $setting->save();
+            });
+
+            if ($settings->contains(fn ($setting) => FlagFeature::isSetting($setting))) {
+                app(FlagRuntimeService::class)->reconcile();
+            }
+
+            $settings->each(fn (DefaultSettings $setting) => $this->applySettingSideEffects('default', [
+                'category' => $setting->default_setting_category,
+                'subcategory' => $setting->default_setting_subcategory,
+                'name' => $setting->default_setting_name,
+                'value' => $setting->default_setting_value,
+            ]));
+
+            return $settings->count();
         });
-
-        $settings->each(fn (DefaultSettings $setting) => $this->applySettingSideEffects('default', [
-            'category' => $setting->default_setting_category,
-            'subcategory' => $setting->default_setting_subcategory,
-            'name' => $setting->default_setting_name,
-            'value' => $setting->default_setting_value,
-        ]));
-
-        return $settings->count();
     }
 
     public function toggleDomain(Domain $domain, array $uuids): int
@@ -405,19 +418,25 @@ class SettingsManagementService
 
     public function deleteDefaults(array $uuids): int
     {
-        $settings = DefaultSettings::query()->whereIn('default_setting_uuid', $uuids)->get();
-        $count = $settings->count();
+        return DB::transaction(function () use ($uuids) {
+            $settings = DefaultSettings::query()->whereIn('default_setting_uuid', $uuids)->get();
+            $count = $settings->count();
 
-        DefaultSettings::query()->whereIn('default_setting_uuid', $settings->pluck('default_setting_uuid'))->delete();
+            DefaultSettings::query()->whereIn('default_setting_uuid', $settings->pluck('default_setting_uuid'))->delete();
 
-        $settings->each(fn (DefaultSettings $setting) => $this->applySettingSideEffects('default', [
-            'category' => $setting->default_setting_category,
-            'subcategory' => $setting->default_setting_subcategory,
-            'name' => $setting->default_setting_name,
-            'value' => $setting->default_setting_value,
-        ]));
+            if ($settings->contains(fn ($setting) => FlagFeature::isSetting($setting))) {
+                app(FlagRuntimeService::class)->reconcile();
+            }
 
-        return $count;
+            $settings->each(fn (DefaultSettings $setting) => $this->applySettingSideEffects('default', [
+                'category' => $setting->default_setting_category,
+                'subcategory' => $setting->default_setting_subcategory,
+                'name' => $setting->default_setting_name,
+                'value' => $setting->default_setting_value,
+            ]));
+
+            return $count;
+        });
     }
 
     public function revertDomain(Domain $domain, array $uuids): int

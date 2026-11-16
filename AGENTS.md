@@ -11,6 +11,14 @@ This repo is a Laravel, Vue/Inertia, VueForm, and FreeSWITCH application. Before
 - Keep user-facing copy short and practical.
 - For release notes, write for users first. Avoid implementation details unless they explain visible behavior.
 
+## Release Notes
+
+- When asked to write FS PBX release notes, save them in `.github/release-notes/vX.Y.Z.md` for the requested version (for example, `.github/release-notes/v2.1.6.md`), unless the user explicitly requests another location or a temporary draft.
+- Use adjacent `config/version.php` version-bump commits to determine the release's changes; tags may have been created later.
+- Use the published [v2.1.2 release](https://github.com/nemerald-voip/fspbx/releases/tag/v2.1.2) as the format reference for all future release notes: start with `## What's new`, give each major topic a `###` heading and a short user-facing introduction, then a `**Highlights**` label and practical bullet points. Add any necessary usage or compatibility note under that topic. Finish with `## Improvements and fixes`. Scale the number of topics to the actual changes; do not reduce the entire release to a flat fixes list. Omit `## Upgrade notes`.
+- Include the matching notes file in the commit that bumps `config/version.php`, before pushing to `main`. The automated release workflow uses that file when creating the draft; if it is missing, GitHub generates the notes automatically. See [.github/RELEASING.md](.github/RELEASING.md).
+- Existing draft and published release descriptions are preserved by the workflow. Adding or changing the Markdown file after draft creation does not automatically update the GitHub release description.
+
 ## Laravel And Vue Pages
 
 - Rebuild legacy `/public/app/.../*.php` admin pages as native Laravel/Vue pages when asked.
@@ -230,7 +238,7 @@ This repo is a Laravel, Vue/Inertia, VueForm, and FreeSWITCH application. Before
 - Whenever changing the included FusionPBX application in the separate `public/` repository, also increment its release version in `public/version.json`. This is the version used by its release workflow and the installer.
 - If an update version has shipped, do not keep editing it for new behavior. Create the next update.
 - An update should be best-effort when touching host services. App updates should not fail just because a FreeSWITCH module cannot be compiled.
-- Update classes can expose `getSupervisorProgramsToRestart()` for `UpdateApp` to restart long-running processes after code, templates, assets, and ownership are updated. Do not include the opt-in `fs-esl-listener-call-webhooks` program in unconditional restarts because its Supervisor config intentionally uses `autostart=false`; Horizon is already recycled with `horizon:terminate`.
+- Update classes can expose `getSupervisorProgramsToRestart()` for `UpdateApp` to restart long-running processes after code, templates, assets, and ownership are updated. The opt-in `fs-esl-listener-call-webhooks` program ships with `numprocs=0` and `autostart=true`: zero instances keeps it disabled even during `supervisorctl restart all`. Preserve an administrator's configured process count and never enable an opt-in service during an update. Horizon is already recycled with `horizon:terminate`.
 - When updates change generated dialplan XML or dialplan details, clear only the affected dialplan cache contexts.
 - Keep update console output truthful. Do not claim a module, file, or cache was refreshed unless it actually was.
 - When replacing untracked legacy files under `public/app/...`, follow the existing update pattern: download from the canonical GitHub raw URL, ensure the destination directory exists, reject empty downloads, and register the update step in `UpdateApp.php`.

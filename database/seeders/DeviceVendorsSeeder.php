@@ -41,6 +41,11 @@ class DeviceVendorsSeeder extends Seeder
                 'enabled'     => 'true',
                 'description' => 'TalkPhone softphone',
             ],
+            [
+                'name'        => 'vtech',
+                'enabled'     => 'true',
+                'description' => '',
+            ],
             // Add more vendors here as needed
         ];
 

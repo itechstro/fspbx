@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\LocationsController;
 use App\Http\Controllers\Api\ProvisioningTemplateController;
 use App\Http\Controllers\BasicQueueController;
 use App\Http\Controllers\BusinessHoursController;
+use App\Http\Controllers\FlagsController;
 use App\Http\Controllers\PagingGroupsController;
 use App\Http\Controllers\BridgeController;
 use App\Http\Controllers\CallBlockController;
@@ -258,6 +259,7 @@ Route::group(['middleware' => ['auth:sanctum', 'api.cookie.auth']], function () 
 
     // Inbound Webhooks
     Route::resource('/inbound-webhooks', InboundWebhooksController::class);
+    Route::get('/outbound-webhooks', [\App\Http\Controllers\OutboundWebhookLogsController::class, 'index'])->name('outbound-webhooks.index');
 
     // Hotel rooms
     Route::resource('/hotel-rooms', HotelRoomController::class);
@@ -358,6 +360,14 @@ Route::group(['middleware' => ['auth:sanctum', 'api.cookie.auth']], function () 
     Route::post('business-hours/select-all', [BusinessHoursController::class, 'selectAll'])->name('business-hours.select.all');
     Route::post('business-hours/duplicate', [BusinessHoursController::class, 'duplicate'])->name('business-hours.duplicate');
 
+    // Flags
+    Route::get('flags/data', [FlagsController::class, 'getData'])->name('flags.data');
+    Route::post('flags', [FlagsController::class, 'store'])->name('flags.store');
+    Route::put('flags/{flag}', [FlagsController::class, 'update'])->name('flags.update');
+    Route::post('flags/item-options', [FlagsController::class, 'getItemOptions'])->name('flags.item.options');
+    Route::post('flags/select-all', [FlagsController::class, 'selectAll'])->name('flags.select.all');
+    Route::post('flags/bulk-delete', [FlagsController::class, 'bulkDelete'])->name('flags.bulk.delete');
+    Route::post('flags/bulk-toggle', [FlagsController::class, 'bulkToggle'])->name('flags.bulk.toggle');
     // Paging groups
     Route::get('paging-groups/data', [PagingGroupsController::class, 'getData'])->name('paging-groups.data');
     Route::post('paging-groups', [PagingGroupsController::class, 'store'])->name('paging-groups.store');
@@ -440,6 +450,7 @@ Route::group(['middleware' => ['auth:sanctum', 'api.cookie.auth']], function () 
     Route::post('scheduled-jobs/nodes/discover', [ScheduledJobCoordinationController::class, 'discover'])->name('scheduled-jobs.nodes.discover');
     Route::post('scheduled-jobs/nodes/{node}/approve', [ScheduledJobCoordinationController::class, 'approve'])->name('scheduled-jobs.nodes.approve');
     Route::post('scheduled-jobs/nodes/{node}/retire', [ScheduledJobCoordinationController::class, 'retire'])->name('scheduled-jobs.nodes.retire');
+    Route::delete('scheduled-jobs/nodes/{node}', [ScheduledJobCoordinationController::class, 'remove'])->name('scheduled-jobs.nodes.remove');
     Route::put('scheduled-jobs/active-node', [ScheduledJobCoordinationController::class, 'updateOwner'])->name('scheduled-jobs.active-node.update');
     Route::post('scheduled-jobs/active-node/force', [ScheduledJobCoordinationController::class, 'force'])->name('scheduled-jobs.active-node.force');
     Route::post('scheduled-jobs/handoffs/{handoff}/force', [ScheduledJobCoordinationController::class, 'forceHandoff'])->name('scheduled-jobs.handoffs.force');
@@ -935,6 +946,10 @@ Route::group(['middleware' => ['auth:sanctum', 'api.cookie.auth']], function () 
     Route::put('account-settings/pms-provider', [AccountSettingsController::class, 'updatePmsProvider'])->name('account-settings.pms-provider.update');
     Route::put('account-settings/update', [AccountSettingsController::class, 'update'])->name('account-settings.update');
     Route::put('account-settings/messaging', [AccountSettingsController::class, 'updateMessaging'])->name('account-settings.messaging.update');
+    Route::put('account-settings/message-webhook', [\App\Http\Controllers\MessageWebhookSettingsController::class, 'update'])
+        ->name('account-settings.message-webhook.update');
+    Route::post('account-settings/message-webhook/secret', [\App\Http\Controllers\MessageWebhookSettingsController::class, 'secret'])
+        ->name('account-settings.message-webhook.secret');
     Route::delete('account-settings/messaging', [AccountSettingsController::class, 'destroyMessaging'])->name('account-settings.messaging.destroy');
 
     // Default Settings
@@ -1036,6 +1051,9 @@ Route::group(['middleware' => ['auth:sanctum', 'api.cookie.auth']], function () 
     Route::get('system/data', [SystemController::class, 'data'])->name('system.data');
 
     // Switch Variables
+    Route::get('switch-variables/network', [\App\Http\Controllers\SwitchNetworkController::class, 'show'])->name('switch-variables.network');
+    Route::post('switch-variables/network/preview', [\App\Http\Controllers\SwitchNetworkController::class, 'preview'])->name('switch-variables.network.preview');
+    Route::put('switch-variables/network', [\App\Http\Controllers\SwitchNetworkController::class, 'update'])->name('switch-variables.network.update');
     Route::get('switch-variables/data', [SwitchVariableController::class, 'data'])->name('switch-variables.data');
     Route::post('switch-variables/item-options', [SwitchVariableController::class, 'itemOptions'])->name('switch-variables.item.options');
     Route::post('switch-variables', [SwitchVariableController::class, 'store'])->name('switch-variables.store');
@@ -1074,6 +1092,11 @@ Route::group(['middleware' => ['auth:sanctum', 'api.cookie.auth']], function () 
     Route::post('/messages/retry', [MessageController::class, 'retry'])->name('messages.retry');
 
     // Message Settings
+    Route::get('/message-settings/{setting}/auto-replies', [\App\Http\Controllers\MessageAutoReplyController::class, 'index'])->name('messages.auto-replies.index');
+    Route::post('/message-settings/{setting}/auto-replies', [\App\Http\Controllers\MessageAutoReplyController::class, 'update'])->name('messages.auto-replies.update');
+    Route::get('/message-settings/{setting}/opt-outs', [\App\Http\Controllers\MessageOptOutController::class, 'index'])->name('messages.opt-outs.index');
+    Route::post('/message-settings/{setting}/opt-outs', [\App\Http\Controllers\MessageOptOutController::class, 'update'])->name('messages.opt-outs.update');
+    Route::delete('/message-settings/{setting}/opt-outs/{optOut}', [\App\Http\Controllers\MessageOptOutController::class, 'destroy'])->whereUuid('optOut')->name('messages.opt-outs.destroy');
     Route::get('/message-settings/data', [MessageSettingsController::class, 'getData'])->name('messages.settings.data');
     Route::put('/message-settings/{setting}', [MessageSettingsController::class, 'update'])->name('messages.settings.update');
     Route::post('/message-settings', [MessageSettingsController::class, 'store'])->name('messages.settings.store');
@@ -1113,6 +1136,10 @@ Route::post('letsencrypt/receive-certificate', [LetsEncryptController::class, 'r
 // user session; each request and response is authenticated by HMAC.
 Route::post('ha/node/identify', [ScheduledJobPeerController::class, 'identify'])
     ->middleware('throttle:30,1')->name('ha.node.identify');
+Route::post('ha/scheduled-jobs/nodes/approve', [ScheduledJobPeerController::class, 'approveNode'])
+    ->middleware('throttle:30,1')->name('ha.scheduled-jobs.nodes.approve');
+Route::post('ha/scheduled-jobs/nodes/remove', [ScheduledJobPeerController::class, 'removeNode'])
+    ->middleware('throttle:30,1')->name('ha.scheduled-jobs.nodes.remove');
 Route::post('ha/scheduled-jobs/handoffs', [ScheduledJobPeerController::class, 'prepareHandoff'])
     ->middleware('throttle:30,1')->name('ha.scheduled-jobs.handoffs.store');
 Route::get('ha/scheduled-jobs/handoffs/{handoff}', [ScheduledJobPeerController::class, 'handoffStatus'])
